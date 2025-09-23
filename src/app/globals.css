@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #121212;
+  color: #F5F5DC; /* Cream/Off-white */
+}
+
+.content-box {
+  background-color: rgba(0, 0, 0, 0.5);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  border: 1px solid #444;
+  backdrop-filter: blur(10px);
+}
+
+.fotmob-table {
+  width: 100%;
+  background-color: transparent;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.fotmob-table thead {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.fotmob-table th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: bold;
+}
+
+.fotmob-table td {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #444;
+}
+
+.fotmob-table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.nav-link,
+.nav-link:visited {
+  text-decoration: none;
+  color: #F5F5DC;
+  transition: color 0.3s;
+}
+
+.nav-link:hover {
+  color: #ffffff;
+}
