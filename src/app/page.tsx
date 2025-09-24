@@ -1,4 +1,4 @@
-import Image from "next/image";
+
 
 export default function Home() {
   return (
@@ -9,7 +9,8 @@ export default function Home() {
           <p className="text-lg leading-relaxed">
             This platform provides data-driven insights into soccer match outcomes.<br /><br />
             We aim to develop an advanced AI/ML algorithm, trained on historical data, to offer users guided decision-making when analyzing potential winner outcomes of two teams facing each other.<br /><br />
-            Our model considers factors like home versus away advantage, striving for transparency and reliability in its predictions.
+            Our model considers factors like home versus away advantage, striving for transparency and reliability in its predictions.<br /><br />
+            Please note, the creator of this tool cannot be held liable for any malpractice or misuse of the information provided.
           </p>
         </div>
       </div>
