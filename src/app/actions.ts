@@ -1,7 +1,7 @@
 'use server';
 
-import fs from 'fs';
-import path from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const dataDir = path.join(process.cwd(), 'data');
 
@@ -148,4 +148,142 @@ export async function fetchChartsData(league: string, season: string) {
     ],
     wdlData,
   };
+}
+
+export async function fetchTeamPerformanceData(league: string, season: string) {
+  const matches = await getMatches(league, season);
+  const seasonStats = await getSeasonStats(league, season);
+  const teams = seasonStats.map(stat => stat.Squad);
+
+  // Sort matches by date
+  matches.sort((a, b) => new Date(a.Date).getTime() - new Date(b.Date).getTime());
+
+  const teamPoints: { [key: string]: number } = {};
+  teams.forEach(team => {
+    teamPoints[team] = 0;
+  });
+
+  const performanceDataMap = new Map<string, any>();
+
+  matches.forEach(match => {
+    if (!match.Date || !match.Home || !match.Away) {
+      return;
+    }
+
+    const homeTeam = match.Home;
+    const awayTeam = match.Away;
+    const homeGoals = parseInt(match['Home Goals'], 10);
+    const awayGoals = parseInt(match['Away Goals'], 10);
+
+    let homePoints = 0;
+    let awayPoints = 0;
+
+    if (homeGoals > awayGoals) {
+      homePoints = 3;
+    } else if (homeGoals < awayGoals) {
+      awayPoints = 3;
+    } else {
+      homePoints = 1;
+      awayPoints = 1;
+    }
+    
+    if (teamPoints[homeTeam] !== undefined) teamPoints[homeTeam] += homePoints;
+    if (teamPoints[awayTeam] !== undefined) teamPoints[awayTeam] += awayPoints;
+
+    performanceDataMap.set(match.Date, { ...teamPoints });
+  });
+
+  const performanceData = Array.from(performanceDataMap.entries()).map(([date, points]) => ({
+    date,
+    ...points
+  }));
+
+  return { performanceData, teams };
+}
+
+function calculateLinearRegression(data: { x: number; y: number }[]) {
+  const n = data.length;
+  if (n === 0) {
+    return { m: 0, c: 0, rSquared: 0 };
+  }
+
+  const sumX = data.reduce((acc, point) => acc + point.x, 0);
+  const sumY = data.reduce((acc, point) => acc + point.y, 0);
+  const sumXY = data.reduce((acc, point) => acc + point.x * point.y, 0);
+  const sumX2 = data.reduce((acc, point) => acc + point.x * point.x, 0);
+  const sumY2 = data.reduce((acc, point) => acc + point.y * point.y, 0);
+
+  const m = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const c = (sumY - m * sumX) / n;
+
+  const r = (n * sumXY - sumX * sumY) / Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+  const rSquared = r * r;
+
+  return { m, c, rSquared };
+}
+
+export async function fetchSeasonAnalysisData(league: string, season: string) {
+  const stats = await getSeasonStats(league, season);
+
+  const goalsData = stats.map(team => ({
+    name: team.Squad,
+    GF: Number(team.GF),
+    GA: Number(team.GA),
+  }));
+
+  const shotsData = stats.map(team => ({
+    name: team.Squad,
+    Shots: Number(team.Sh),
+    SoT: Number(team.SoT),
+  }));
+
+  const goalsRegression = calculateLinearRegression(goalsData.map(d => ({ x: d.GF, y: d.GA })));
+  const shotsRegression = calculateLinearRegression(shotsData.map(d => ({ x: d.Shots, y: d.SoT })));
+
+  return {
+    goalsData,
+    shotsData,
+    goalsRegression,
+    shotsRegression,
+  };
+}
+
+export async function fetchAverageGoalsPerSeason(league: string) {
+  const matchesPath = path.join(dataDir, league, 'matches.csv');
+  const matchesFile = fs.readFileSync(matchesPath, 'utf-8');
+  const lines = matchesFile.split('\n');
+  const headers = lines[0].split(',');
+
+  const matches = lines.slice(1).map(line => {
+    const values = line.split(',');
+    const match: Match = {} as Match;
+    headers.forEach((header, i) => {
+      match[header.trim() as keyof Match] = values[i];
+    });
+    return match;
+  });
+
+  const seasonalGoals: { [season: string]: { totalGoals: number; matchCount: number } } = {};
+
+  matches.forEach(match => {
+    if (match.Season && match['Home Goals'] && match['Away Goals']) {
+      const season = match.Season;
+      const totalGoals = Number(match['Home Goals']) + Number(match['Away Goals']);
+      if (!seasonalGoals[season]) {
+        seasonalGoals[season] = { totalGoals: 0, matchCount: 0 };
+      }
+      seasonalGoals[season].totalGoals += totalGoals;
+      seasonalGoals[season].matchCount++;
+    }
+  });
+
+  const avgGoalsPerSeason = Object.entries(seasonalGoals).map(([season, data]) => ({
+    season,
+    avgGoals: data.totalGoals / data.matchCount,
+  }));
+
+  // Sort by season
+  avgGoalsPerSeason.sort((a, b) => a.season.localeCompare(b.season));
+
+  return avgGoalsPerSeason;
 }

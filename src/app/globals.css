@@ -13,7 +13,7 @@ body {
 }
 
 .content-box {
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.1);
   border-radius: 0.5rem;
   padding: 1.5rem;
   border: 1px solid #444;
