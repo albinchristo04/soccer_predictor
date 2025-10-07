@@ -15,7 +15,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "fbref_data")
-MASTER_PATH = os.path.join(DATA_DIR, "fbref_master_dataset.csv")
 JSON_PATH = os.path.join(SCRIPTS_DIR, "season_links.json")
 os.makedirs(DATA_DIR, exist_ok=True)
 
@@ -154,30 +153,6 @@ def update_league_data(league_name, season_urls):
     return new_rows
 
 # --------------------------
-# Combine all leagues
-# --------------------------
-def combine_leagues():
-    files = [f for f in os.listdir(DATA_DIR) if f.endswith(".csv") and f != os.path.basename(MASTER_PATH)]
-    dfs = []
-    summary = []
-
-    for f in tqdm(files, desc="Combining leagues", ncols=90):
-        path = os.path.join(DATA_DIR, f)
-        df = pd.read_csv(path)
-        league_name = f.replace(".csv","")
-        df["League"] = league_name
-        dfs.append(df)
-        summary.append((league_name, len(df)))
-
-    if dfs:
-        master = pd.concat(dfs, ignore_index=True)
-        master.to_csv(MASTER_PATH, index=False)
-        print(f"\nMaster dataset saved to {MASTER_PATH}")
-        return summary, len(master)
-    else:
-        return None, 0
-
-# --------------------------
 # Main
 # --------------------------
 if __name__ == "__main__":
@@ -192,25 +167,15 @@ if __name__ == "__main__":
         print(f" - {key}")
 
     choice = input("\nEnter league key to fetch (or 'all'): ").strip().lower()
-    summaries = []
 
-    leagues_to_scrape = [choice] if choice in season_links else list(season_links.keys()) if choice=="all" else []
-    if not leagues_to_scrape:
+    if choice == "all":
+        leagues_to_scrape = list(season_links.keys())
+    elif choice in season_links:
+        leagues_to_scrape = [choice]
+    else:
         print("Invalid input.")
         exit()
 
     for lg in leagues_to_scrape:
         urls = season_links[lg]
-        new_rows = update_league_data(lg, urls)
-        summaries.append((lg, new_rows))
-
-    print("\nCombining all leagues into master dataset...")
-    summary, total_rows = combine_leagues()
-    if summary:
-        df_summary = pd.DataFrame(summary, columns=["League", "Total Rows"])
-        df_summary["New Rows Scraped"] = [dict(summaries).get(l,0) for l in df_summary["League"]]
-        print("\nSummary")
-        print("-"*60)
-        print(df_summary.to_string(index=False))
-        print("-"*60)
-        print(f"Grand Total Rows in Master Dataset: {total_rows:,}")
+        update_league_data(lg, urls)
