@@ -1,57 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchAllSeasons } from '@/app/actions';
 
-const ITEM_HEIGHT = 24; // Approximate height of each season link (py-1 is 8px vertical padding, plus font size)
-const VISIBLE_ITEMS = 5;
 
-export default function Navbar() {
-  const [allSeasons, setAllSeasons] = useState<string[]>([]);
-  const [visibleSeasons, setVisibleSeasons] = useState<string[]>([]);
-  const [startIndex, setStartIndex] = useState(0);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const loadAllSeasons = async () => {
-      const seasons = await fetchAllSeasons();
-      setAllSeasons(seasons);
-    };
-    loadAllSeasons();
-  }, []);
-
-  const updateVisibleItems = useCallback(() => {
-    if (!scrollContainerRef.current || allSeasons.length === 0) return;
-
-    const { scrollTop } = scrollContainerRef.current;
-    const newStartIndex = Math.floor(scrollTop / ITEM_HEIGHT);
-    const newEndIndex = Math.min(newStartIndex + VISIBLE_ITEMS, allSeasons.length);
-
-    if (newStartIndex !== startIndex) {
-      setStartIndex(newStartIndex);
-      setVisibleSeasons(allSeasons.slice(newStartIndex, newEndIndex));
-    }
-  }, [allSeasons, startIndex]);
-
-  useEffect(() => {
-    if (allSeasons.length > 0) {
-      const initialEndIndex = Math.min(VISIBLE_ITEMS, allSeasons.length);
-      setVisibleSeasons(allSeasons.slice(0, initialEndIndex));
-    }
-  }, [allSeasons]);
-
-  useEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer) return;
-
-    scrollContainer.addEventListener('scroll', updateVisibleItems);
-
-    return () => {
-      scrollContainer.removeEventListener('scroll', updateVisibleItems);
-    };
-  }, [updateVisibleItems]);
-
+  export default function Navbar() {
   return (
     <header style={{ backgroundColor: '#121212', borderBottom: '1px solid rgba(245, 245, 220, 0.5)' }}>
       <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', margin: '0 auto', padding: '1rem', color: '#F5F5DC', boxSizing: 'border-box' }}>

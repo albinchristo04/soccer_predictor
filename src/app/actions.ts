@@ -3,7 +3,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const dataDir = path.join(process.cwd(), 'data');
+const dataDir = path.join(process.cwd(), 'fbref_data');
+
+const leagueToFileMap: { [key: string]: string } = {
+  "uefa champions league": "ucl",
+  "uefa europa league": "uel",
+  "fifa world cup": "world_cup",
+};
 
 export interface Match {
   Season: string;
@@ -41,13 +47,26 @@ export interface SeasonStats {
   PKcon: string;
   OG: string;
   GD?: number;
+  relegated?: boolean;
 }
 
 export async function fetchAllSeasons(league: string) {
-  const seasonsPath = path.join(dataDir, league, 'seasons.csv');
+  const lowerCaseLeague = league.toLowerCase();
+  const fileName = leagueToFileMap[lowerCaseLeague] || lowerCaseLeague.replace(/ /g, '_');
+  const seasonsPath = path.join(dataDir, `${fileName}.csv`);
   const seasonsFile = fs.readFileSync(seasonsPath, 'utf-8');
-  const seasons = seasonsFile.split('\n').slice(1).map(line => line.split(',')[1]);
-  return seasons.filter(Boolean);
+  const lines = seasonsFile.split('\n').slice(1);
+  const seasons = new Set<string>();
+  lines.forEach(line => {
+    const columns = line.split(',');
+    if (columns[3]) {
+      const seasonString = columns[3].match(/(\d{4}-\d{4}|\d{4})/);
+      if (seasonString) {
+        seasons.add(seasonString[0]);
+      }
+    }
+  });
+  return Array.from(seasons).sort().reverse();
 }
 
 export async function getTeams(league: string) {
@@ -57,40 +76,55 @@ export async function getTeams(league: string) {
   return teams.filter(Boolean);
 }
 
-export async function getMatches(league: string, season: string): Promise<Match[]> {
-  const matchesPath = path.join(dataDir, league, 'matches.csv');
-  const matchesFile = fs.readFileSync(matchesPath, 'utf-8');
-  const lines = matchesFile.split('\n');
-  const headers = lines[0].split(',');
 
-  const matches = lines.slice(1).map(line => {
-    const values = line.split(',');
-    const match: Match = {} as Match;
-    headers.forEach((header, i) => {
-      match[header.trim() as keyof Match] = values[i];
-    });
-    return match;
-  });
-
-  return matches.filter(match => match.Season === season);
-}
 
 export async function getSeasonStats(league: string, season: string): Promise<SeasonStats[]> {
-  const seasonStatsPath = path.join(dataDir, league, 'seasonstats.csv');
+  const lowerCaseLeague = league.toLowerCase();
+  const fileName = leagueToFileMap[lowerCaseLeague] || lowerCaseLeague.replace(/ /g, '_');
+  const seasonStatsPath = path.join(dataDir, `${fileName}.csv`);
   const seasonStatsFile = fs.readFileSync(seasonStatsPath, 'utf-8');
   const lines = seasonStatsFile.split('\n');
-  const headers = lines[0].split(',');
 
-  const stats = lines.slice(1).map(line => {
-    const values = line.split(',');
-    const seasonStat: SeasonStats = {} as SeasonStats;
-    headers.forEach((header, i) => {
-      seasonStat[header.trim() as keyof SeasonStats] = values[i];
-    });
-    return seasonStat;
+  const stats: SeasonStats[] = [];
+  lines.forEach(line => {
+    const columns = line.split(',');
+    // Ensure basic columns exist for a potential team stat row
+    if (columns[3] && columns[10] && columns[12] && columns[18]) {
+      const rank = parseInt(columns[0]);
+      const seasonInColumn = columns[3].match(/(\d{4}-\d{4}|\d{4})/);
+
+      // Further filter for valid team rows and the correct season
+      if (!isNaN(rank) && rank > 0 && !columns[10].includes('•') && seasonInColumn && seasonInColumn[0] === season) {
+        stats.push({
+          Season: season,
+          Squad: columns[10],
+          W: columns[12],
+          D: columns[13],
+          L: columns[14],
+          GF: columns[15],
+          GA: columns[16],
+          GD: parseInt(columns[15]) - parseInt(columns[16]),
+          Pts: columns[18],
+          Sh: '0',
+          SoT: '0',
+          FK: '0',
+          PK: '0',
+          Cmp: '0',
+          Att: '0',
+          'Cmp%': '0',
+          CK: '0',
+          CrdY: '0',
+          CrdR: '0',
+          Fls: '0',
+          PKcon: '0',
+          OG: '0',
+          relegated: columns[26] ? columns[26].includes('Relegated') : false,
+        });
+      }
+    }
   });
 
-  return stats.filter(stat => stat.Season === season);
+  return stats;
 }
 
 export async function fetchRankedSeasonStats(league: string, season: string): Promise<SeasonStats[]> {
@@ -125,81 +159,7 @@ export async function fetchRankedSeasonStats(league: string, season: string): Pr
   return rankedStats;
 }
 
-export async function fetchChartsData(league: string, season: string) {
-  const matches = await getMatches(league, season);
 
-  const homeWins = matches.filter(match => Number(match['Home Goals']) > Number(match['Away Goals'])).length;
-  const awayWins = matches.filter(match => Number(match['Away Goals']) > Number(match['Home Goals'])).length;
-  const draws = matches.filter(match => Number(match['Home Goals']) === Number(match['Away Goals'])).length;
-
-  const stats = await getSeasonStats(league, season);
-  const wdlData = stats.map(team => ({
-    name: team.Squad,
-    W: Number(team.W),
-    D: Number(team.D),
-    L: Number(team.L),
-  }));
-
-  return {
-    outcomeData: [
-      { name: 'Home Wins', value: homeWins },
-      { name: 'Away Wins', value: awayWins },
-      { name: 'Draws', value: draws },
-    ],
-    wdlData,
-  };
-}
-
-export async function fetchTeamPerformanceData(league: string, season: string) {
-  const matches = await getMatches(league, season);
-  const seasonStats = await getSeasonStats(league, season);
-  const teams = seasonStats.map(stat => stat.Squad);
-
-  // Sort matches by date
-  matches.sort((a, b) => new Date(a.Date).getTime() - new Date(b.Date).getTime());
-
-  const teamPoints: { [key: string]: number } = {};
-  teams.forEach(team => {
-    teamPoints[team] = 0;
-  });
-
-  const performanceDataMap = new Map<string, any>();
-
-  matches.forEach(match => {
-    if (!match.Date || !match.Home || !match.Away) {
-      return;
-    }
-
-    const homeTeam = match.Home;
-    const awayTeam = match.Away;
-    const homeGoals = parseInt(match['Home Goals'], 10);
-    const awayGoals = parseInt(match['Away Goals'], 10);
-
-    let homePoints = 0;
-    let awayPoints = 0;
-
-    if (homeGoals > awayGoals) {
-      homePoints = 3;
-    } else if (homeGoals < awayGoals) {
-      awayPoints = 3;
-    } else {
-      homePoints = 1;
-      awayPoints = 1;
-    }
-    
-    if (teamPoints[homeTeam] !== undefined) teamPoints[homeTeam] += homePoints;
-    if (teamPoints[awayTeam] !== undefined) teamPoints[awayTeam] += awayPoints;
-
-    performanceDataMap.set(match.Date, { ...teamPoints });
-  });
-
-  const performanceData = Array.from(performanceDataMap.entries()).map(([date, points]) => ({
-    date,
-    ...points
-  }));
-
-  return { performanceData, teams };
-}
 
 function calculateLinearRegression(data: { x: number; y: number }[]) {
   const n = data.length;
