@@ -1,5 +1,20 @@
+#!/usr/bin/env python3
+"""
+Generate season URLs for all leagues.
+Run from root directory: python3 scripts/populate_seasons.py
+"""
 import json
+import os
 from datetime import datetime
+
+# --------------------------
+# Path Configuration
+# --------------------------
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(SCRIPT_DIR)
+DATA_DIR = os.path.join(ROOT_DIR, "fbref_data")
+os.makedirs(DATA_DIR, exist_ok=True)  # ensure fbref_data exists
+OUTPUT_PATH = os.path.join(DATA_DIR, "season_links.json")
 
 # --------------------------
 # League info
@@ -48,37 +63,55 @@ def generate_seasons(start, end, single_year=False, step=1):
 # --------------------------
 # Generate JSON structure
 # --------------------------
-season_links = {}
+def generate_season_links():
+    season_links = {}
 
-for league, info in LEAGUES.items():
-    league_id = info["id"]
-    start_season = info["start_season"]
-    single_year = isinstance(start_season, int)
-    current_season = get_current_season(single_year=single_year)
+    for league, info in LEAGUES.items():
+        league_id = info["id"]
+        start_season = info["start_season"]
+        single_year = isinstance(start_season, int)
+        current_season = get_current_season(single_year=single_year)
 
-    # World Cup happens every 4 years
-    if league == "world_cup":
-        seasons = generate_seasons(start=start_season, end=current_season, single_year=True, step=4)
-    else:
-        seasons = generate_seasons(start=start_season, end=current_season, single_year=single_year)
+        # World Cup happens every 4 years
+        if league == "world_cup":
+            seasons = generate_seasons(start=start_season, end=current_season, single_year=True, step=4)
+        else:
+            seasons = generate_seasons(start=start_season, end=current_season, single_year=single_year)
 
-    links = []
-    for s in seasons:
-        league_name_clean = league.replace('_', ' ').title()
-        # Fix Champions League / Europa League naming in URL
-        if league_name_clean == "Ucl":
-            league_name_clean = "Champions-League"
-        elif league_name_clean == "Uel":
-            league_name_clean = "Europa-League"
-        # Remove spaces for URL formatting
-        league_name_clean = league_name_clean.replace(' ', '-')
-        links.append(f"https://fbref.com/en/comps/{league_id}/{s}/{s}-{league_name_clean}-Stats")
-    season_links[league] = links
+        links = []
+        for s in seasons:
+            league_name_clean = league.replace('_', ' ').title()
+            if league_name_clean == "Ucl":
+                league_name_clean = "Champions-League"
+            elif league_name_clean == "Uel":
+                league_name_clean = "Europa-League"
+            league_name_clean = league_name_clean.replace(' ', '-')
+            # OLD (gets standings, not match results):
+            # links.append(f"https://fbref.com/en/comps/{league_id}/{s}/{s}-{league_name_clean}-Stats")
+            # NEW (gets match results):
+            links.append(f"https://fbref.com/en/comps/{league_id}/{s}/schedule/{s}-{league_name_clean}-Scores-and-Fixtures")
+        season_links[league] = links
+
+    return season_links
 
 # --------------------------
-# Save to JSON
+# Main
 # --------------------------
-with open("season_links.json", "w") as f:
-    json.dump(season_links, f, indent=2)
-
-print("season_links.json created with all seasons for each league.")
+if __name__ == "__main__":
+    print("="*60)
+    print("Season Links Generator")
+    print("="*60)
+    print(f"\nGenerating season URLs for {len(LEAGUES)} leagues...")
+    
+    season_links = generate_season_links()
+    
+    for league, links in season_links.items():
+        print(f"  {league:20s}: {len(links)} seasons")
+    
+    # Save to JSON inside fbref_data/
+    with open(OUTPUT_PATH, "w") as f:
+        json.dump(season_links, f, indent=2)
+    
+    print(f"\nSeason links saved to: {OUTPUT_PATH}")
+    print(f"  Total URLs generated: {sum(len(links) for links in season_links.values())}")
+    print("="*60)

@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+"""
+Scrape FBRef data for all leagues.
+Run from root directory: python3 scripts/fbref_scraper.py
+"""
 import os
 import time
 import random
@@ -15,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "fbref_data")
-JSON_PATH = os.path.join(SCRIPTS_DIR, "season_links.json")
+JSON_PATH = os.path.join(DATA_DIR, "season_links.json")
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # --------------------------
