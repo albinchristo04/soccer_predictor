@@ -2,68 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body {
-  height: 100%;
+:root {
+  --background: #0D1117;
+  --text: #E0E0E0;
+  --accent: #00C853;
 }
 
 body {
-  background-color: #121212;
-  color: #F5F5DC; /* Cream/Off-white */
-  overflow-y: auto;
+  background-color: var(--background);
+  color: var(--text);
 }
 
-.content-box {
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 0.5rem;
-  padding: 1.5rem;
-  border: 1px solid #444;
-  backdrop-filter: blur(10px);
+.hover-glow {
+  transition: all 0.3s ease;
 }
 
-.fotmob-table {
-  width: 100%;
-  background-color: transparent;
-  border-radius: 0.5rem;
-  overflow: hidden;
+.hover-glow:hover {
+  filter: drop-shadow(0 0 8px var(--accent));
 }
 
-.fotmob-table thead {
-  background-color: rgba(0, 0, 0, 0.3);
-}
-
-.fotmob-table th {
-  padding: 0.75rem 1rem;
-  text-align: left;
-  font-weight: bold;
-}
-
-.fotmob-table td {
-  padding: 0.75rem 1rem;
-  border-top: 1px solid #444;
-}
-
-.fotmob-table tbody tr:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-}
-
-.nav-link,
-.nav-link:visited {
-  text-decoration: none;
-  color: #F5F5DC;
-  transition: color 0.3s;
-}
-
-.nav-link:hover {
-  color: #ffffff;
-}
-
-.league-link {
-  color: #61dafb;
-  text-decoration: none;
-  transition: color 0.3s ease-in-out;
-}
-
-.league-link:hover {
-  color: #a0e9ff;
-  text-shadow: 0 0 8px rgba(97, 218, 251, 0.6);
+/* Soccer field background pattern */
+.field-pattern {
+  background-image: linear-gradient(
+    rgba(13, 17, 23, 0.97),
+    rgba(13, 17, 23, 0.97)
+  ),
+  url('/soccer-field.svg');
+  background-repeat: repeat;
+  background-size: 300px;
+  background-position: center;
 }

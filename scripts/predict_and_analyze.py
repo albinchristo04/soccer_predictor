@@ -50,6 +50,12 @@ def load_league_data(league):
     df = pd.read_csv(data_path, low_memory=False)
     return df
 
+def get_all_teams_for_league(league):
+    """Get all unique team names for a given league."""
+    df = load_league_data(league)
+    all_teams = sorted(set(df['home_team'].unique()) | set(df['away_team'].unique()))
+    return [team for team in all_teams if pd.notna(team)]
+
 # --------------------------
 # Find team (case-insensitive fuzzy match)
 # --------------------------
@@ -143,6 +149,136 @@ def save_prediction(output_dir, filename, proba_dict, title, teams=None):
     
     print(f"Saved: {json_path}")
     print(f"Saved: {img_path}")
+
+    return combined.fillna(0)
+
+# --------------------------
+# Analytics Functions
+# --------------------------
+def get_league_stats(league):
+    """Get overall league statistics."""
+    df = load_league_data(league)
+    
+    total_matches = len(df)
+    home_wins = df[df['result'] == 'win'].shape[0]
+    away_wins = df[df['result'] == 'loss'].shape[0]
+    draws = df[df['result'] == 'draw'].shape[0]
+    
+    avg_home_goals = df['home_goals'].mean()
+    avg_away_goals = df['away_goals'].mean()
+    avg_total_goals = df['total_goals'].mean()
+    
+    home_win_percentage = (home_wins / total_matches) * 100
+    away_win_percentage = (away_wins / total_matches) * 100
+    draw_percentage = (draws / total_matches) * 100
+    
+    return {
+        'total_matches': total_matches,
+        'home_wins': home_wins,
+        'away_wins': away_wins,
+        'draws': draws,
+        'home_win_percentage': round(home_win_percentage, 2),
+        'away_win_percentage': round(away_win_percentage, 2),
+        'draw_percentage': round(draw_percentage, 2),
+        'avg_home_goals': round(avg_home_goals, 2),
+        'avg_away_goals': round(avg_away_goals, 2),
+        'avg_total_goals': round(avg_total_goals, 2),
+    }
+
+def get_team_detailed_stats(league, team_name):
+    """Get detailed statistics for a specific team."""
+    df = load_league_data(league)
+    
+    available_teams = sorted(set(df['home_team'].unique()) | set(df['away_team'].unique()))
+    team_name = find_team(team_name, available_teams)
+    
+    team_matches = df[(df['home_team'].str.lower() == team_name.lower()) | (df['away_team'].str.lower() == team_name.lower())].copy()
+    
+    if team_matches.empty:
+        raise ValueError(f"No matches found for team '{team_name}' in {league}.")
+
+    # Calculate team-specific metrics
+    total_matches = len(team_matches)
+    
+    # Goals scored and conceded
+    team_matches['team_goals_scored'] = team_matches.apply(
+        lambda row: row['home_goals'] if row['home_team'].lower() == team_name.lower() else row['away_goals'], axis=1
+    )
+    team_matches['team_goals_conceded'] = team_matches.apply(
+        lambda row: row['away_goals'] if row['home_team'].lower() == team_name.lower() else row['home_goals'], axis=1
+    )
+    
+    avg_goals_scored = team_matches['team_goals_scored'].mean()
+    avg_goals_conceded = team_matches['team_goals_conceded'].mean()
+
+    # Win/Loss/Draw
+    team_wins = 0
+    team_draws = 0
+    team_losses = 0
+    
+    for _, row in team_matches.iterrows():
+        if row['home_team'].lower() == team_name.lower():
+            if row['result'] == 'win': team_wins += 1
+            elif row['result'] == 'draw': team_draws += 1
+            else: team_losses += 1
+        else: # away team
+            if row['result'] == 'loss': team_wins += 1 # away win is home loss
+            elif row['result'] == 'draw': team_draws += 1
+            else: team_losses += 1 # away loss is home win
+
+    win_percentage = (team_wins / total_matches) * 100
+    draw_percentage = (team_draws / total_matches) * 100
+    loss_percentage = (team_losses / total_matches) * 100
+
+    # Example of other metrics (you can add more based on your processed data)
+    # Assuming 'possession', 'shots', 'shots_on_target' are in your processed CSV
+    # You might need to adjust column names based on your actual data
+    
+    # Filter for relevant columns for team stats (example columns)
+    stat_cols = [col for col in team_matches.columns if 'possession' in col or 'shots' in col or 'xg' in col]
+    
+    team_stats_summary = {}
+    for col in stat_cols:
+        if col.startswith('home_') and team_name.lower() == team_matches['home_team'].iloc[0].lower():
+            team_stats_summary[col.replace('home_', '')] = team_matches[col].mean()
+        elif col.startswith('away_') and team_name.lower() == team_matches['away_team'].iloc[0].lower():
+            team_stats_summary[col.replace('away_', '')] = team_matches[col].mean()
+        elif not col.startswith(('home_', 'away_')): # General stats not specific to home/away
+             team_stats_summary[col] = team_matches[col].mean()
+
+    return {
+        'team_name': team_name,
+        'total_matches': total_matches,
+        'wins': team_wins,
+        'draws': team_draws,
+        'losses': team_losses,
+        'win_percentage': round(win_percentage, 2),
+        'draw_percentage': round(draw_percentage, 2),
+        'loss_percentage': round(loss_percentage, 2),
+        'avg_goals_scored': round(avg_goals_scored, 2),
+        'avg_goals_conceded': round(avg_goals_conceded, 2),
+        **{k: round(v, 2) for k, v in team_stats_summary.items() if isinstance(v, (int, float))}, # Add other stats
+    }
+
+def get_season_trends(league):
+    """Get data for plotting season trends (e.g., average goals per season)."""
+    df = load_league_data(league)
+    
+    if 'season' not in df.columns:
+        raise ValueError(f"'season' column not found in {league} data. Cannot generate season trends.")
+
+    # Ensure 'season' is treated as a categorical or string for grouping
+    df['season'] = df['season'].astype(str)
+
+    season_data = df.groupby('season').agg(
+        avg_total_goals=('total_goals', 'mean'),
+        avg_home_goals=('home_goals', 'mean'),
+        avg_away_goals=('away_goals', 'mean'),
+        total_matches=('date', 'count') # Count matches per season
+    ).reset_index()
+
+    # Convert to dictionary for JSON serialization
+    return season_data.to_dict(orient='records')
 
 # --------------------------
 # Head-to-head prediction

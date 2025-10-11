@@ -1,0 +1,14 @@
+# Issues to be fixed:
+- When user clicks on the home landing page, either head-to-heaad or cross-league, they should be directed to the respective page. Currently, when clicking on either button, it redirects to only the head-to-head page.
+- In the predict tab, the league names in the dropdown are not the correct 9 leagues to be displayed. The correct leagues to be displayed are:
+    - Premier League
+    - La Liga
+    - Serie A
+    - Bundesliga
+    - Ligue 1
+    - Champions League (UCL)
+    - Europa League (UEL)
+    - MLS
+    - FIFA World Cup
+- The analytics page is running into a 404 error
+- When running predictions, the results are not being generated and displayed on the frontend.
