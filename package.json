@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"source venv/bin/activate && python backend/main.py\" \"next dev\"",
+    "dev": "concurrently \"PYTHONPATH=./backend ./.venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000\" \"next dev\"",
     "build": "next build",
-    "start": "concurrently \"source venv/bin/activate && python backend/main.py\" \"next start\"",
+    "start": "concurrently \"PYTHONPATH=./backend ./.venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000\" \"next start\"",
     "lint": "next lint"
   },
   "dependencies": {

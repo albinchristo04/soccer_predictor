@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useStore } from '@/store/store'
 import { TeamSelector } from '@/components/TeamSelector'
 import { PredictionResult } from '@/components/PredictionResult'
@@ -8,8 +9,19 @@ import { LoadingSpinner } from '@/components/LoadingSpinner'
 
 type PredictionMode = 'head-to-head' | 'cross-league'
 
-export default function PredictPage() {
-  const [mode, setMode] = useState<PredictionMode>('head-to-head')
+function PredictPageContent() {
+  const searchParams = useSearchParams()
+  const [mode, setMode] = useState<PredictionMode | null>(null)
+  
+  useEffect(() => {
+    const queryMode = searchParams.get('mode')
+    if (queryMode === 'cross-league') {
+      setMode('cross-league')
+    } else {
+      setMode('head-to-head')
+    }
+  }, [searchParams])
+
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
   const { selectedLeague } = useStore()
@@ -64,6 +76,14 @@ export default function PredictPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (mode === null) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <LoadingSpinner />
+      </div>
+    )
   }
 
   return (
@@ -136,5 +156,13 @@ export default function PredictPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function PredictPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <PredictPageContent />
+    </Suspense>
   )
 }

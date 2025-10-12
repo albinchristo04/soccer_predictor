@@ -157,8 +157,24 @@ python3 scripts/predict_and_analyze.py --mode season_simulation \
 
 ### Running the Web Application
 
+**Option 1: Single Command**
+
+Use the `run_app.sh` script to start both the frontend and backend concurrently:
+
 ```bash
+./run_app.sh
+```
+
+**Option 2: Manual Start**
+
+If you prefer to run the frontend and backend separately:
+
+```bash
+# Start the Next.js frontend
 npm run dev
+
+# In a new terminal, start the FastAPI backend
+.venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
@@ -305,9 +321,19 @@ Shows projected final standings based on Monte Carlo simulation:
 - **Cause**: Scraper got standings instead of match results
 - **Fix**: Ensure `populate_seasons.py` generates `/schedule/` URLs
 
-### "Team not found"
-- **Cause**: Typo or team not in dataset
-- **Fix**: Check available teams with case-insensitive matching
+### "Analytics page is not found (404)"
+- **Cause**: The Next.js application might not be properly built.
+- **Fix**: Rebuild the application:
+  ```bash
+  npm run build
+  ```
+
+### "Prediction results are not displayed"
+- **Cause**: The prediction models have not been trained.
+- **Fix**: Run the model training script:
+  ```bash
+  python3 scripts/train_league_models.py
+  ```
 
 ### "Model not found"
 - **Cause**: Haven't trained models yet

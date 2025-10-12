@@ -49,3 +49,5 @@ venv/
 
 # Gemini API Key
 gemini.md
+
+.gemini/

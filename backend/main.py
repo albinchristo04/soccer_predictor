@@ -7,6 +7,12 @@ from pydantic import BaseModel, validator
 import prediction_service as ps
 from typing import List, Optional
 
+import os
+
+# Constants
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "fbref_data")
+
 app = FastAPI(title="Soccer Predictor API")
 
 # Enable CORS
@@ -27,7 +33,7 @@ class HeadToHeadRequest(BaseModel):
     @validator('league')
     def validate_league(cls, v):
         allowed_leagues = ['premier_league', 'la_liga', 'bundesliga', 
-                         'serie_a', 'ligue_1', 'mls', 'ucl', 'uel']
+                         'serie_a', 'ligue_1', 'mls', 'ucl', 'uel', 'world_cup']
         if v not in allowed_leagues:
             raise ValueError(f'League must be one of: {", ".join(allowed_leagues)}')
         return v
@@ -41,7 +47,7 @@ class CrossLeagueRequest(BaseModel):
     @validator('league_a', 'league_b')
     def validate_leagues(cls, v):
         allowed_leagues = ['premier_league', 'la_liga', 'bundesliga', 
-                         'serie_a', 'ligue_1', 'mls', 'ucl', 'uel']
+                         'serie_a', 'ligue_1', 'mls', 'ucl', 'uel', 'world_cup']
         if v not in allowed_leagues:
             raise ValueError(f'League must be one of: {", ".join(allowed_leagues)}')
         return v
@@ -101,6 +107,17 @@ async def get_teams(league: str):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+import os
+from fastapi.responses import FileResponse
+
+@app.get("/api/analytics/{league}/{visualization}")
+async def get_visualization(league: str, visualization: str):
+    """Get visualization for a league."""
+    vis_path = os.path.join(DATA_DIR, league, "visualizations", f"{visualization}.png")
+    if not os.path.exists(vis_path):
+        raise HTTPException(status_code=404, detail="Visualization not found")
+    return FileResponse(vis_path)
 
 if __name__ == "__main__":
     import uvicorn
