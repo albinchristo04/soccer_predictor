@@ -15,10 +15,9 @@ This tool scrapes historical soccer data from FBRef, processes it with advanced 
 
 *   **Web Interface:** A Next.js application provides a user-friendly interface to interact with the prediction models.
 *   **AI/ML Algorithm:** The platform uses an advanced AI/ML algorithm, trained on historical data, to offer users guided decision-making for predicting winner outcomes, considering factors like home versus away advantage.
-*   **Prediction Modes:**
+*   **Prediction Modes (Website):**
     *   **Head-to-Head:** Predict the outcome of a match between two teams.
     *   **Cross-League:** Compare teams from different leagues and see predicted outcomes.
-    *   **Simulation:** Simulate the outcome of a season or a tournament.
 *   **Analytics:**
     *   **League Stats:** View statistics for each league.
     *   **Team Comparisons:** Compare the performance of different teams.
@@ -27,6 +26,21 @@ This tool scrapes historical soccer data from FBRef, processes it with advanced 
     *   **Model Explanation:** Understand how the prediction model works.
     *   **Accuracy Metrics:** View the accuracy of the prediction model.
     *   **Disclaimers:** Important information about the limitations of the tool.
+
+## 🌐 Website vs. Local Execution
+
+It's important to understand the distinction between the web interface and running the scripts locally.
+
+*   **Web Interface (http://localhost:3000):** The website provides a user-friendly way to get predictions for **head-to-head** and **cross-league** matches. It's designed for quick, interactive predictions.
+
+*   **Local Execution (CLI):** For more advanced features like **season simulations**, you must run the scripts directly from your command line. This provides access to the full capabilities of the prediction engine, including Monte Carlo simulations.
+
+To run a season simulation, use the following command:
+
+```bash
+python3 scripts/predict_and_analyze.py --mode season_simulation \
+    --league premier_league --simulations 10000
+```
 
 ## 📊 How It Works
 

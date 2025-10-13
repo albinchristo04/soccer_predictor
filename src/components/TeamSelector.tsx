@@ -11,21 +11,37 @@ interface TeamSelectorProps {
 
 export const TeamSelector = ({ type, formData, setFormData }: TeamSelectorProps) => {
 
+  const modelSelector = (
+    <div>
+      <label className="block text-sm font-medium mb-2">Model</label>
+      <select
+        value="RandomForest"
+        disabled
+        className="w-full p-2 bg-background rounded border border-gray-700 opacity-50"
+      >
+        <option>RandomForest</option>
+      </select>
+    </div>
+  );
+
   if (type === 'head-to-head') {
     return (
       <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-2">League</label>
-          <select
-            value={formData.league}
-            onChange={(e) => setFormData({ ...formData, league: e.target.value })}
-            className="w-full p-2 bg-background rounded border border-gray-700"
-          >
-            <option value="">Select League</option>
-            {leagues.map(league => (
-              <option key={league} value={league}>{league}</option>
-            ))}
-          </select>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">League</label>
+            <select
+              value={formData.league}
+              onChange={(e) => setFormData({ ...formData, league: e.target.value })}
+              className="w-full p-2 bg-background rounded border border-gray-700"
+            >
+              <option value="">Select League</option>
+              {leagues.map(league => (
+                <option key={league} value={league}>{league}</option>
+              ))}
+            </select>
+          </div>
+          {modelSelector}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -65,9 +81,10 @@ export const TeamSelector = ({ type, formData, setFormData }: TeamSelectorProps)
 
   return (
     <div className="space-y-4">
+      {modelSelector}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium mb-2">League A</label>
+          <label className="block text-sm font-medium mb-2">Home League</label>
           <select
             value={formData.league_a}
             onChange={(e) => setFormData({ ...formData, league_a: e.target.value })}
@@ -80,7 +97,7 @@ export const TeamSelector = ({ type, formData, setFormData }: TeamSelectorProps)
           </select>
 
           <div className="mt-4">
-            <label className="block text-sm font-medium mb-2">Team A</label>
+            <label className="block text-sm font-medium mb-2">Home Team</label>
             <select
               value={formData.team_a}
               onChange={(e) => setFormData({ ...formData, team_a: e.target.value })}
@@ -96,7 +113,7 @@ export const TeamSelector = ({ type, formData, setFormData }: TeamSelectorProps)
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">League B</label>
+          <label className="block text-sm font-medium mb-2">Away League</label>
           <select
             value={formData.league_b}
             onChange={(e) => setFormData({ ...formData, league_b: e.target.value })}
@@ -109,7 +126,7 @@ export const TeamSelector = ({ type, formData, setFormData }: TeamSelectorProps)
           </select>
 
           <div className="mt-4">
-            <label className="block text-sm font-medium mb-2">Team B</label>
+            <label className="block text-sm font-medium mb-2">Away Team</label>
             <select
               value={formData.team_b}
               onChange={(e) => setFormData({ ...formData, team_b: e.target.value })}

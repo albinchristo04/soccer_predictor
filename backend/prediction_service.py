@@ -12,21 +12,21 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "fbref_data")
 PROCESSED_DIR = os.path.join(DATA_DIR, "processed")
 
-@lru_cache(maxsize=10)  # Cache up to 10 loaded models
 def load_league_model(league: str) -> Dict:
-    """Load trained model with caching."""
+    """Load trained model."""
     model_path = os.path.join(DATA_DIR, league, "model.pkl")
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Model for '{league}' not found")
     return joblib.load(model_path)
 
-@lru_cache(maxsize=10)  # Cache processed data
 def load_league_data(league: str) -> pd.DataFrame:
-    """Load processed match data with caching."""
+    """Load processed match data."""
     data_path = os.path.join(PROCESSED_DIR, f"{league}_processed.csv")
     if not os.path.exists(data_path):
         raise FileNotFoundError(f"Data for '{league}' not found")
-    return pd.read_csv(data_path, low_memory=False)
+    df = pd.read_csv(data_path, low_memory=False)
+    df['total_goals'] = df['home_goals'] + df['away_goals']
+    return df
 
 def get_team_stats(df: pd.DataFrame, team_name: str, model_data: Dict) -> pd.Series:
     """Calculate team statistics."""
@@ -143,3 +143,50 @@ def predict_cross_league(team_a: str, league_a: str, team_b: str, league_b: str)
         'league_a': league_a,
         'league_b': league_b
     }
+
+# --------------------------
+# Analytics Functions
+# --------------------------
+
+def get_league_stats_overview(league: str) -> Dict:
+    """Get overall league statistics."""
+    df = load_league_data(league)
+    total_matches = len(df)
+    avg_goals = df['total_goals'].mean()
+    home_win_pct = (df['result'] == 'win').mean()
+    draw_pct = (df['result'] == 'draw').mean()
+    loss_pct = (df['result'] == 'loss').mean()
+    return {
+        'total_matches': total_matches,
+        'avg_goals_per_match': round(avg_goals, 2),
+        'home_win_percentage': round(home_win_pct * 100, 1),
+        'draw_percentage': round(draw_pct * 100, 1),
+        'away_win_percentage': round(loss_pct * 100, 1),
+    }
+
+def get_season_trends(league: str) -> List[Dict]:
+    """Get season trends for average goals."""
+    df = load_league_data(league)
+    print(f"DataFrame columns: {df.columns.tolist()}")
+    print(f"First 5 rows of 'season':\n{df['season'].head()}")
+    print(f"First 5 rows of 'total_goals':\n{df['total_goals'].head()}")
+    if 'season' not in df.columns:
+        print("'season' column not found in DataFrame.")
+        return []
+    trends = df.groupby('season')['total_goals'].mean().round(2).reset_index()
+    print(f"Season trends after groupby:\n{trends.head()}")
+    return trends.to_dict(orient='records')
+
+def get_result_distribution(league: str) -> List[Dict]:
+    """Get distribution of match results."""
+    df = load_league_data(league)
+    dist = df['result'].value_counts().reset_index()
+    dist.columns = ['name', 'value']
+    return dist.to_dict(orient='records')
+
+def get_goals_distribution(league: str) -> List[Dict]:
+    """Get distribution of total goals per match."""
+    df = load_league_data(league)
+    dist = df['total_goals'].value_counts().sort_index().reset_index()
+    dist.columns = ['name', 'value']
+    return dist.to_dict(orient='records')

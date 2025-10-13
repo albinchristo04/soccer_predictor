@@ -64,7 +64,9 @@ async def predict_head_to_head(request: HeadToHeadRequest):
         )
         return {
             "success": True,
-            "predictions": result
+            "predictions": result,
+            "home_team": request.home_team,
+            "away_team": request.away_team
         }
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -85,7 +87,11 @@ async def predict_cross_league(request: CrossLeagueRequest):
         )
         return {
             "success": True,
-            "predictions": result
+            "predictions": result,
+            "team_a": request.team_a,
+            "team_b": request.team_b,
+            "league_a": request.league_a,
+            "league_b": request.league_b
         }
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -108,16 +114,38 @@ async def get_teams(league: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-import os
-from fastapi.responses import FileResponse
+# --------------------------
+# Analytics Routes
+# --------------------------
 
-@app.get("/api/analytics/{league}/{visualization}")
-async def get_visualization(league: str, visualization: str):
-    """Get visualization for a league."""
-    vis_path = os.path.join(DATA_DIR, league, "visualizations", f"{visualization}.png")
-    if not os.path.exists(vis_path):
-        raise HTTPException(status_code=404, detail="Visualization not found")
-    return FileResponse(vis_path)
+@app.get("/api/analytics/overview/{league}")
+async def get_analytics_overview(league: str):
+    try:
+        return ps.get_league_stats_overview(league)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/analytics/season_trends/{league}")
+async def get_analytics_season_trends(league: str):
+    try:
+        return ps.get_season_trends(league)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/analytics/result_distribution/{league}")
+async def get_analytics_result_distribution(league: str):
+    try:
+        return ps.get_result_distribution(league)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/analytics/goals_distribution/{league}")
+async def get_analytics_goals_distribution(league: str):
+    try:
+        return ps.get_goals_distribution(league)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     import uvicorn

@@ -58,12 +58,6 @@ export const Navbar = () => {
             >
               About
             </Link>
-            <Link 
-              href="/contact" 
-              className="px-4 py-2 hover:text-accent transition-colors focus:outline-none focus:ring-2 focus:ring-accent rounded-md"
-            >
-              Contact
-            </Link>
           </div>
         </div>
       </div>

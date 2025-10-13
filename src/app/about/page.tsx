@@ -64,9 +64,9 @@ export default function AboutPage() {
     },
     {
       title: "Data Sources",
-      content: `Match data is sourced from FBRef, one of the most comprehensive football statistics 
+      content: `Match data is sourced from <a href="https://fbref.com/en/" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">FBRef</a>, one of the most comprehensive football statistics 
       databases. The data includes detailed match statistics, team performance metrics, and historical 
-      results from major European leagues. All data usage complies with FBRef's terms of service.`
+      results from major European leagues. All data usage complies with <a href="https://fbref.com/en/" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">FBRef</a>'s terms of service.`
     },
     {
       title: "Limitations",

@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { useStore } from '@/store/store'
 import { TeamSelector } from '@/components/TeamSelector'
 import { PredictionResult } from '@/components/PredictionResult'
-import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { SoccerSpinner } from '@/components/SoccerSpinner'
 
 type PredictionMode = 'head-to-head' | 'cross-league'
 
@@ -36,8 +36,25 @@ function PredictPageContent() {
     team_b: ''
   })
 
+  const leagueNameMap: Record<string, string> = {
+    'Premier League': 'premier_league',
+    'La Liga': 'la_liga',
+    'Serie A': 'serie_a',
+    'Bundesliga': 'bundesliga',
+    'Ligue 1': 'ligue_1',
+    'Champions League (UCL)': 'ucl',
+    'Europa League (UEL)': 'uel',
+    'MLS': 'mls',
+    'FIFA World Cup': 'world_cup'
+  };
+
+  useEffect(() => {
+    setResult(null);
+  }, [formData]);
+
   const handlePredict = async () => {
     setLoading(true)
+    setResult(null)
     try {
       const endpoint = mode === 'head-to-head' 
         ? '/api/predict/head-to-head'
@@ -45,14 +62,14 @@ function PredictPageContent() {
 
       const payload = mode === 'head-to-head'
         ? {
-            league: formData.league,
+            league: leagueNameMap[formData.league],
             home_team: formData.home_team,
             away_team: formData.away_team
           }
         : {
-            league_a: formData.league_a,
+            league_a: leagueNameMap[formData.league_a],
             team_a: formData.team_a,
-            league_b: formData.league_b,
+            league_b: leagueNameMap[formData.league_b],
             team_b: formData.team_b
           }
 
@@ -81,7 +98,7 @@ function PredictPageContent() {
   if (mode === null) {
     return (
       <div className="flex justify-center items-center h-64">
-        <LoadingSpinner />
+        <SoccerSpinner />
       </div>
     )
   }
@@ -140,14 +157,21 @@ function PredictPageContent() {
             disabled={loading}
             className="w-full mt-6 px-6 py-3 bg-accent text-black rounded-lg hover:bg-accent/90 transition-colors disabled:opacity-50"
           >
-            {loading ? 'Predicting...' : 'Predict Match'}
+            {loading ? (
+              <div className="flex items-center justify-center">
+                <SoccerSpinner />
+                <span className="ml-2">Predicting...</span>
+              </div>
+            ) : (
+              'Predict Match'
+            )}
           </button>
         </div>
 
         {/* Results Section */}
         {loading ? (
           <div className="mt-8 flex justify-center">
-            <LoadingSpinner />
+            <SoccerSpinner />
           </div>
         ) : result && (
           <div className="mt-8">
@@ -161,7 +185,7 @@ function PredictPageContent() {
 
 export default function PredictPage() {
   return (
-    <Suspense fallback={<LoadingSpinner />}>
+    <Suspense fallback={<SoccerSpinner />}>
       <PredictPageContent />
     </Suspense>
   )

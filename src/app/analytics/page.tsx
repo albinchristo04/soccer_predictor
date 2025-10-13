@@ -2,36 +2,41 @@
 
 import { useState } from 'react'
 import { leagues } from '@/data/leagues'
+import { LeagueStats } from '@/components/LeagueStats'
+import { SeasonTrendsChart } from '@/components/SeasonTrendsChart'
+import { ResultDistributionChart } from '@/components/ResultDistributionChart'
+import { GoalsDistributionChart } from '@/components/GoalsDistributionChart'
 
 export default function AnalyticsPage() {
   const [selectedLeague, setSelectedLeague] = useState<string | null>(null)
 
-  const visualizations = [
-    'confusion_matrix',
-    'feature_importance',
-    'goals_distribution',
-    'result_distribution',
-    'season_trends'
-  ]
+  const leagueNameMap: Record<string, string> = {
+    'Premier League': 'premier_league',
+    'La Liga': 'la_liga',
+    'Serie A': 'serie_a',
+    'Bundesliga': 'bundesliga',
+    'Ligue 1': 'ligue_1',
+    'Champions League (UCL)': 'ucl',
+    'Europa League (UEL)': 'uel',
+    'MLS': 'mls',
+    'FIFA World Cup': 'world_cup'
+  };
+
+  const mappedLeague = selectedLeague ? leagueNameMap[selectedLeague] : null;
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8">Analytics</h1>
-      <p className="mb-8">This page provides a visual analysis of the data used to train the prediction models. Select a league from the dropdown below to see the following visualizations:</p>
-      <ul className="list-disc list-inside mb-8">
-        <li>Confusion Matrix: A table showing the performance of the classification model.</li>
-        <li>Feature Importance: A bar chart showing the most important features for the model.</li>
-        <li>Goals Distribution: A histogram showing the distribution of goals scored by the home and away teams.</li>
-        <li>Result Distribution: A bar chart showing the distribution of match results (win, draw, loss).</li>
-        <li>Season Trends: A line chart showing the trend of goals and home wins over the seasons.</li>
-      </ul>
-
+    <div className="max-w-7xl mx-auto">
+      <h1 className="text-4xl font-bold mb-8">League Analytics</h1>
+      <p className="text-lg text-gray-400 mb-8">
+        This page provides a deep dive into the statistics of each league. Explore interactive charts to understand league dynamics, team performance, and the key factors that influence match outcomes.
+      </p>
+      
       <div className="mb-8">
         <select
           onChange={(e) => setSelectedLeague(e.target.value)}
-          className="bg-secondary p-2 rounded-lg"
+          className="bg-secondary p-3 rounded-lg text-lg"
         >
-          <option value="">Select a league</option>
+          <option value="">Select a league to view analytics</option>
           {leagues.map((league) => (
             <option key={league} value={league}>
               {league}
@@ -40,14 +45,25 @@ export default function AnalyticsPage() {
         </select>
       </div>
 
-      {selectedLeague && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {visualizations.map((vis) => (
-            <div key={vis} className="bg-secondary p-6 rounded-lg">
-              <h2 className="text-xl font-semibold mb-4">{vis.replace(/_/g, ' ').toUpperCase()}</h2>
-              <img src={`http://localhost:8000/api/analytics/${selectedLeague}/${selectedLeague}_${vis}`} alt={vis} />
+      {mappedLeague && (
+        <div className="space-y-8">
+          <LeagueStats league={mappedLeague} />
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-secondary p-6 rounded-lg">
+              <h2 className="text-2xl font-semibold mb-4">Result Distribution</h2>
+              <ResultDistributionChart league={mappedLeague} />
             </div>
-          ))}
+            <div className="bg-secondary p-6 rounded-lg">
+              <h2 className="text-2xl font-semibold mb-4">Goals per Match Distribution</h2>
+              <GoalsDistributionChart league={mappedLeague} />
+            </div>
+          </div>
+
+          <div className="bg-secondary p-6 rounded-lg">
+            <h2 className="text-2xl font-semibold mb-4">Average Goals per Match (by Season)</h2>
+            <SeasonTrendsChart league={mappedLeague} />
+          </div>
         </div>
       )}
     </div>
