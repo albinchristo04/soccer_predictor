@@ -19,8 +19,25 @@ export const GoalsDistributionChart = ({ league }: GoalsDistributionChartProps) 
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={data}>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="name" label={{ value: "Total Goals Scored", position: "insideBottom", offset: 0, dy: 10 }} />
-        <YAxis label={{ value: "Number of Matches", angle: -90, position: "insideLeft" }} />
+        <XAxis 
+          dataKey="name" 
+          label={{ 
+            value: "Total Goals per Match", 
+            position: "insideBottom",
+            offset: 0,
+            dy: 15,
+            style: { textAnchor: 'middle' }
+          }} 
+        />
+        <YAxis 
+          label={{ 
+            value: "Number of Matches", 
+            angle: -90, 
+            position: "insideLeft",
+            offset: 10,
+            style: { textAnchor: 'middle' }
+          }} 
+        />
         <Tooltip />
         <Bar dataKey="value" name="Number of Matches" fill="#82ca9d" />
       </BarChart>

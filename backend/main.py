@@ -139,6 +139,13 @@ async def get_analytics_result_distribution(league: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/analytics/home_away_performance/{league}")
+async def get_analytics_home_away_performance(league: str):
+    try:
+        return ps.get_home_away_performance(league)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/analytics/goals_distribution/{league}")
 async def get_analytics_goals_distribution(league: str):
     try:

@@ -166,27 +166,113 @@ def get_league_stats_overview(league: str) -> Dict:
 
 def get_season_trends(league: str) -> List[Dict]:
     """Get season trends for average goals."""
-    df = load_league_data(league)
-    print(f"DataFrame columns: {df.columns.tolist()}")
-    print(f"First 5 rows of 'season':\n{df['season'].head()}")
-    print(f"First 5 rows of 'total_goals':\n{df['total_goals'].head()}")
-    if 'season' not in df.columns:
-        print("'season' column not found in DataFrame.")
+    try:
+        df = load_league_data(league)
+        
+        # -- Debugging --
+        print(f"--- Debugging get_season_trends for {league} ---")
+        print(f"DataFrame shape: {df.shape}")
+        print(f"Columns: {df.columns.tolist()}")
+        
+        if 'season' not in df.columns:
+            print("Error: 'season' column not found!")
+            return []
+            
+        print(f"Season column data type: {df['season'].dtype}")
+        print(f"Total goals column data type: {df['total_goals'].dtype}")
+        
+        print(f"Unique seasons found: {df['season'].unique()}")
+        print(f"NaNs in season column: {df['season'].isnull().sum()}")
+
+        # Drop rows where season is NaN
+        df.dropna(subset=['season'], inplace=True)
+
+        if df.empty:
+            print("DataFrame is empty after dropping NaNs in 'season'.")
+            return []
+
+        trends = df.groupby('season')['total_goals'].mean().round(2).reset_index()
+        trends.columns = ['season', 'total_goals'] # Rename for consistency
+        
+        print("Successfully calculated trends:")
+        print(trends)
+        
+        return trends.to_dict(orient='records')
+
+    except Exception as e:
+        print(f"An error occurred in get_season_trends: {e}")
         return []
-    trends = df.groupby('season')['total_goals'].mean().round(2).reset_index()
-    print(f"Season trends after groupby:\n{trends.head()}")
-    return trends.to_dict(orient='records')
 
 def get_result_distribution(league: str) -> List[Dict]:
+
     """Get distribution of match results."""
+
     df = load_league_data(league)
+
     dist = df['result'].value_counts().reset_index()
+
     dist.columns = ['name', 'value']
+
     return dist.to_dict(orient='records')
+
+
+
+def get_home_away_performance(league: str) -> List[Dict]:
+
+    """Get home vs away performance."""
+
+    df = load_league_data(league)
+
+    home_wins = len(df[df['result'] == 'win'])
+
+    away_wins = len(df[df['result'] == 'loss'])
+
+    draws = len(df[df['result'] == 'draw'])
+
+    return [
+
+        {"name": "Home Wins", "value": home_wins},
+
+        {"name": "Away Wins", "value": away_wins},
+
+        {"name": "Draws", "value": draws}
+
+    ]
+
+
 
 def get_goals_distribution(league: str) -> List[Dict]:
     """Get distribution of total goals per match."""
-    df = load_league_data(league)
-    dist = df['total_goals'].value_counts().sort_index().reset_index()
-    dist.columns = ['name', 'value']
-    return dist.to_dict(orient='records')
+    try:
+        df = load_league_data(league)
+        
+        # -- Debugging --
+        print(f"--- Debugging get_goals_distribution for {league} ---")
+        print(f"DataFrame shape: {df.shape}")
+        print(f"Columns: {df.columns.tolist()}")
+        
+        if 'total_goals' not in df.columns:
+            print("Error: 'total_goals' column not found!")
+            return []
+            
+        print(f"Total goals column data type: {df['total_goals'].dtype}")
+        print(f"NaNs in total_goals column: {df['total_goals'].isnull().sum()}")
+
+        # Drop rows where total_goals is NaN
+        df.dropna(subset=['total_goals'], inplace=True)
+
+        if df.empty:
+            print("DataFrame is empty after dropping NaNs in 'total_goals'.")
+            return []
+
+        dist = df['total_goals'].value_counts().sort_index().reset_index()
+        dist.columns = ['name', 'value']
+        
+        print("Successfully calculated distribution:")
+        print(dist)
+        
+        return dist.to_dict(orient='records')
+
+    except Exception as e:
+        print(f"An error occurred in get_goals_distribution: {e}")
+        return []

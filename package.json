@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"PYTHONPATH=./backend ./.venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000\" \"next dev\"",
+    "dev": "concurrently \"PYTHONPATH=./backend ./.venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload\" \"next dev\"",
     "build": "next build",
     "start": "concurrently \"PYTHONPATH=./backend ./.venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000\" \"next start\"",
     "lint": "next lint"

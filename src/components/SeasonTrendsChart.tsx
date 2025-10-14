@@ -19,8 +19,8 @@ export const SeasonTrendsChart = ({ league }: SeasonTrendsChartProps) => {
     <ResponsiveContainer width="100%" height={300}>
       <LineChart data={data}>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="season" label={{ value: "Season", position: "insideBottom", offset: 0 }} />
-        <YAxis label={{ value: "Average Goals", angle: -90, position: "insideLeft" }} />
+        <XAxis dataKey="season" label={{ value: "Season", position: "insideBottom", offset: 0, dy: 10, style: { textAnchor: 'middle' } }} />
+        <YAxis label={{ value: "Average Goals per Match", angle: -90, position: "insideLeft", offset: 10, style: { textAnchor: 'middle' } }} />
         <Tooltip />
         <Line type="monotone" dataKey="total_goals" name="Avg Goals / Match" stroke="#8884d8" />
       </LineChart>
