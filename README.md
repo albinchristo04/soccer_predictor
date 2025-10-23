@@ -18,7 +18,7 @@ A comprehensive machine learning system for predicting soccer match outcomes usi
 
 ***
 
-## ✨ Features
+## Features
 
 ### Web Application (Frontend)
 - **Interactive Predictions:** Easily predict match outcomes for head-to-head and cross-league matchups.
@@ -43,7 +43,7 @@ A comprehensive machine learning system for predicting soccer match outcomes usi
 
 ***
 
-## 💻 Technologies Used
+## Technologies Used
 
 ### Frontend
 - **Next.js:** A React framework for building server-side rendered and static web applications.
@@ -80,7 +80,7 @@ A comprehensive machine learning system for predicting soccer match outcomes usi
 
 ***
 
-## 🏗️ System Architecture
+## System Architecture
 
 The application is composed of three main components:
 
@@ -90,7 +90,7 @@ The application is composed of three main components:
 
 ***
 
-## 🚀 Installation and Setup
+## Installation and Setup
 
 To run the Soccer Match Predictor locally, follow these steps:
 
@@ -158,7 +158,7 @@ python3 scripts/predict_and_analyze.py --mode head_to_head --league premier_leag
 
 **Cross-League Prediction:**
 ```bash
-python3 scripts/predict_and_analyze.py --mode cross_league --league_a premier_league --team_a "Real Madrid" --league_b la_liga --team_b "Barcelona"
+python3 scripts/predict_and_analyze.py --mode cross_league --league_a premier_league --team_a "Chelsea" --league_b la_liga --team_b "Barcelona"
 ```
 
 **Season Simulation:**
@@ -168,7 +168,7 @@ python3 scripts/predict_and_analyze.py --mode season_simulation --league premier
 
 ***
 
-## 📁 Project Structure
+## Project Structure
 ```
 soccer_predictor/
 ├── backend/              # FastAPI backend server
@@ -191,7 +191,7 @@ soccer_predictor/
 
 ***
 
-## 🎓 Supported Leagues
+## Supported Leagues
 - Premier League (England)
 - La Liga (Spain)
 - Bundesliga (Germany)
@@ -204,21 +204,21 @@ soccer_predictor/
 
 ***
 
-## 🤝 Contributing
+## Contributing
 Contributions are welcome! If you have any ideas, suggestions, or bug reports, please open an issue on the GitHub repository.
 
 ***
 
 ***
 
-## 🙏 Acknowledgments and Credits
+## Acknowledgments and Credits
 - **Data Source:** [FBRef](https://fbref.com) for providing comprehensive soccer statistics.
 - **Inspiration:** This project was inspired by the desire to apply machine learning to the beautiful game of soccer.
 - **Libraries & Frameworks:** A big thank you to the developers of all the open-source libraries and frameworks used in this project.
 
 ***
 
-## 📞 Contact
+## Contact
 Roni Altshuler - [GitHub](https://github.com/roni-altshuler)
 
 Project Link: [https://github.com/roni-altshuler/soccer_predictor](https://github.com/roni-altshuler/soccer_predictor)
