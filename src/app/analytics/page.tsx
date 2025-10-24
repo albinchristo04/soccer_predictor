@@ -3,9 +3,13 @@
 import { useState } from 'react'
 import { leagues } from '@/data/leagues'
 import { LeagueStats } from '@/components/LeagueStats'
-import { SeasonTrendsChart } from '@/components/SeasonTrendsChart'
 import { ResultDistributionChart } from '@/components/ResultDistributionChart'
 import { GoalsDistributionChart } from '@/components/GoalsDistributionChart'
+import { ModelMetrics } from '@/components/ModelMetrics'
+import { ConfusionMatrix } from '@/components/ConfusionMatrix'
+import { FeatureImportance } from '@/components/FeatureImportance'
+import { TrainClassificationReport } from '@/components/TrainClassificationReport'
+import { TestClassificationReport } from '@/components/TestClassificationReport'
 
 export default function AnalyticsPage() {
   const [selectedLeague, setSelectedLeague] = useState<string | null>(null)
@@ -60,9 +64,18 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          <div className="bg-secondary p-6 rounded-lg">
-            <h2 className="text-2xl font-semibold mb-4">Average Goals per Match (by Season)</h2>
-            <SeasonTrendsChart league={mappedLeague} />
+
+
+          <ModelMetrics league={mappedLeague} />
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <TrainClassificationReport league={mappedLeague} />
+            <TestClassificationReport league={mappedLeague} />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <ConfusionMatrix league={mappedLeague} />
+            <FeatureImportance league={mappedLeague} />
           </div>
         </div>
       )}

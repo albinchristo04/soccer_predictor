@@ -18,6 +18,7 @@ A comprehensive machine learning system for predicting soccer match outcomes usi
 
 ***
 
+<a name="features"></a>
 ## Features
 
 ### Web Application (Frontend)
@@ -43,6 +44,7 @@ A comprehensive machine learning system for predicting soccer match outcomes usi
 
 ***
 
+<a name="technologies-used"></a>
 ## Technologies Used
 
 ### Frontend
@@ -80,6 +82,7 @@ A comprehensive machine learning system for predicting soccer match outcomes usi
 
 ***
 
+<a name="system-architecture"></a>
 ## System Architecture
 
 The application is composed of three main components:
@@ -90,6 +93,7 @@ The application is composed of three main components:
 
 ***
 
+<a name="installation-and-setup"></a>
 ## Installation and Setup
 
 To run the Soccer Match Predictor locally, follow these steps:
@@ -144,7 +148,9 @@ The application will be available at `http://localhost:3000`.
 
 ***
 
-##  Usage
+<a name="usage"></a>
+
+## Usage
 ### Web Interface
 Navigate to `http://localhost:3000` in your web browser. You can use the "Predict" page to make head-to-head and cross-league predictions, and the "Analytics" page to explore league statistics.
 
@@ -168,6 +174,7 @@ python3 scripts/predict_and_analyze.py --mode season_simulation --league premier
 
 ***
 
+<a name="project-structure"></a>
 ## Project Structure
 ```
 soccer_predictor/
@@ -191,6 +198,7 @@ soccer_predictor/
 
 ***
 
+<a name="supported-leagues"></a>
 ## Supported Leagues
 - Premier League (England)
 - La Liga (Spain)
@@ -204,6 +212,7 @@ soccer_predictor/
 
 ***
 
+<a name="contributing"></a>
 ## Contributing
 Contributions are welcome! If you have any ideas, suggestions, or bug reports, please open an issue on the GitHub repository.
 
@@ -211,6 +220,7 @@ Contributions are welcome! If you have any ideas, suggestions, or bug reports, p
 
 ***
 
+<a name="acknowledgments-and-credits"></a>
 ## Acknowledgments and Credits
 - **Data Source:** [FBRef](https://fbref.com) for providing comprehensive soccer statistics.
 - **Inspiration:** This project was inspired by the desire to apply machine learning to the beautiful game of soccer.
@@ -218,6 +228,7 @@ Contributions are welcome! If you have any ideas, suggestions, or bug reports, p
 
 ***
 
+<a name="contact"></a>
 ## Contact
 Roni Altshuler - [GitHub](https://github.com/roni-altshuler)
 

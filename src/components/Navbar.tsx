@@ -41,6 +41,12 @@ export const Navbar = () => {
 
           <div className="flex items-center space-x-6">
             <Link 
+              href="/upcoming" 
+              className="px-4 py-2 hover:text-accent transition-colors focus:outline-none focus:ring-2 focus:ring-accent rounded-md"
+            >
+              Upcoming Matches
+            </Link>
+            <Link 
               href="/predict" 
               className="px-4 py-2 hover:text-accent transition-colors focus:outline-none focus:ring-2 focus:ring-accent rounded-md"
             >
