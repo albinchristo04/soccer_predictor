@@ -277,17 +277,63 @@ def get_model_metrics(league: str) -> Dict[str, Any]:
 
 def get_upcoming_matches(league: str) -> List[Dict[str, Any]]:
     """
-    Get upcoming matches for a given league.
+    Get upcoming matches for a given league with predictions.
 
     Args:
         league: The name of the league.
 
     Returns:
-        A list of dictionaries with upcoming match data.
+        A list of dictionaries with upcoming match data and predictions.
     """
-    df = load_league_data(league)
-    upcoming = df[df["status"] == "scheduled"].copy()
-    return upcoming.to_dict(orient="records")
+    try:
+        # Load fixture data from the seasons_links.json
+        with open(os.path.join(DATA_DIR, "seasons_links.json"), "r") as f:
+            seasons_data = json.load(f)
+            
+        league_data = next((data for data in seasons_data if data["league"] == league), None)
+        if not league_data:
+            return []
+            
+        # Load the processed data
+        df = pd.read_csv(os.path.join(DATA_DIR, "processed", f"{league}_matches.csv"))
+        upcoming = df[df["status"] == "scheduled"].copy()
+        
+        # Load the model for predictions
+        model_data = load_league_model(league)
+        if not model_data or "model" not in model_data:
+            return []
+            
+        model = model_data["model"]
+        features = model_data.get("features", [])
+        
+        predictions = []
+        for _, match in upcoming.iterrows():
+            try:
+                # Prepare features for prediction
+                X = prepare_features(match, features)
+                if X is not None:
+                    # Get prediction probabilities
+                    probs = model.predict_proba(X)[0]
+                    match_dict = {
+                        "date": match["date"],
+                        "home_team": match["home_team"],
+                        "away_team": match["away_team"],
+                        "predicted_home_win": float(probs[2]),  # Win
+                        "predicted_draw": float(probs[1]),      # Draw
+                        "predicted_away_win": float(probs[0])   # Loss
+                    }
+                    predictions.append(match_dict)
+            except Exception as e:
+                print(f"Error predicting match {match['home_team']} vs {match['away_team']}: {str(e)}")
+                continue
+                
+        # Sort matches by date
+        predictions.sort(key=lambda x: x["date"])
+        return predictions
+        
+    except Exception as e:
+        print(f"Error getting upcoming matches for league {league}: {str(e)}")
+        return []
 
 
 def get_league_stats_overview(league: str) -> Dict[str, Any]:

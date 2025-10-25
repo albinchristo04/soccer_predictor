@@ -267,7 +267,7 @@ async def get_analytics_season_trends(league: str) -> List[Dict[str, Any]]:
         return ps.get_season_trends(league)
     except Exception as e:
         print(f"Unhandled exception in get_season_trends: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @app.get("/api/analytics/result_distribution/{league}")
@@ -327,13 +327,20 @@ async def get_analytics_goals_distribution(league: str) -> List[Dict[str, Any]]:
 @app.get("/api/upcoming_matches/{league}")
 async def get_upcoming_matches(league: str) -> List[Dict[str, Any]]:
     """
-    Get upcoming matches for a league.
+    Get upcoming matches for a league with predictions.
 
     Args:
         league: The name of the league.
 
     Returns:
-        A list of dictionaries with upcoming match data.
+        A list of dictionaries with upcoming match data and predictions.
+        Each dictionary contains:
+        - date: The match date
+        - home_team: The home team name
+        - away_team: The away team name
+        - predicted_home_win: Probability of home team winning
+        - predicted_draw: Probability of a draw
+        - predicted_away_win: Probability of away team winning
     """
     try:
         return ps.get_upcoming_matches(league)
