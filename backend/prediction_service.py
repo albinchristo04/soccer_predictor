@@ -19,6 +19,7 @@ Error handling is incorporated to manage issues like missing files or data.
 """
 
 import os
+import json
 import joblib
 import pandas as pd
 from typing import Dict, Tuple, List, Any
@@ -181,7 +182,7 @@ def predict_head_to_head(league: str, home_team: str, away_team: str) -> Dict[st
     home_stats = get_team_stats(df, home_team_found, model_data)
     away_stats = get_team_stats(df, away_team_found, model_data)
 
-    feature_diff = (home_stats - away_stats).values.reshape(1, -1)
+    feature_diff = pd.DataFrame(home_stats - away_stats).T
 
     model = model_data["model"]
     proba = model.predict_proba(feature_diff)[0]
@@ -223,8 +224,12 @@ def predict_cross_league(
     stats_b = get_team_stats(df_b, team_b_found, model_data_b)
 
     scaler = StandardScaler()
+    feature_names = stats_a.index
     stats_normalized = scaler.fit_transform([stats_a.values, stats_b.values])
-    feature_diff = (stats_normalized[0] - stats_normalized[1]).reshape(1, -1)
+    
+    stats_normalized_df = pd.DataFrame(stats_normalized, columns=feature_names)
+    
+    feature_diff = pd.DataFrame(stats_normalized_df.iloc[0] - stats_normalized_df.iloc[1]).T
 
     model_a = model_data_a["model"]
     model_b = model_data_b["model"]
@@ -286,51 +291,45 @@ def get_upcoming_matches(league: str) -> List[Dict[str, Any]]:
         A list of dictionaries with upcoming match data and predictions.
     """
     try:
-        # Load fixture data from the seasons_links.json
-        with open(os.path.join(DATA_DIR, "seasons_links.json"), "r") as f:
-            seasons_data = json.load(f)
-            
-        league_data = next((data for data in seasons_data if data["league"] == league), None)
-        if not league_data:
-            return []
-            
-        # Load the processed data
-        df = pd.read_csv(os.path.join(DATA_DIR, "processed", f"{league}_matches.csv"))
+        df = load_league_data(league)
         upcoming = df[df["status"] == "scheduled"].copy()
-        
-        # Load the model for predictions
-        model_data = load_league_model(league)
-        if not model_data or "model" not in model_data:
+
+        if upcoming.empty:
             return []
-            
+
+        model_data = load_league_model(league)
         model = model_data["model"]
-        features = model_data.get("features", [])
-        
+        classes = model_data["classes"]
+
+        def prepare_features(match, df, model_data):
+            home_team = match["home_team"]
+            away_team = match["away_team"]
+            home_stats = get_team_stats(df, home_team, model_data)
+            away_stats = get_team_stats(df, away_team, model_data)
+            return pd.DataFrame(home_stats - away_stats).T
+
         predictions = []
         for _, match in upcoming.iterrows():
             try:
-                # Prepare features for prediction
-                X = prepare_features(match, features)
-                if X is not None:
-                    # Get prediction probabilities
-                    probs = model.predict_proba(X)[0]
+                feature_diff = prepare_features(match, df, model_data)
+                if feature_diff is not None:
+                    probs = model.predict_proba(feature_diff)[0]
                     match_dict = {
                         "date": match["date"],
                         "home_team": match["home_team"],
                         "away_team": match["away_team"],
-                        "predicted_home_win": float(probs[2]),  # Win
-                        "predicted_draw": float(probs[1]),      # Draw
-                        "predicted_away_win": float(probs[0])   # Loss
+                        "predicted_home_win": float(probs[classes.index("win")]),
+                        "predicted_draw": float(probs[classes.index("draw")]),
+                        "predicted_away_win": float(probs[classes.index("loss")]),
                     }
                     predictions.append(match_dict)
             except Exception as e:
                 print(f"Error predicting match {match['home_team']} vs {match['away_team']}: {str(e)}")
                 continue
-                
-        # Sort matches by date
+
         predictions.sort(key=lambda x: x["date"])
         return predictions
-        
+
     except Exception as e:
         print(f"Error getting upcoming matches for league {league}: {str(e)}")
         return []

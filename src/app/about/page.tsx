@@ -3,33 +3,59 @@
 import { useState } from 'react'
 
 interface AccordionItemProps {
+
   title: string
+
   children: React.ReactNode
+
   isOpen: boolean
+
   onToggle: () => void
+
 }
 
+
+
 const AccordionItem = ({ title, children, isOpen, onToggle }: AccordionItemProps) => {
+
   return (
+
     <div className="border-b border-gray-700">
+
       <button
-        className="w-full py-4 text-left flex justify-between items-center"
+
+        className="w-full py-4 text-left flex justify-between items-center focus:outline-none"
+
         onClick={onToggle}
+
       >
-        <span className="text-lg font-medium">{title}</span>
-        <span className="transform transition-transform duration-200 text-2xl">
-          {isOpen ? '−' : '+'}
+
+        <span className="text-lg font-medium text-white">{title}</span>
+
+        <span className={`transform transition-transform duration-300 text-2xl ${isOpen ? 'rotate-45' : ''}`}>
+
+          +
+
         </span>
+
       </button>
+
       <div
-        className={`overflow-hidden transition-all duration-200 ${
-          isOpen ? 'max-h-96' : 'max-h-0'
-        }`}
-      >
-        <div className="pb-4 text-secondary">{children}</div>
+
+        className={`overflow-hidden transition-all duration-500 ease-in-out ${isOpen ? 'max-h-screen' : 'max-h-0'}`}>
+
+        <div className="py-4 text-gray-300">
+
+          {children}
+
+        </div>
+
       </div>
+
     </div>
+
   )
+
 }
 
 export default function AboutPage() {
@@ -84,20 +110,27 @@ export default function AboutPage() {
   ]
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8">About Soccer Stats Predictor</h1>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="text-center mb-12">
+        <h1 className="text-5xl font-extrabold text-white sm:text-6xl md:text-7xl">About Soccer Stats Predictor</h1>
+        <p className="mt-4 text-xl text-gray-400 max-w-3xl mx-auto">
+          Learn more about the project, the data, and the models behind the predictions.
+        </p>
+      </div>
       
-      <div className="bg-secondary rounded-lg p-6">
-        {sections.map((section, index) => (
-          <AccordionItem
-            key={index}
-            title={section.title}
-            isOpen={openSections.has(index)}
-            onToggle={() => toggleSection(index)}
-          >
-            {section.content}
-          </AccordionItem>
-        ))}
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-gray-900 p-8 rounded-xl shadow-2xl">
+          {sections.map((section, index) => (
+            <AccordionItem
+              key={index}
+              title={section.title}
+              isOpen={openSections.has(index)}
+              onToggle={() => toggleSection(index)}
+            >
+              <div dangerouslySetInnerHTML={{ __html: section.content }} />
+            </AccordionItem>
+          ))}
+        </div>
       </div>
     </div>
   )
