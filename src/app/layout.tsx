@@ -1,8 +1,17 @@
 import { Suspense } from 'react'
+import type { Metadata } from 'next'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { PageLoader } from '@/components/PageLoader'
 import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Soccer Stats Predictor',
+  description: 'AI-powered soccer match prediction and analysis',
+  icons: {
+    icon: '/soccer-ball.png',
+  },
+}
 
 export default function RootLayout({
   children,
@@ -11,9 +20,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <head>
-        <link rel="icon" href="/soccer-ball.png" />
-      </head>
       <body className="min-h-screen">
         <Suspense fallback={null}>
           <PageLoader />
