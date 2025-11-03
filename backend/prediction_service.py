@@ -91,8 +91,19 @@ def get_team_stats(
     Raises:
         ValueError: If the team is not found in the data.
     """
-    home_matches = df[df["home_team"].str.lower() == team_name.lower()]
-    away_matches = df[df["away_team"].str.lower() == team_name.lower()]
+    # Optimize: Convert to lowercase once
+    team_lower = team_name.lower()
+    
+    # Use pre-computed lowercase columns if available, otherwise compute on-the-fly
+    if "home_team_lower" in df.columns and "away_team_lower" in df.columns:
+        home_mask = df["home_team_lower"] == team_lower
+        away_mask = df["away_team_lower"] == team_lower
+    else:
+        home_mask = df["home_team"].str.lower() == team_lower
+        away_mask = df["away_team"].str.lower() == team_lower
+    
+    home_matches = df[home_mask]
+    away_matches = df[away_mask]
 
     if home_matches.empty and away_matches.empty:
         raise ValueError(f"Team '{team_name}' not found in data")
@@ -161,9 +172,126 @@ def get_league_teams(league: str) -> List[str]:
     return [t for t in teams if pd.notna(t)]
 
 
+def predict_scoreline(
+    df: pd.DataFrame, 
+    home_team: str, 
+    away_team: str, 
+    outcome_probs: Dict[str, float]
+) -> Dict[str, Any]:
+    """
+    Predict the scoreline for a match based on historical data and outcome probabilities.
+    
+    Args:
+        df: The DataFrame containing historical match data.
+        home_team: The name of the home team.
+        away_team: The name of the away team.
+        outcome_probs: Dictionary with win/draw/loss probabilities.
+    
+    Returns:
+        A dictionary with predicted goals for home and away teams.
+    """
+    try:
+        # Calculate league averages first (fallback values)
+        completed_matches = df[df["status"] != "scheduled"]
+        if len(completed_matches) == 0:
+            # No historical data - use generic values
+            return {"predicted_home_goals": 1.5, "predicted_away_goals": 1.0}
+        
+        league_avg_home = completed_matches["home_goals"].mean()
+        league_avg_away = completed_matches["away_goals"].mean()
+        
+        # Get recent matches for both teams (last 2 seasons for better recency)
+        unique_seasons = sorted(df["season"].unique())
+        if len(unique_seasons) >= 2:
+            recent_seasons = unique_seasons[-2:]
+            recent_df = df[df["season"].isin(recent_seasons)].copy()
+        else:
+            recent_df = df.copy()
+        
+        # Optimize: Use lowercase comparison
+        home_lower = home_team.lower()
+        away_lower = away_team.lower()
+        
+        # Use pre-computed lowercase columns if available
+        if "home_team_lower" in recent_df.columns:
+            home_as_home = recent_df[recent_df["home_team_lower"] == home_lower]
+            home_as_away = recent_df[recent_df["away_team_lower"] == home_lower]
+            away_as_home = recent_df[recent_df["home_team_lower"] == away_lower]
+            away_as_away = recent_df[recent_df["away_team_lower"] == away_lower]
+        else:
+            home_as_home = recent_df[recent_df["home_team"].str.lower() == home_lower]
+            home_as_away = recent_df[recent_df["away_team"].str.lower() == home_lower]
+            away_as_home = recent_df[recent_df["home_team"].str.lower() == away_lower]
+            away_as_away = recent_df[recent_df["away_team"].str.lower() == away_lower]
+        
+        # Calculate home team stats
+        home_goals_scored = []
+        home_goals_conceded = []
+        if len(home_as_home) > 0:
+            home_goals_scored.extend(home_as_home["home_goals"].tolist())
+            home_goals_conceded.extend(home_as_home["away_goals"].tolist())
+        if len(home_as_away) > 0:
+            home_goals_scored.extend(home_as_away["away_goals"].tolist())
+            home_goals_conceded.extend(home_as_away["home_goals"].tolist())
+        
+        # Calculate away team stats
+        away_goals_scored = []
+        away_goals_conceded = []
+        if len(away_as_home) > 0:
+            away_goals_scored.extend(away_as_home["home_goals"].tolist())
+            away_goals_conceded.extend(away_as_home["away_goals"].tolist())
+        if len(away_as_away) > 0:
+            away_goals_scored.extend(away_as_away["away_goals"].tolist())
+            away_goals_conceded.extend(away_as_away["home_goals"].tolist())
+        
+        # Use team averages or fall back to league averages
+        home_scoring_avg = pd.Series(home_goals_scored).mean() if home_goals_scored else league_avg_home
+        home_conceding_avg = pd.Series(home_goals_conceded).mean() if home_goals_conceded else league_avg_away
+        away_scoring_avg = pd.Series(away_goals_scored).mean() if away_goals_scored else league_avg_away
+        away_conceding_avg = pd.Series(away_goals_conceded).mean() if away_goals_conceded else league_avg_home
+        
+        # Weight prediction by outcome probabilities
+        # Strategy: Use team scoring/conceding averages weighted by match outcome
+        
+        home_win_prob = outcome_probs["home_win"]
+        draw_prob = outcome_probs["draw"]
+        away_win_prob = outcome_probs["away_win"]
+        
+        # Base expectations from team stats
+        base_home_goals = (home_scoring_avg + away_conceding_avg) / 2
+        base_away_goals = (away_scoring_avg + home_conceding_avg) / 2
+        
+        # Adjust based on outcome probabilities
+        # If home team likely to win: boost home goals, reduce away goals
+        # If away team likely to win: reduce home goals, boost away goals
+        # If draw likely: keep closer to averages
+        
+        predicted_home_goals = (
+            base_home_goals * (1.0 + 0.3 * home_win_prob - 0.3 * away_win_prob)
+        )
+        
+        predicted_away_goals = (
+            base_away_goals * (1.0 + 0.3 * away_win_prob - 0.3 * home_win_prob)
+        )
+        
+        # Round to 1 decimal place for cleaner display
+        return {
+            "predicted_home_goals": round(predicted_home_goals, 1),
+            "predicted_away_goals": round(predicted_away_goals, 1),
+        }
+    except Exception as e:
+        print(f"Error in predict_scoreline: {str(e)}")
+        # Return fallback values on error
+        return {
+            "predicted_home_goals": 1.5,
+            "predicted_away_goals": 1.0,
+        }
+
+
 def predict_head_to_head(league: str, home_team: str, away_team: str) -> Dict[str, Any]:
     """
     Make a head-to-head prediction for a match within a single league.
+    Includes both outcome probabilities and predicted scoreline.
 
     Args:
         league: The league of the match.
@@ -171,7 +299,7 @@ def predict_head_to_head(league: str, home_team: str, away_team: str) -> Dict[st
         away_team: The name of the away team.
 
     Returns:
-        A dictionary with prediction probabilities and team information.
+        A dictionary with prediction probabilities, predicted scoreline, and team information.
     """
     model_data = load_league_model(league)
     df = load_league_data(league)
@@ -188,10 +316,18 @@ def predict_head_to_head(league: str, home_team: str, away_team: str) -> Dict[st
     proba = model.predict_proba(feature_diff)[0]
     classes = model_data["classes"]
 
-    return {
+    outcome_probs = {
         "home_win": float(proba[classes.index("win")]),
         "draw": float(proba[classes.index("draw")]),
         "away_win": float(proba[classes.index("loss")]),
+    }
+    
+    # Add scoreline prediction
+    scoreline = predict_scoreline(df, home_team_found, away_team_found, outcome_probs)
+
+    return {
+        **outcome_probs,
+        **scoreline,
         "home_team": home_team_found,
         "away_team": away_team_found,
     }
@@ -202,6 +338,7 @@ def predict_cross_league(
 ) -> Dict[str, Any]:
     """
     Make a prediction for a match between teams from two different leagues.
+    Includes both outcome probabilities and predicted scoreline.
 
     Args:
         team_a: Name of the first team.
@@ -210,7 +347,7 @@ def predict_cross_league(
         league_b: League of the second team.
 
     Returns:
-        A dictionary with prediction probabilities and team information.
+        A dictionary with prediction probabilities, predicted scoreline, and team information.
     """
     model_data_a = load_league_model(league_a)
     model_data_b = load_league_model(league_b)
@@ -243,10 +380,25 @@ def predict_cross_league(
     classes = model_data_a["classes"]
     proba_ensemble = (proba_a * weight_a + proba_b * weight_b) / (weight_a + weight_b)
 
-    return {
+    outcome_probs = {
         "team_a_win": float(proba_ensemble[classes.index("win")]),
         "draw": float(proba_ensemble[classes.index("draw")]),
         "team_b_win": float(proba_ensemble[classes.index("loss")]),
+    }
+    
+    # For scoreline, combine data from both leagues
+    # Use league_a data with team_a as home, team_b stats from league_b
+    combined_df = pd.concat([df_a, df_b], ignore_index=True)
+    scoreline = predict_scoreline(combined_df, team_a_found, team_b_found, {
+        "home_win": outcome_probs["team_a_win"],
+        "draw": outcome_probs["draw"],
+        "away_win": outcome_probs["team_b_win"],
+    })
+
+    return {
+        **outcome_probs,
+        "predicted_team_a_goals": scoreline["predicted_home_goals"],
+        "predicted_team_b_goals": scoreline["predicted_away_goals"],
         "team_a": team_a_found,
         "team_b": team_b_found,
         "league_a": league_a,
@@ -283,6 +435,9 @@ def get_model_metrics(league: str) -> Dict[str, Any]:
 def get_upcoming_matches(league: str) -> List[Dict[str, Any]]:
     """
     Get upcoming matches for a given league with predictions.
+    
+    Only shows scheduled matches from the CURRENT season (2025-2026).
+    Uses team stats from the last 10 seasons for more accurate predictions.
 
     Args:
         league: The name of the league.
@@ -291,47 +446,113 @@ def get_upcoming_matches(league: str) -> List[Dict[str, Any]]:
         A list of dictionaries with upcoming match data and predictions.
     """
     try:
+        from datetime import datetime, timedelta
+        
         df = load_league_data(league)
-        upcoming = df[df["status"] == "scheduled"].copy()
-
+        
+        # CURRENT SEASON: Only show upcoming matches from 2025-2026 season
+        current_season = "2025-2026"
+        upcoming = df[(df["status"] == "scheduled") & (df["season"] == current_season)].copy()
+        
         if upcoming.empty:
+            print(f"No scheduled matches found for {league} in {current_season} season")
             return []
+        
+        # Convert date column to datetime and filter for future matches only
+        upcoming["date"] = pd.to_datetime(upcoming["date"], errors='coerce')
+        today = pd.Timestamp.now().normalize()
+        
+        # Get matches from today onwards for the next 30 days
+        end_date = today + timedelta(days=30)
+        upcoming = upcoming[(upcoming["date"] >= today) & (upcoming["date"] <= end_date)]
+        
+        if upcoming.empty:
+            print(f"No upcoming matches in the next 30 days for {league}")
+            return []
+        
+        # Sort by date
+        upcoming = upcoming.sort_values('date')
+        print(f"Found {len(upcoming)} upcoming matches for {league} in current season")
+
+        # For team stats, use ALL historical data EXCLUDING current season
+        # This matches the training data approach
+        completed_df = df[
+            (df["status"] != "scheduled") & 
+            (df["season"] != current_season)
+        ].copy()
+        
+        # Pre-lowercase team columns for faster comparison
+        completed_df["home_team_lower"] = completed_df["home_team"].str.lower()
+        completed_df["away_team_lower"] = completed_df["away_team"].str.lower()
+        
+        print(f"Using {len(completed_df)} completed matches from all historical seasons (excluding current) for team stats")
 
         model_data = load_league_model(league)
         model = model_data["model"]
         classes = model_data["classes"]
-
-        def prepare_features(match, df, model_data):
-            home_team = match["home_team"]
-            away_team = match["away_team"]
-            home_stats = get_team_stats(df, home_team, model_data)
-            away_stats = get_team_stats(df, away_team, model_data)
-            return pd.DataFrame(home_stats - away_stats).T
+        
+        # Pre-compute team stats for all unique teams
+        unique_teams = set(upcoming["home_team"].tolist() + upcoming["away_team"].tolist())
+        team_stats_cache = {}
+        
+        print(f"Computing stats for {len(unique_teams)} unique teams...")
+        for team in unique_teams:
+            try:
+                team_stats_cache[team] = get_team_stats(completed_df, team, model_data)
+            except Exception as e:
+                print(f"Warning: Could not compute stats for {team}: {str(e)}")
+                continue
 
         predictions = []
-        for _, match in upcoming.iterrows():
+        for idx, match in upcoming.iterrows():
             try:
-                feature_diff = prepare_features(match, df, model_data)
+                home_team = match["home_team"]
+                away_team = match["away_team"]
+                
+                # Skip if we don't have stats for both teams
+                if home_team not in team_stats_cache or away_team not in team_stats_cache:
+                    print(f"Skipping {home_team} vs {away_team} - missing team stats")
+                    continue
+                
+                home_stats = team_stats_cache[home_team]
+                away_stats = team_stats_cache[away_team]
+                feature_diff = pd.DataFrame(home_stats - away_stats).T
+                
                 if feature_diff is not None:
                     probs = model.predict_proba(feature_diff)[0]
+                    
+                    outcome_probs = {
+                        "home_win": float(probs[classes.index("win")]),
+                        "draw": float(probs[classes.index("draw")]),
+                        "away_win": float(probs[classes.index("loss")]),
+                    }
+                    
+                    # Add scoreline prediction
+                    scoreline = predict_scoreline(completed_df, home_team, away_team, outcome_probs)
+                    
                     match_dict = {
-                        "date": match["date"],
-                        "home_team": match["home_team"],
-                        "away_team": match["away_team"],
-                        "predicted_home_win": float(probs[classes.index("win")]),
-                        "predicted_draw": float(probs[classes.index("draw")]),
-                        "predicted_away_win": float(probs[classes.index("loss")]),
+                        "date": match["date"].isoformat(),
+                        "home_team": home_team,
+                        "away_team": away_team,
+                        "predicted_home_win": outcome_probs["home_win"],
+                        "predicted_draw": outcome_probs["draw"],
+                        "predicted_away_win": outcome_probs["away_win"],
+                        "predicted_home_goals": scoreline["predicted_home_goals"],
+                        "predicted_away_goals": scoreline["predicted_away_goals"],
                     }
                     predictions.append(match_dict)
             except Exception as e:
                 print(f"Error predicting match {match['home_team']} vs {match['away_team']}: {str(e)}")
                 continue
 
+        print(f"Successfully generated {len(predictions)} predictions")
         predictions.sort(key=lambda x: x["date"])
         return predictions
 
     except Exception as e:
         print(f"Error getting upcoming matches for league {league}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return []
 
 

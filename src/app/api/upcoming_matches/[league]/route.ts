@@ -1,3 +1,8 @@
+// NOTE: This Next.js API route is currently not being used.
+// The upcoming matches page calls the Python backend directly at:
+// ${NEXT_PUBLIC_BACKEND_URL}/api/upcoming_matches/${league}
+// This route is kept as a fallback option.
+
 import { NextResponse } from 'next/server'
 import path from 'path'
 import fs from 'fs/promises'

@@ -19,6 +19,10 @@ interface PredictionResultProps {
       team_a_win?: number
       team_b_win?: number
     }
+    predicted_home_goals?: number
+    predicted_away_goals?: number
+    predicted_team_a_goals?: number
+    predicted_team_b_goals?: number
     home_team?: string
     away_team?: string
     team_a?: string
@@ -30,7 +34,19 @@ interface PredictionResultProps {
 }
 
 export const PredictionResult = ({ result, mode }: PredictionResultProps) => {
-  const { predictions, home_team, away_team, team_a, team_b, league_a, league_b } = result;
+  const { 
+    predictions, 
+    home_team, 
+    away_team, 
+    team_a, 
+    team_b, 
+    league_a, 
+    league_b,
+    predicted_home_goals,
+    predicted_away_goals,
+    predicted_team_a_goals,
+    predicted_team_b_goals
+  } = result;
 
   const winProb = mode === 'head-to-head' ? (predictions.home_win ?? 0) : (predictions.team_a_win ?? 0);
   const drawProb = predictions.draw ?? 0;
@@ -38,6 +54,9 @@ export const PredictionResult = ({ result, mode }: PredictionResultProps) => {
 
   const homeTeamName = mode === 'head-to-head' ? home_team : team_a;
   const awayTeamName = mode === 'head-to-head' ? away_team : team_b;
+  
+  const homeGoals = mode === 'head-to-head' ? predicted_home_goals : predicted_team_a_goals;
+  const awayGoals = mode === 'head-to-head' ? predicted_away_goals : predicted_team_b_goals;
 
   const getOutcome = () => {
     if (winProb > drawProb && winProb > lossProb) {
@@ -88,6 +107,14 @@ export const PredictionResult = ({ result, mode }: PredictionResultProps) => {
         <p className="text-lg text-gray-400">
           with a probability of {(mostLikelyOutcome.probability * 100).toFixed(1)}%
         </p>
+        {homeGoals !== undefined && awayGoals !== undefined && (
+          <div className="mt-4 p-4 bg-gray-800 rounded-lg inline-block">
+            <p className="text-sm font-semibold uppercase text-gray-400 mb-1">Predicted Scoreline</p>
+            <p className="text-3xl font-bold text-green-400">
+              {homeGoals} - {awayGoals}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-4 my-8 text-center">
@@ -110,7 +137,7 @@ export const PredictionResult = ({ result, mode }: PredictionResultProps) => {
           <BarChart data={chartData} layout="vertical">
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis type="number" tickFormatter={(value) => `${(value * 100).toFixed(0)}%`} />
-            <YAxis type="category" dataKey="name" width={150} tick={{ textTransform: 'uppercase' }} />
+            <YAxis type="category" dataKey="name" width={150} />
             <Tooltip
               formatter={(value: number) => `${(value * 100).toFixed(1)}%`}
               contentStyle={{ backgroundColor: '#1a1a1a', border: 'none' }}
@@ -122,7 +149,9 @@ export const PredictionResult = ({ result, mode }: PredictionResultProps) => {
 
       <div className="mt-8 text-sm text-gray-500 text-center">
         <p>⚠️ Predictions are for educational and entertainment purposes only.</p>
-        <p>Scoreline prediction is not available with the current model.</p>
+        {homeGoals === undefined || awayGoals === undefined ? (
+          <p>Scoreline prediction will be available after model retraining.</p>
+        ) : null}
       </div>
     </div>
   )

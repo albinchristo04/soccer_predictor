@@ -11,49 +11,30 @@ interface TeamSelectorProps {
 
 export const TeamSelector = ({ type, formData, setFormData }: TeamSelectorProps) => {
 
-  const modelSelector = (
-    <div>
-      <label className="block text-sm font-medium mb-2 text-gray-400">Model</label>
-      <div className="relative">
-        <select
-          value="RandomForest"
-          disabled
-          className="appearance-none w-full bg-gray-800 border border-gray-700 text-white text-lg rounded-lg py-3 px-5 pr-10 focus:outline-none focus:border-blue-500 transition duration-300 ease-in-out opacity-50 cursor-not-allowed"
-        >
-          <option>RandomForest</option>
-        </select>
-        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-          <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M5.516 7.548c.436-.446 1.143-.446 1.579 0L10 10.405l2.905-2.857c.436-.446 1.143-.446 1.579 0 .436.445.436 1.167 0 1.612l-3.695 3.63c-.436.446-1.143.446-1.579 0L5.516 9.16c-.436-.445-.436-1.167 0-1.612z"/></svg>
-        </div>
-      </div>
-    </div>
-  );
-
   if (type === 'head-to-head') {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium mb-2 text-gray-400">League</label>
-            <div className="relative">
-              <select
-                value={formData.league}
-                onChange={(e) => setFormData({ ...formData, league: e.target.value, home_team: '', away_team: '' })}
-                className="appearance-none w-full bg-gray-800 border border-gray-700 text-white text-lg rounded-lg py-3 px-5 pr-10 focus:outline-none focus:border-blue-500 transition duration-300 ease-in-out"
-              >
-                <option value="">Select League</option>
-                {leagues.map(league => (
-                  <option key={league} value={league}>{league}</option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M5.516 7.548c.436-.446 1.143-.446 1.579 0L10 10.405l2.905-2.857c.436-.446 1.143-.446 1.579 0 .436.445.436 1.167 0 1.612l-3.695 3.63c-.436.446-1.143.446-1.579 0L5.516 9.16c-.436-.445-.436-1.167 0-1.612z"/></svg>
-              </div>
+        {/* League Selector - Full Width Center */}
+        <div>
+          <label className="block text-sm font-medium mb-2 text-gray-400 text-center">League</label>
+          <div className="relative max-w-md mx-auto">
+            <select
+              value={formData.league}
+              onChange={(e) => setFormData({ ...formData, league: e.target.value, home_team: '', away_team: '' })}
+              className="appearance-none w-full bg-gray-800 border border-gray-700 text-white text-lg rounded-lg py-3 px-5 pr-10 focus:outline-none focus:border-blue-500 transition duration-300 ease-in-out"
+            >
+              <option value="">Select League</option>
+              {leagues.map(league => (
+                <option key={league} value={league}>{league}</option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+              <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M5.516 7.548c.436-.446 1.143-.446 1.579 0L10 10.405l2.905-2.857c.436-.446 1.143-.446 1.579 0 .436.445.436 1.167 0 1.612l-3.695 3.63c-.436.446-1.143.446-1.579 0L5.516 9.16c-.436-.445-.436-1.167 0-1.612z"/></svg>
             </div>
           </div>
-          {modelSelector}
         </div>
 
+        {/* Team Selectors - Side by Side */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium mb-2 text-gray-400">Home Team</label>
@@ -99,12 +80,12 @@ export const TeamSelector = ({ type, formData, setFormData }: TeamSelectorProps)
     )
   }
 
+  // Cross-league mode
   return (
     <div className="space-y-6">
-      {modelSelector}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label className="block text-sm font-medium mb-2 text-gray-400">Home League</label>
+          <label className="block text-sm font-medium mb-2 text-gray-400">Team A League</label>
           <div className="relative">
             <select
               value={formData.league_a}
@@ -122,7 +103,7 @@ export const TeamSelector = ({ type, formData, setFormData }: TeamSelectorProps)
           </div>
 
           <div className="mt-6">
-            <label className="block text-sm font-medium mb-2 text-gray-400">Home Team</label>
+            <label className="block text-sm font-medium mb-2 text-gray-400">Team A</label>
             <div className="relative">
               <select
                 value={formData.team_a}
@@ -143,7 +124,7 @@ export const TeamSelector = ({ type, formData, setFormData }: TeamSelectorProps)
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2 text-gray-400">Away League</label>
+          <label className="block text-sm font-medium mb-2 text-gray-400">Team B League</label>
           <div className="relative">
             <select
               value={formData.league_b}
@@ -161,7 +142,7 @@ export const TeamSelector = ({ type, formData, setFormData }: TeamSelectorProps)
           </div>
 
           <div className="mt-6">
-            <label className="block text-sm font-medium mb-2 text-gray-400">Away Team</label>
+            <label className="block text-sm font-medium mb-2 text-gray-400">Team B</label>
             <div className="relative">
               <select
                 value={formData.team_b}

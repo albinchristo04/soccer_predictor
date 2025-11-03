@@ -25,7 +25,7 @@ from typing import Dict, List, Any
 import os
 import traceback
 
-import prediction_service as ps
+from backend import prediction_service as ps
 
 # Constants
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -41,6 +41,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Simple health check endpoint
+@app.get("/api/health")
+async def health_check():
+    """Simple health check to verify the API is running."""
+    return {"status": "healthy", "message": "Soccer Predictor API is running"}
 
 
 # Models for request validation
@@ -119,7 +126,6 @@ class CrossLeagueRequest(BaseModel):
 # Routes with error handling
 @app.post("/api/predict/head-to-head")
 async def predict_head_to_head(request: HeadToHeadRequest) -> Dict[str, Any]:
-    print(f"Received head-to-head prediction request for league: {request.league}, home: {request.home_team}, away: {request.away_team}")
     """
     Predict the outcome of a head-to-head match within a league.
 
@@ -131,6 +137,7 @@ async def predict_head_to_head(request: HeadToHeadRequest) -> Dict[str, Any]:
         A dictionary with the prediction results, including win/draw/loss
         probabilities and team names.
     """
+    print(f"Received head-to-head prediction request for league: {request.league}, home: {request.home_team}, away: {request.away_team}")
     try:
         result = ps.predict_head_to_head(
             request.league, request.home_team, request.away_team
@@ -347,6 +354,45 @@ async def get_upcoming_matches(league: str) -> List[Dict[str, Any]]:
     except Exception as e:
         print(f"Unhandled exception in get_upcoming_matches: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@app.get("/api/upcoming_matches_debug/{league}")
+async def get_upcoming_matches_debug(league: str) -> List[Dict[str, Any]]:
+    """
+    DEBUG endpoint: Get upcoming matches WITHOUT predictions for testing.
+    """
+    try:
+        from datetime import datetime, timedelta
+        import pandas as pd
+        
+        df = ps.load_league_data(league)
+        upcoming = df[df["status"] == "scheduled"].copy()
+        
+        if upcoming.empty:
+            return []
+        
+        upcoming["date"] = pd.to_datetime(upcoming["date"], errors='coerce')
+        today = pd.Timestamp.now().normalize()
+        end_date = today + timedelta(days=7)
+        upcoming = upcoming[(upcoming["date"] >= today) & (upcoming["date"] <= end_date)]
+        
+        if upcoming.empty:
+            return []
+        
+        upcoming = upcoming.sort_values('date').head(20)
+        
+        results = []
+        for idx, match in upcoming.iterrows():
+            results.append({
+                "date": match["date"].isoformat(),
+                "home_team": match["home_team"],
+                "away_team": match["away_team"],
+            })
+        
+        return results
+    except Exception as e:
+        print(f"Debug endpoint error: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 
 if __name__ == "__main__":

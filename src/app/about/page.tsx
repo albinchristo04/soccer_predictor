@@ -75,37 +75,96 @@ export default function AboutPage() {
 
   const sections = [
     {
+      title: "What is Soccer Stats Predictor?",
+      content: `Soccer Stats Predictor is an AI-powered tool that predicts the outcomes of soccer matches using machine learning. 
+      Our system analyzes historical data from over 150,000 matches across 9 major leagues and competitions to provide accurate 
+      win/draw/loss probabilities and predicted scorelines. The tool supports head-to-head predictions within leagues and 
+      cross-league comparisons, helping you understand potential match outcomes based on data-driven insights.`
+    },
+    {
+      title: "Key Features",
+      content: `
+        <ul class="list-disc pl-6 space-y-2">
+          <li><strong>Match Outcome Predictions:</strong> Get win/draw/loss probabilities for any matchup</li>
+          <li><strong>Predicted Scorelines:</strong> See the estimated final score based on team performance patterns</li>
+          <li><strong>Upcoming Matches:</strong> View predictions for scheduled matches with a convenient week/day calendar view</li>
+          <li><strong>Cross-League Predictions:</strong> Compare teams from different leagues (e.g., Man City vs Real Madrid)</li>
+          <li><strong>Analytics Dashboard:</strong> Explore model performance metrics, confidence thresholds, and feature importance</li>
+          <li><strong>9 Major Leagues:</strong> Premier League, La Liga, Serie A, Bundesliga, Ligue 1, MLS, UCL, UEL, and FIFA World Cup</li>
+        </ul>
+      `
+    },
+    {
       title: "About the Model",
-      content: `Our prediction system uses a Random Forest model trained on extensive historical match data. 
-      The model considers various factors including recent form, head-to-head records, goal-scoring patterns, 
-      and team strengths. Random Forest was chosen for its ability to handle complex interactions between 
-      features and provide probability estimates for match outcomes.`
+      content: `Our prediction system uses a Random Forest Classifier with 400 decision trees, trained on comprehensive historical 
+      match data dating back decades (Premier League data goes back to 1888!). The model uses all available historical data 
+      with exponential weighting favoring recent seasons (last 5 seasons weighted 1.5x-3.0x) to capture current trends while 
+      maintaining historical context. Key features include team form metrics (goals scored/conceded, win rates), attendance, 
+      and head-to-head performance. The model is trained separately for each league to capture league-specific dynamics.`
+    },
+    {
+      title: "Scoreline Prediction",
+      content: `In addition to match outcomes, we predict the final scoreline by analyzing each team's recent scoring and conceding 
+      patterns from the last 2 seasons. The scoreline is adjusted based on the predicted outcome - if a team is likely to win, 
+      their predicted goals are boosted while the opponent's are reduced. This provides a realistic estimate of not just who will 
+      win, but by approximately what margin.`
     },
     {
       title: "Model Performance",
-      content: `The model achieves approximately 60-65% accuracy in predicting match outcomes, which is 
-      significantly better than random chance (33%) for three-way football predictions. However, it's important 
-      to note that football matches are inherently unpredictable, and many factors (injuries, weather, 
-      team selection) cannot be accounted for in historical data.`
+      content: `The model achieves approximately 50-70% accuracy across different leagues (varies by league), significantly better 
+      than random chance (33%) for three-way football predictions. Premier League accuracy is around 52%, while competitions like 
+      the World Cup achieve up to 70% on test data. Our analytics page provides detailed confidence threshold analysis showing 
+      precision/recall trade-offs at different confidence levels, helping you understand when the model is most reliable.`
+    },
+    {
+      title: "Training Approach",
+      content: `Models are trained using ALL historical data (excluding the current season 2025-2026) with custom sample weighting:
+        <ul class="list-disc pl-6 space-y-2 mt-2">
+          <li>Last 5 seasons (2020-2024): 2.06x average weight to emphasize recent trends</li>
+          <li>Older seasons: 0.67x average weight to maintain historical context</li>
+          <li>Custom class weights (Win: 1.2, Draw: 0.6, Loss: 1.2) to combat draw bias</li>
+          <li>400 estimators with max depth 20 for robust prediction</li>
+        </ul>
+      `
     },
     {
       title: "Data Sources",
-      content: `Match data is sourced from <a href="https://fbref.com/en/" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">FBRef</a>, one of the most comprehensive football statistics 
-      databases. The data includes detailed match statistics, team performance metrics, and historical 
-      results from major European leagues. All data usage complies with <a href="https://fbref.com/en/" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">FBRef</a>'s terms of service.`
+      content: `Match data is sourced from <a href="https://fbref.com/en/" target="_blank" rel="noopener noreferrer" class="text-green-400 hover:underline">FBRef</a>, one of the most comprehensive football statistics 
+      databases. Our dataset includes over 150,000 historical matches with detailed statistics including goals, attendance, 
+      team form metrics, and match outcomes. All data usage complies with FBRef's terms of service. Data is regularly updated 
+      to include the latest matches while excluding ongoing fixtures to prevent data leakage.`
     },
     {
-      title: "Limitations",
-      content: `The predictions are based purely on historical data and statistical patterns. They cannot 
-      account for real-time factors such as injuries, weather conditions, or team morale. The model also 
-      has limited data for newly promoted teams and cross-league predictions rely on indirect comparisons.`
+      title: "How to Use",
+      content: `
+        <ul class="list-disc pl-6 space-y-2">
+          <li><strong>Predict:</strong> Select a league and two teams for head-to-head predictions, or choose teams from different leagues for cross-league comparisons</li>
+          <li><strong>Upcoming Matches:</strong> Browse scheduled fixtures with automatic predictions - toggle between week view and detailed day view</li>
+          <li><strong>Analytics:</strong> Explore model performance metrics including confusion matrices, feature importance, prediction distributions, and confidence threshold analysis</li>
+        </ul>
+      `
+    },
+    {
+      title: "Limitations & Responsible Use",
+      content: `While our model provides data-driven insights, soccer matches are inherently unpredictable. The predictions cannot 
+      account for real-time factors such as:
+        <ul class="list-disc pl-6 space-y-1 mt-2">
+          <li>Player injuries or suspensions</li>
+          <li>Weather conditions</li>
+          <li>Team morale and motivation</li>
+          <li>Tactical changes or lineup rotations</li>
+          <li>Referee decisions or red cards</li>
+        </ul>
+        <p class="mt-3 font-semibold">This tool is for educational and entertainment purposes only. Do not use predictions for betting or financial decisions.</p>
+      `
     },
     {
       title: "Legal Disclaimer",
-      content: `This tool is provided for educational and entertainment purposes only. The predictions 
-      should not be used for betting or financial decisions. The developers accept no responsibility for 
-      any losses incurred from using these predictions for gambling purposes. Always gamble responsibly 
-      and be aware of your local gambling laws and regulations.`
+      content: `This tool is provided for educational and entertainment purposes only. The predictions are based on historical 
+      data and statistical models, and should not be interpreted as guarantees of future results. The developers accept no 
+      responsibility for any losses incurred from using these predictions for gambling or betting purposes. Always gamble 
+      responsibly and be aware of your local gambling laws and regulations. If you or someone you know has a gambling problem, 
+      please seek help from organizations like the National Council on Problem Gambling (1-800-522-4700).`
     }
   ]
 

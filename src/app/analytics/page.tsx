@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { leagues } from '@/data/leagues'
-import { LeagueStats } from '@/components/LeagueStats'
-import MLMetricsVisualizations from '@/components/MLMetricsVisualizations'
-import FeatureImportanceChart from '@/components/FeatureImportanceChart'
-import { SoccerSpinner } from '@/components/SoccerSpinner' // Import the spinner
+import React, { useState, useEffect } from 'react';
+import { leagues } from '@/data/leagues';
+import { LeagueStats } from '../../components/LeagueStats';
+import MLMetricsVisualizations from '../../components/MLMetricsVisualizations';
+import { SoccerSpinner } from '../../components/SoccerSpinner';
 
 export default function AnalyticsPage() {
   const [selectedLeague, setSelectedLeague] = useState<string | null>(null)
@@ -69,17 +68,15 @@ export default function AnalyticsPage() {
         </div>
       ) : mappedLeague && (
         <div className="space-y-12">
-          <div className="bg-gray-900 p-8 rounded-xl shadow-2xl transition duration-500 ease-in-out transform hover:-translate-y-1 hover:scale-105">
-            <LeagueStats league={mappedLeague} />
-          </div>
+        {/* League Stats Component */}
+        <div className="mb-16 transform transition-all duration-300 hover:scale-[1.01]">
+          <LeagueStats league={mappedLeague} />
+        </div>
 
-          <div className="bg-gray-900 p-8 rounded-xl shadow-2xl transition duration-500 ease-in-out transform hover:-translate-y-1 hover:scale-105">
-            <FeatureImportanceChart league={mappedLeague} />
-          </div>
-
-          <div className="bg-gray-900 p-8 rounded-xl shadow-2xl transition duration-500 ease-in-out transform hover:-translate-y-1 hover:scale-105">
-            <MLMetricsVisualizations league={mappedLeague} />
-          </div>
+        {/* ML Metrics Visualizations */}
+        <div className="mb-12">
+          <MLMetricsVisualizations league={mappedLeague} />
+        </div>
         </div>
       )}
     </div>

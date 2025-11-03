@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { format, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns'
+import { leagues } from '@/data/leagues'
 import { SoccerSpinner } from '@/components/SoccerSpinner'
 import { PredictionResult } from '@/components/PredictionResult'
 
@@ -12,6 +13,8 @@ type Match = {
   predicted_home_win: number
   predicted_draw: number
   predicted_away_win: number
+  predicted_home_goals?: number
+  predicted_away_goals?: number
 }
 
 type ViewMode = 'week' | 'day'
@@ -21,48 +24,54 @@ function formatDate(date: Date): string {
 }
 
 export default function UpcomingMatches() {
-  const [selectedLeague, setSelectedLeague] = useState('')
+  const [selectedLeague, setSelectedLeague] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('week')
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(false)
 
-  const leagueOptions = {
+  const leagueNameMap: Record<string, string> = {
     'Premier League': 'premier_league',
     'La Liga': 'la_liga',
-    'Bundesliga': 'bundesliga',
     'Serie A': 'serie_a',
+    'Bundesliga': 'bundesliga',
     'Ligue 1': 'ligue_1',
     'Champions League (UCL)': 'ucl',
     'Europa League (UEL)': 'uel',
     'MLS': 'mls',
+    'FIFA World Cup': 'world_cup'
   }
 
+  const mappedLeague = selectedLeague ? leagueNameMap[selectedLeague] : null
+
+  // Always start week from today (Saturday to Friday)
+  const today = new Date()
   const weekDays = eachDayOfInterval({
-    start: startOfWeek(selectedDate, { weekStartsOn: 6 }), // Start from Saturday
-    end: endOfWeek(selectedDate, { weekStartsOn: 6 }) 
+    start: startOfWeek(today, { weekStartsOn: 6 }), // Start from Saturday
+    end: endOfWeek(today, { weekStartsOn: 6 }) 
   })
 
   useEffect(() => {
     const fetchMatches = async () => {
-      if (!selectedLeague) return
+      if (!mappedLeague) return
       setLoading(true)
       try {
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/upcoming_matches/${selectedLeague}`
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/upcoming_matches/${mappedLeague}`
         )
         if (!response.ok) throw new Error('Failed to fetch matches')
         const data = await response.json()
         setMatches(data)
       } catch (error) {
         console.error('Error fetching matches:', error)
+        setMatches([]) // Clear matches on error
       } finally {
         setLoading(false)
       }
     }
 
     fetchMatches()
-  }, [selectedLeague])
+  }, [mappedLeague])
 
   const matchesByDate = matches.reduce((acc: Record<string, Match[]>, match) => {
     const date = match.date.split('T')[0]
@@ -87,14 +96,13 @@ export default function UpcomingMatches() {
       <div className="mb-10 flex justify-center">
         <div className="relative">
           <select
-            value={selectedLeague}
             onChange={(e) => setSelectedLeague(e.target.value)}
             className="appearance-none bg-gray-800 border border-gray-700 text-white text-lg rounded-lg py-3 px-5 pr-10 focus:outline-none focus:border-blue-500 transition duration-300 ease-in-out"
           >
             <option value="">Select a league</option>
-            {Object.entries(leagueOptions).map(([name, value]) => (
-              <option key={value} value={value}>
-                {name}
+            {leagues.map((league) => (
+              <option key={league} value={league}>
+                {league}
               </option>
             ))}
           </select>
@@ -104,21 +112,16 @@ export default function UpcomingMatches() {
         </div>
       </div>
 
-      {!selectedLeague ? (
-        <div className="text-center bg-gray-900 p-8 rounded-xl shadow-2xl">
-          <p className="text-2xl font-semibold text-white mb-4">Please select a league</p>
-          <p className="text-gray-400">Select a league from the dropdown above to see upcoming matches.</p>
-        </div>
-      ) : loading ? (
+      {loading ? (
         <div className="flex justify-center items-center h-64">
           <SoccerSpinner />
         </div>
-      ) : matches.length === 0 ? (
+      ) : mappedLeague && matches.length === 0 ? (
         <div className="text-center bg-gray-900 p-8 rounded-xl shadow-2xl">
           <p className="text-2xl font-semibold text-white mb-4">No Upcoming Matches</p>
           <p className="text-gray-400">There are no scheduled matches for this league at the moment. Please check back later.</p>
         </div>
-      ) : (
+      ) : mappedLeague && (
         <div className="bg-gray-900 p-8 rounded-xl shadow-2xl">
           {/* View Mode Toggle */}
           <div className="flex justify-end mb-6 space-x-2">
@@ -182,15 +185,30 @@ export default function UpcomingMatches() {
           ) : (
             // Day View
             <div className="space-y-6">
-              <h2 className="text-3xl font-bold text-white mb-6">
-                {format(selectedDate, 'EEEE, MMMM d, yyyy')}
-              </h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-3xl font-bold text-white">
+                  {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+                </h2>
+                <button
+                  onClick={() => setViewMode('week')}
+                  className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors duration-300"
+                >
+                  ← Back to Week View
+                </button>
+              </div>
               {getMatchesForDate(selectedDate).length > 0 ? (
                 getMatchesForDate(selectedDate).map((match, idx) => (
                   <div key={idx} className="bg-gray-800 p-6 rounded-lg shadow-lg">
                     <div className="text-xl font-semibold text-white mb-4 text-center">
                       {match.home_team} vs {match.away_team}
                     </div>
+                    {match.predicted_home_goals !== undefined && match.predicted_away_goals !== undefined && (
+                      <div className="text-center mb-4">
+                        <span className="text-lg font-bold text-green-400">
+                          Predicted Scoreline: {match.predicted_home_goals} - {match.predicted_away_goals}
+                        </span>
+                      </div>
+                    )}
                     <PredictionResult
                       result={{
                         predictions: {

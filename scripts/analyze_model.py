@@ -195,10 +195,15 @@ def analyze_model_for_league(league_name: str) -> None:
 
         df = load_processed_data(league_name)
         
-        # Filter for played matches and last 10 seasons (consistent with training)
+        # Filter for played matches and EXCLUDE current season (2025-2026)
+        # Use ALL historical data - matching training approach
         df = df[df["status"] == "played"].copy()
         df["season_start_year"] = df["season"].apply(lambda x: int(str(x).split("-")[0]))
-        df = df[(df["season_start_year"] >= 2015) & (df["season_start_year"] <= 2025)]
+        current_season_start = 2025
+        df = df[df["season_start_year"] < current_season_start].copy()
+        
+        tqdm.write(f"Using ALL historical data from {df['season_start_year'].min()} to {df['season_start_year'].max()}")
+        tqdm.write(f"Total matches for analysis: {len(df)}")
 
         X, y, _ = prepare_features(df) # _ to ignore feature_cols from prepare_features as we use model_data's feature_cols
         X = X[feature_cols] # Ensure feature order and selection matches training
