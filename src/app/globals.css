@@ -3,14 +3,18 @@
 @tailwind utilities;
 
 :root {
-  --background: #0D1117;
-  --text: #E0E0E0;
-  --accent: #00C853;
+  --background: #f0f9f4;
+  --text: #1f2937;
+  --accent: #10b981;
+  --secondary-bg: #ffffff;
+  --border-color: #d1d5db;
 }
 
 body {
-  background-color: var(--background);
+  background: linear-gradient(135deg, #f0f9f4 0%, #e0f2fe 50%, #fef3c7 100%);
+  background-attachment: fixed;
   color: var(--text);
+  min-height: 100vh;
 }
 
 .hover-glow {
@@ -24,8 +28,8 @@ body {
 /* Soccer field background pattern */
 .field-pattern {
   background-image: linear-gradient(
-    rgba(13, 17, 23, 0.97),
-    rgba(13, 17, 23, 0.97)
+    rgba(240, 249, 244, 0.95),
+    rgba(224, 242, 254, 0.95)
   ),
   url('/soccer-field.svg');
   background-repeat: repeat;

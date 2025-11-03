@@ -24,18 +24,28 @@ export const LeagueStats = ({ league }: LeagueStatsProps) => {
 
   return (
     <div className="w-full">
-      <div className="text-center mb-6">
-        <h2 className="text-3xl font-bold">League Overview</h2>
-        <div className="w-24 h-1 bg-green-500 mx-auto mt-2"></div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-        {stats.map((stat) => (
-          <div key={stat.label} className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 flex flex-col items-center justify-center text-center">
-            <div className="text-4xl mb-3">{stat.icon}</div>
-            <div className="text-lg font-semibold text-gray-300">{stat.label}</div>
-            <div className="text-3xl font-bold text-blue-400 mt-1">{stat.value}</div>
-          </div>
-        ))}
+      {/* Prominent border around entire league stats section */}
+      <div className="border-4 border-green-500 rounded-2xl p-8 bg-gradient-to-br from-gray-800/50 to-gray-900/50 shadow-2xl">
+        <div className="text-center mb-8">
+          <h2 className="text-4xl font-bold text-white flex items-center justify-center gap-3">
+            <span className="text-5xl">⚽</span>
+            League Overview
+            <span className="text-5xl">⚽</span>
+          </h2>
+          <div className="w-32 h-1 bg-gradient-to-r from-green-400 to-blue-500 mx-auto mt-3"></div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+          {stats.map((stat) => (
+            <div 
+              key={stat.label} 
+              className="bg-gradient-to-br from-white to-gray-100 p-6 rounded-xl shadow-lg border-2 border-gray-300 flex flex-col items-center justify-center text-center hover:shadow-xl transition-shadow duration-300 hover:scale-105 transform"
+            >
+              <div className="text-5xl mb-3">{stat.icon}</div>
+              <div className="text-sm font-semibold text-gray-700 uppercase tracking-wide">{stat.label}</div>
+              <div className="text-3xl font-black text-green-600 mt-2">{stat.value}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )

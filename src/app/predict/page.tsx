@@ -107,8 +107,8 @@ function PredictPageContent() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="text-center mb-12">
-        <h1 className="text-5xl font-extrabold text-white sm:text-6xl md:text-7xl">Match Prediction</h1>
-        <p className="mt-4 text-xl text-gray-400 max-w-3xl mx-auto">
+        <h1 className="text-5xl font-extrabold text-gray-800 sm:text-6xl md:text-7xl">Match Prediction</h1>
+        <p className="mt-4 text-xl text-gray-600 max-w-3xl mx-auto">
           Select two teams to see the predicted outcome of a match between them.
         </p>
       </div>
@@ -119,8 +119,8 @@ function PredictPageContent() {
           <button
             className={`px-6 py-3 rounded-lg font-semibold transition-colors duration-300 ${
               mode === 'head-to-head' 
-                ? 'bg-green-500 text-black' 
-                : 'bg-gray-800 text-white hover:bg-gray-700'
+                ? 'bg-green-500 text-white' 
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
             }`}
             onClick={() => setMode('head-to-head')}
           >
@@ -129,8 +129,8 @@ function PredictPageContent() {
           <button
             className={`px-6 py-3 rounded-lg font-semibold transition-colors duration-300 ${
               mode === 'cross-league' 
-                ? 'bg-green-500 text-black' 
-                : 'bg-gray-800 text-white hover:bg-gray-700'
+                ? 'bg-green-500 text-white' 
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
             }`}
             onClick={() => setMode('cross-league')}
           >
@@ -139,7 +139,7 @@ function PredictPageContent() {
         </div>
 
         {/* Prediction Form */}
-        <div className="bg-gray-900 p-8 rounded-xl shadow-2xl mb-8">
+        <div className="bg-white p-8 rounded-xl shadow-2xl mb-8 border-2 border-gray-200">
           {mode === 'head-to-head' ? (
             <div className="space-y-6">
               <TeamSelector
@@ -161,7 +161,7 @@ function PredictPageContent() {
           <button
             onClick={handlePredict}
             disabled={loading}
-            className="w-full mt-8 px-6 py-4 bg-green-500 text-black text-lg font-bold rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full mt-8 px-6 py-4 bg-green-500 text-white text-lg font-bold rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
           >
             {loading ? (
               <div className="flex items-center justify-center">
@@ -180,7 +180,7 @@ function PredictPageContent() {
             <SoccerSpinner />
           </div>
         ) : result && (
-          <div className="bg-gray-900 p-8 rounded-xl shadow-2xl">
+          <div className="bg-white p-8 rounded-xl shadow-2xl border-2 border-gray-200">
             <PredictionResult result={result} mode={mode} />
           </div>
         )}

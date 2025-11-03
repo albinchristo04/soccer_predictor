@@ -37,8 +37,8 @@ export default function AnalyticsPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="text-center mb-12">
-        <h1 className="text-5xl font-extrabold text-white sm:text-6xl md:text-7xl">League Analytics</h1>
-        <p className="mt-4 text-xl text-gray-400 max-w-3xl mx-auto">
+        <h1 className="text-5xl font-extrabold text-gray-800 sm:text-6xl md:text-7xl">League Analytics</h1>
+        <p className="mt-4 text-xl text-gray-600 max-w-3xl mx-auto">
           Dive deep into the statistics of each league. Explore interactive charts to understand league dynamics, team performance, and the key factors that influence match outcomes.
         </p>
       </div>
@@ -47,7 +47,7 @@ export default function AnalyticsPage() {
         <div className="relative">
           <select
             onChange={(e) => setSelectedLeague(e.target.value)}
-            className="appearance-none bg-gray-800 border border-gray-700 text-white text-lg rounded-lg py-3 px-5 pr-10 focus:outline-none focus:border-blue-500 transition duration-300 ease-in-out"
+            className="appearance-none bg-white border-2 border-green-500 text-gray-800 text-lg rounded-lg py-3 px-5 pr-10 focus:outline-none focus:border-green-600 focus:ring-2 focus:ring-green-500 transition duration-300 ease-in-out shadow-md"
           >
             <option value="">Select a league</option>
             {leagues.map((league) => (
@@ -56,7 +56,7 @@ export default function AnalyticsPage() {
               </option>
             ))}
           </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-green-600">
             <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M5.516 7.548c.436-.446 1.143-.446 1.579 0L10 10.405l2.905-2.857c.436-.446 1.143-.446 1.579 0 .436.445.436 1.167 0 1.612l-3.695 3.63c-.436.446-1.143.446-1.579 0L5.516 9.16c-.436-.445-.436-1.167 0-1.612z"/></svg>
           </div>
         </div>

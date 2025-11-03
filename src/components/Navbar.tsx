@@ -32,35 +32,35 @@ export const Navbar = () => {
   }
 
   return (
-    <nav className="sticky top-0 z-50 bg-secondary py-4 shadow-lg" role="navigation">
+    <nav className="sticky top-0 z-50 bg-white shadow-lg border-b-4 border-green-500" role="navigation">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold hover:text-accent transition-colors">
+          <Link href="/" className="text-2xl font-bold text-gray-800 hover:text-green-600 transition-colors">
             ⚽ Soccer Stats Predictor
           </Link>
 
           <div className="flex items-center space-x-6">
             <Link 
               href="/upcoming" 
-              className="px-4 py-2 hover:text-accent transition-colors focus:outline-none focus:ring-2 focus:ring-accent rounded-md"
+              className="px-4 py-2 text-gray-700 hover:text-green-600 font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 rounded-md"
             >
               Upcoming Matches
             </Link>
             <Link 
               href="/predict" 
-              className="px-4 py-2 hover:text-accent transition-colors focus:outline-none focus:ring-2 focus:ring-accent rounded-md"
+              className="px-4 py-2 text-gray-700 hover:text-green-600 font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 rounded-md"
             >
               Predict
             </Link>
             <Link 
               href="/analytics" 
-              className="px-4 py-2 hover:text-accent transition-colors focus:outline-none focus:ring-2 focus:ring-accent rounded-md"
+              className="px-4 py-2 text-gray-700 hover:text-green-600 font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 rounded-md"
             >
               Analytics
             </Link>
             <Link 
               href="/about" 
-              className="px-4 py-2 hover:text-accent transition-colors focus:outline-none focus:ring-2 focus:ring-accent rounded-md"
+              className="px-4 py-2 text-gray-700 hover:text-green-600 font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 rounded-md"
             >
               About
             </Link>

@@ -9,11 +9,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <head>
         <link rel="icon" href="/soccer-ball.png" />
       </head>
-      <body className="min-h-screen bg-background text-text">
+      <body className="min-h-screen">
         <PageLoader />
         <div className="flex flex-col min-h-screen">
           <Navbar />

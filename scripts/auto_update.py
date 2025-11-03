@@ -24,6 +24,7 @@ import subprocess
 from datetime import datetime
 import logging
 from typing import Tuple, Optional, List
+import pandas as pd
 
 # Setup logging
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -48,13 +49,21 @@ logger = logging.getLogger(__name__)
 # Configuration
 # --------------------------
 DATA_DIR: str = os.path.join(ROOT_DIR, "fbref_data")
-SEASON_LINKS_PATH: str = os.path.join(DATA_DIR, "season_links.json")
 
-# Leagues to update (or 'all')
+# Leagues to update (can be 'all' or specific league)
 LEAGUES_TO_UPDATE: str = "all"  # Change to specific league if needed
 
 # Retrain threshold: retrain if new data added
-RETRAIN_THRESHOLD: int = 10  # Minimum new rows to trigger retrain
+RETRAIN_THRESHOLD: int = 50  # Minimum new rows to trigger retrain
+
+# Available leagues
+AVAILABLE_LEAGUES = [
+    "premier_league",
+    "la_liga",
+    "bundesliga",
+    "serie_a",
+    "ligue_1"
+]
 
 
 # --------------------------
@@ -98,35 +107,41 @@ def run_script(
 
 
 # --------------------------
-# Check for updates
+# Check for new matches
 # --------------------------
-def check_for_updates() -> bool:
+def check_for_new_matches(league: str) -> int:
     """
-    Check if the season links file needs to be updated.
-
+    Check if there are new matches to scrape for a league.
+    
     Returns:
-        True if an update is needed, False otherwise.
+        Number of estimated new matches
     """
-    logger.info("Checking for season updates...")
-
-    if not os.path.exists(SEASON_LINKS_PATH):
-        logger.warning("Season links not found. Generating...")
-        return True
-
-    now = datetime.now()
-    if now.month == 8 and now.day <= 7:
-        logger.info("New season detected (August). Updating season links...")
-        return True
-
-    file_mod_time = datetime.fromtimestamp(os.path.getmtime(SEASON_LINKS_PATH))
-    days_old = (now - file_mod_time).days
-
-    if days_old > 30:
-        logger.info(f"Season links are {days_old} days old. Updating...")
-        return True
-
-    logger.info("Season links are up to date.")
-    return False
+    processed_file = os.path.join(DATA_DIR, league, "data", "processed.csv")
+    
+    if not os.path.exists(processed_file):
+        logger.info(f"{league}: No processed data found")
+        return 0
+    
+    df = pd.read_csv(processed_file)
+    if 'Date' not in df.columns:
+        return 0
+    
+    # Check most recent match date
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    last_match = df['Date'].max()
+    
+    if pd.isna(last_match):
+        return 0
+    
+    days_since_last = (datetime.now() - last_match).days
+    
+    # Estimate: ~3-4 matches per week during season
+    estimated_new_matches = max(0, (days_since_last // 7) * 3)
+    
+    logger.info(f"{league}: Last match {last_match.date()}, {days_since_last} days ago")
+    logger.info(f"{league}: Estimated {estimated_new_matches} new matches")
+    
+    return estimated_new_matches
 
 
 # --------------------------
@@ -144,15 +159,21 @@ def update_data() -> bool:
     logger.info("=" * 60)
     logger.info(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    if check_for_updates():
-        success, _ = run_script("populate_seasons.py")
-        if not success:
-            logger.error("Failed to update season links. Aborting.")
-            return False
+    # Check for new matches across all leagues
+    total_estimated_new = 0
+    leagues_to_process = AVAILABLE_LEAGUES if LEAGUES_TO_UPDATE == "all" else [LEAGUES_TO_UPDATE]
+    
+    for league in leagues_to_process:
+        estimated_new = check_for_new_matches(league)
+        total_estimated_new += estimated_new
+    
+    if total_estimated_new == 0:
+        logger.info("No new matches estimated. Skipping scraping.")
+        return True
 
-    logger.info("\nStep 2: Scraping new data...")
+    logger.info(f"\nStep 1: Scraping new data for {len(leagues_to_process)} league(s)...")
     success, output = run_script(
-        "fbref_scraper.py", input_text=LEAGUES_TO_UPDATE + "\n"
+        "scrape_all_leagues.py", input_text=LEAGUES_TO_UPDATE + "\n"
     )
 
     if not success:
@@ -170,17 +191,11 @@ def update_data() -> bool:
     logger.info(f"Total new rows added: {new_rows}")
 
     if new_rows == 0:
-        logger.info("No new data found. Skipping processing and training.")
+        logger.info("No new data found. Skipping training.")
         return True
 
-    logger.info("\nStep 3: Processing data...")
-    success, _ = run_script("process_scraped_data.py")
-
-    if not success:
-        logger.error("Failed to process data. Continuing anyway...")
-
+    logger.info("\nStep 2: Retraining models...")
     if new_rows >= RETRAIN_THRESHOLD:
-        logger.info(f"\nStep 4: Retraining models ({new_rows} new rows)...")
         success, _ = run_script(
             "train_league_models.py", input_text=LEAGUES_TO_UPDATE + "\n"
         )
@@ -189,10 +204,20 @@ def update_data() -> bool:
             logger.error("Failed to retrain models.")
             return False
 
-        logger.info("Models retrained successfully")
+        logger.info("✓ Models retrained successfully")
+        
+        logger.info("\nStep 3: Generating analytics visualizations...")
+        success, _ = run_script(
+            "analyze_model.py", input_text=LEAGUES_TO_UPDATE + "\n"
+        )
+        
+        if not success:
+            logger.warning("Failed to generate analytics (non-critical)")
+        else:
+            logger.info("✓ Analytics generated successfully")
     else:
         logger.info(
-            f"\nStep 4: Skipping retrain ({new_rows} < {RETRAIN_THRESHOLD} threshold)"
+            f"\nStep 2: Skipping retrain ({new_rows} < {RETRAIN_THRESHOLD} threshold)"
         )
 
     logger.info("\n" + "=" * 60)

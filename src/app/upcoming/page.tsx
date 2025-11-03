@@ -87,8 +87,8 @@ export default function UpcomingMatches() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="text-center mb-12">
-        <h1 className="text-5xl font-extrabold text-white sm:text-6xl md:text-7xl">Upcoming Matches</h1>
-        <p className="mt-4 text-xl text-gray-400 max-w-3xl mx-auto">
+        <h1 className="text-5xl font-extrabold text-gray-800 sm:text-6xl md:text-7xl">Upcoming Matches</h1>
+        <p className="mt-4 text-xl text-gray-600 max-w-3xl mx-auto">
           Explore upcoming matches and see AI-powered predictions for various leagues.
         </p>
       </div>
@@ -97,7 +97,7 @@ export default function UpcomingMatches() {
         <div className="relative">
           <select
             onChange={(e) => setSelectedLeague(e.target.value)}
-            className="appearance-none bg-gray-800 border border-gray-700 text-white text-lg rounded-lg py-3 px-5 pr-10 focus:outline-none focus:border-blue-500 transition duration-300 ease-in-out"
+            className="appearance-none bg-white border-2 border-green-500 text-gray-800 text-lg rounded-lg py-3 px-5 pr-10 focus:outline-none focus:border-green-600 focus:ring-2 focus:ring-green-500 transition duration-300 ease-in-out shadow-md"
           >
             <option value="">Select a league</option>
             {leagues.map((league) => (
@@ -106,7 +106,7 @@ export default function UpcomingMatches() {
               </option>
             ))}
           </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-green-600">
             <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M5.516 7.548c.436-.446 1.143-.446 1.579 0L10 10.405l2.905-2.857c.436-.446 1.143-.446 1.579 0 .436.445.436 1.167 0 1.612l-3.695 3.63c-.436.446-1.143.446-1.579 0L5.516 9.16c-.436-.445-.436-1.167 0-1.612z"/></svg>
           </div>
         </div>
@@ -117,18 +117,18 @@ export default function UpcomingMatches() {
           <SoccerSpinner />
         </div>
       ) : mappedLeague && matches.length === 0 ? (
-        <div className="text-center bg-gray-900 p-8 rounded-xl shadow-2xl">
-          <p className="text-2xl font-semibold text-white mb-4">No Upcoming Matches</p>
-          <p className="text-gray-400">There are no scheduled matches for this league at the moment. Please check back later.</p>
+        <div className="text-center bg-white p-8 rounded-xl shadow-2xl border-2 border-gray-200">
+          <p className="text-2xl font-semibold text-gray-800 mb-4">No Upcoming Matches</p>
+          <p className="text-gray-600">There are no scheduled matches for this league at the moment. Please check back later.</p>
         </div>
       ) : mappedLeague && (
-        <div className="bg-gray-900 p-8 rounded-xl shadow-2xl">
+        <div className="bg-white p-8 rounded-xl shadow-2xl border-2 border-gray-200">
           {/* View Mode Toggle */}
           <div className="flex justify-end mb-6 space-x-2">
             <button
               onClick={() => setViewMode('week')}
               className={`px-4 py-2 rounded-lg font-semibold transition-colors duration-300 ${
-                viewMode === 'week' ? 'bg-green-500 text-black' : 'bg-gray-800 text-white hover:bg-gray-700'
+                viewMode === 'week' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
               }`}
             >
               Week View
@@ -136,7 +136,7 @@ export default function UpcomingMatches() {
             <button
               onClick={() => setViewMode('day')}
               className={`px-4 py-2 rounded-lg font-semibold transition-colors duration-300 ${
-                viewMode === 'day' ? 'bg-green-500 text-black' : 'bg-gray-800 text-white hover:bg-gray-700'
+                viewMode === 'day' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
               }`}
             >
               Day View
@@ -154,28 +154,28 @@ export default function UpcomingMatches() {
                   <div
                     key={date.toString()}
                     className={`p-4 rounded-lg transition-all duration-300 cursor-pointer ${
-                      isToday ? 'bg-green-500/20 border-2 border-green-500' : 'bg-gray-800 hover:bg-gray-700'
+                      isToday ? 'bg-green-100 border-2 border-green-500' : 'bg-gray-50 hover:bg-gray-100 border-2 border-gray-200'
                     }`}
                     onClick={() => {
                       setSelectedDate(date)
                       setViewMode('day')
                     }}
                   >
-                    <div className="font-bold text-center text-white mb-3">
+                    <div className="font-bold text-center text-gray-800 mb-3">
                       {format(date, 'EEE')}
                     </div>
-                    <div className="text-center text-gray-300 mb-4">
+                    <div className="text-center text-gray-600 mb-4">
                       {format(date, 'MMM d')}
                     </div>
                     <div className="space-y-2">
                       {dayMatches.length > 0 ? (
                         dayMatches.map((match, idx) => (
-                          <div key={idx} className="text-xs text-center text-gray-400 truncate">
+                          <div key={idx} className="text-xs text-center text-gray-700 truncate">
                             {match.home_team} vs {match.away_team}
                           </div>
                         ))
                       ) : (
-                        <div className="text-xs text-center text-gray-500">No matches</div>
+                        <div className="text-xs text-center text-gray-400">No matches</div>
                       )}
                     </div>
                   </div>
@@ -186,25 +186,25 @@ export default function UpcomingMatches() {
             // Day View
             <div className="space-y-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-3xl font-bold text-white">
+                <h2 className="text-3xl font-bold text-gray-800">
                   {format(selectedDate, 'EEEE, MMMM d, yyyy')}
                 </h2>
                 <button
                   onClick={() => setViewMode('week')}
-                  className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors duration-300"
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors duration-300"
                 >
                   ← Back to Week View
                 </button>
               </div>
               {getMatchesForDate(selectedDate).length > 0 ? (
                 getMatchesForDate(selectedDate).map((match, idx) => (
-                  <div key={idx} className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                    <div className="text-xl font-semibold text-white mb-4 text-center">
+                  <div key={idx} className="bg-gradient-to-br from-gray-50 to-white p-6 rounded-lg shadow-lg border-2 border-gray-200">
+                    <div className="text-xl font-semibold text-gray-800 mb-4 text-center">
                       {match.home_team} vs {match.away_team}
                     </div>
                     {match.predicted_home_goals !== undefined && match.predicted_away_goals !== undefined && (
                       <div className="text-center mb-4">
-                        <span className="text-lg font-bold text-green-400">
+                        <span className="text-lg font-bold text-green-600">
                           Predicted Scoreline: {match.predicted_home_goals} - {match.predicted_away_goals}
                         </span>
                       </div>
@@ -224,7 +224,7 @@ export default function UpcomingMatches() {
                   </div>
                 ))
               ) : (
-                <div className="text-center text-gray-400 py-8">
+                <div className="text-center text-gray-600 py-8">
                   No matches scheduled for this day.
                 </div>
               )}

@@ -140,16 +140,31 @@ pip install -r requirements.txt
 npm install
 ```
 
-4. **Train Models** (Optional - pre-trained models included)
+4. **Generate Data and Train Models**
+
+⚠️ **Important:** The repository does NOT include CSV data files or trained models (.pkl files) due to their large size. You must generate them locally:
 
 ```bash
-# Automated training script
-./scripts/retrain_all.sh
+# Step 1: Scrape data from FBRef (this will take some time)
+./.venv/bin/python scripts/scrape_all_leagues.py
+# When prompted, enter 'all' to scrape all leagues
 
-# Or manual training:
-./.venv/bin/python scripts/train_league_models.py  # Enter 'all'
-./.venv/bin/python scripts/analyze_model.py  # Enter 'all'
+# Step 2: Train models on the scraped data
+./.venv/bin/python scripts/train_league_models.py
+# When prompted, enter 'all' to train all leagues
+
+# Step 3: Generate analytics visualizations
+./.venv/bin/python scripts/analyze_model.py
+# When prompted, enter 'all' to analyze all leagues
 ```
+
+This process will create:
+
+- `fbref_data/{league}/data/processed.csv` - Processed match data
+- `fbref_data/{league}/models/model.pkl` - Trained Random Forest models
+- `fbref_data/{league}/visualizations/*.png` - Performance charts
+
+**Expected time:** ~30-60 minutes for all leagues (depends on internet speed and CPU)
 
 5. **Run Application**
 
@@ -273,8 +288,6 @@ The application currently supports **5 major European leagues** with comprehensi
 | **Ligue 1**        | France 🇫🇷  | 1932-2024         | 27,492        |
 
 **Total:** 150,000+ historical matches analyzed
-
-**Coming Soon:** Eredivisie, Liga Portugal, Süper Lig, Primera División (Argentina)
 
 ---
 

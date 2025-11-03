@@ -1,4 +1,5 @@
 import React from 'react';
+import { ImageModal } from './ImageModal';
 
 interface MLMetricsVisualizationsProps {
   league: string;
@@ -91,108 +92,154 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
   ];
 
   return (
-    <div className="space-y-16">
+    <div className="space-y-16 bg-gradient-to-br from-green-50 via-blue-50 to-white p-8 rounded-3xl relative overflow-hidden">
+      {/* Soccer-themed background pattern */}
+      <div className="absolute inset-0 opacity-5 pointer-events-none">
+        <div className="absolute top-10 left-10 text-8xl">⚽</div>
+        <div className="absolute top-40 right-20 text-6xl">🏆</div>
+        <div className="absolute bottom-20 left-1/4 text-7xl">⚽</div>
+        <div className="absolute top-1/3 right-1/3 text-9xl">⚽</div>
+        <div className="absolute bottom-10 right-10 text-6xl">🥅</div>
+        <div className="absolute top-1/2 left-10 text-5xl">🏟️</div>
+      </div>
+
       {/* Header */}
-      <div className="text-center">
-        <h2 className="text-4xl font-extrabold text-white mb-4">Model Performance Metrics</h2>
-        <p className="text-lg text-gray-400 max-w-3xl mx-auto">
-          Comprehensive analysis of the machine learning model trained on {league.replace('_', ' ').toUpperCase()} match data. 
+      <div className="text-center relative z-10">
+        <div className="flex items-center justify-center gap-4 mb-4">
+          <span className="text-5xl">📊</span>
+          <h2 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">
+            Model Performance Metrics
+          </h2>
+          <span className="text-5xl">📊</span>
+        </div>
+        <p className="text-lg text-gray-700 max-w-3xl mx-auto font-medium">
+          Comprehensive analysis of the machine learning model trained on <span className="font-bold text-green-600">{league.replace('_', ' ').toUpperCase()}</span> match data. 
           These visualizations show prediction accuracy, feature importance, and model confidence levels.
         </p>
-        <div className="w-32 h-1 bg-gradient-to-r from-blue-500 to-green-500 mx-auto mt-4"></div>
+        <div className="w-48 h-1.5 bg-gradient-to-r from-green-500 via-blue-500 to-green-500 mx-auto mt-4 rounded-full"></div>
       </div>
 
       {/* Main Performance Metrics */}
-      <div>
+      <div className="relative z-10">
         <div className="text-center mb-8">
-          <h3 className="text-3xl font-bold text-white">Model Performance Analysis</h3>
-          <div className="w-24 h-1 bg-blue-500 mx-auto mt-3"></div>
+          <h3 className="text-3xl font-bold text-gray-800 flex items-center justify-center gap-3">
+            <span className="text-4xl">🎯</span>
+            Model Performance Analysis
+            <span className="text-4xl">🎯</span>
+          </h3>
+          <div className="w-32 h-1 bg-green-500 mx-auto mt-3 rounded-full"></div>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
-          {modelVisualizationImages.map((image) => {
+        
+        {/* First Row: Confusion Matrix and Feature Importance */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-10">
+          {modelVisualizationImages.slice(0, 2).map((image) => {
             const imageUrl = `/api/visualizations/${league}/${image.name}`;
             
             return (
               <div 
                 key={image.name} 
-                className="bg-gradient-to-br from-gray-800 to-gray-900 p-6 rounded-2xl shadow-2xl border border-gray-700 
-                         flex flex-col transition-all duration-300 ease-in-out hover:scale-105 hover:shadow-blue-500/20 hover:border-blue-500/50"
+                className="bg-white p-8 rounded-2xl shadow-xl border-2 border-gray-200 
+                         flex flex-col transition-all duration-300 ease-in-out hover:shadow-2xl hover:border-green-400"
+                style={{ minHeight: '600px' }}
               >
-                <h4 className="text-xl font-bold mb-4 text-center text-white">{image.title}</h4>
-                <div className="flex-grow flex items-center justify-center bg-gray-900/50 rounded-lg p-4 mb-4">
-                  <img 
-                    src={imageUrl} 
-                    alt={image.title} 
-                    className="max-w-full h-auto object-contain rounded-md"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = '/placeholder-chart.png';
-                    }}
+                <h4 className="text-2xl font-bold mb-6 text-center text-gray-800">{image.title}</h4>
+                <div className="flex-grow flex items-center justify-center bg-gray-50 rounded-lg p-6 mb-6 border border-gray-200">
+                  <ImageModal
+                    src={imageUrl}
+                    alt={image.title}
+                    title={image.title}
+                    description={image.description}
                   />
                 </div>
-                <p className="text-sm text-gray-400 text-center leading-relaxed">{image.description}</p>
+                <p className="text-base text-gray-600 text-center leading-relaxed">{image.description}</p>
               </div>
             );
           })}
         </div>
+
+        {/* Second Row: Prediction Distribution (Centered) */}
+        {modelVisualizationImages.slice(2).map((image) => {
+          const imageUrl = `/api/visualizations/${league}/${image.name}`;
+          
+          return (
+            <div key={image.name} className="flex justify-center">
+              <div 
+                className="bg-white p-8 rounded-2xl shadow-xl border-2 border-gray-200 
+                         flex flex-col transition-all duration-300 ease-in-out hover:shadow-2xl hover:border-green-400 w-full lg:w-2/3"
+                style={{ minHeight: '600px' }}
+              >
+                <h4 className="text-2xl font-bold mb-6 text-center text-gray-800">{image.title}</h4>
+                <div className="flex-grow flex items-center justify-center bg-gray-50 rounded-lg p-6 mb-6 border border-gray-200">
+                  <ImageModal
+                    src={imageUrl}
+                    alt={image.title}
+                    title={image.title}
+                    description={image.description}
+                  />
+                </div>
+                <p className="text-base text-gray-600 text-center leading-relaxed">{image.description}</p>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Divider */}
-      <div className="relative">
+      <div className="relative z-10">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-700"></div>
+          <div className="w-full border-t-2 border-green-300"></div>
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="px-6 py-2 bg-gray-900 text-gray-400 font-semibold rounded-full border border-gray-700">
-            Classification Reports
+          <span className="px-6 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white font-bold rounded-full shadow-lg">
+            📋 Classification Reports
           </span>
         </div>
       </div>
 
       {/* Classification Reports */}
-      <div>
+      <div className="relative z-10">
         <div className="text-center mb-8">
-          <h3 className="text-3xl font-bold text-white">Detailed Classification Metrics</h3>
-          <div className="w-24 h-1 bg-green-500 mx-auto mt-3"></div>
+          <h3 className="text-3xl font-bold text-gray-800 flex items-center justify-center gap-3">
+            <span className="text-4xl">📈</span>
+            Detailed Classification Metrics
+            <span className="text-4xl">📈</span>
+          </h3>
+          <div className="w-32 h-1 bg-blue-500 mx-auto mt-3 rounded-full"></div>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-stretch">
           {classificationReportImages.map((image) => {
             const imageUrl = `/api/visualizations/${league}/${image.name}`;
             const bgGradient = image.category === 'train' 
-              ? 'from-green-900/20 to-gray-900' 
-              : 'from-blue-900/20 to-gray-900';
+              ? 'from-green-50 to-white' 
+              : 'from-blue-50 to-white';
             const borderColor = image.category === 'train'
-              ? 'border-green-500/30 hover:border-green-500/60'
-              : 'border-blue-500/30 hover:border-blue-500/60';
+              ? 'border-green-300 hover:border-green-500'
+              : 'border-blue-300 hover:border-blue-500';
+            const badgeColor = image.category === 'train'
+              ? 'bg-green-500 text-white'
+              : 'bg-blue-500 text-white';
             
             return (
               <div 
                 key={image.name} 
-                className={`bg-gradient-to-br ${bgGradient} p-8 rounded-2xl shadow-2xl border ${borderColor}
-                         flex flex-col transition-all duration-300 ease-in-out hover:scale-102 hover:shadow-xl`}
+                className={`bg-gradient-to-br ${bgGradient} p-8 rounded-2xl shadow-xl border-2 ${borderColor}
+                         flex flex-col transition-all duration-300 ease-in-out hover:shadow-2xl h-full`}
               >
                 <div className="flex items-center justify-between mb-6">
-                  <h4 className="text-2xl font-bold text-white">{image.title}</h4>
-                  <span className={`px-4 py-1 rounded-full text-sm font-semibold ${
-                    image.category === 'train' 
-                      ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
-                      : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                  }`}>
-                    {image.category.toUpperCase()}
+                  <h4 className="text-2xl font-bold text-gray-800">{image.title}</h4>
+                  <span className={`px-3 py-1 ${badgeColor} rounded-full text-sm font-semibold`}>
+                    {image.category === 'train' ? 'Training' : 'Testing'}
                   </span>
                 </div>
-                <div className="flex-grow flex items-center justify-center bg-gray-900/70 rounded-xl p-6 mb-6">
-                  <img 
-                    src={imageUrl} 
-                    alt={image.title} 
-                    className="max-w-full h-auto object-contain rounded-md"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = '/placeholder-chart.png';
-                    }}
+                <div className="flex-grow flex items-center justify-center bg-white rounded-lg p-6 mb-6 border border-gray-200">
+                  <ImageModal
+                    src={imageUrl}
+                    alt={image.title}
+                    title={image.title}
+                    description={image.description}
                   />
                 </div>
-                <p className="text-base text-gray-400 leading-relaxed">{image.description}</p>
+                <p className="text-base text-gray-600 leading-relaxed">{image.description}</p>
               </div>
             );
           })}
@@ -200,58 +247,67 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
       </div>
 
       {/* Divider */}
-      <div className="relative">
+      <div className="relative z-10">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-700"></div>
+          <div className="w-full border-t-2 border-blue-300"></div>
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="px-6 py-2 bg-gray-900 text-gray-400 font-semibold rounded-full border border-gray-700">
-            Confidence Threshold Analysis
+          <span className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-full shadow-lg">
+            🎚️ Confidence Threshold Analysis
           </span>
         </div>
       </div>
 
       {/* Confidence Threshold Visualizations */}
-      <div>
+      <div className="relative z-10">
         <div className="text-center mb-8">
-          <h3 className="text-3xl font-bold text-white">Prediction Confidence Analysis</h3>
-          <p className="text-gray-400 mt-2 max-w-3xl mx-auto">
+          <h3 className="text-3xl font-bold text-gray-800 flex items-center justify-center gap-3">
+            <span className="text-4xl">🎯</span>
+            Prediction Confidence Analysis
+            <span className="text-4xl">🎯</span>
+          </h3>
+          <p className="text-gray-600 mt-2 max-w-3xl mx-auto font-medium">
             These charts show how model performance (precision, recall, F1-score) changes at different confidence thresholds. 
             Higher confidence means more reliable predictions but fewer total predictions.
           </p>
-          <div className="w-24 h-1 bg-purple-500 mx-auto mt-3"></div>
+          <div className="w-32 h-1 bg-purple-500 mx-auto mt-3 rounded-full"></div>
         </div>
         
         {/* Training Set Confidence */}
         <div className="mb-12">
-          <h4 className="text-2xl font-bold text-green-400 text-center mb-6">Training Set Confidence Metrics</h4>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <h4 className="text-2xl font-bold text-green-600 text-center mb-6 flex items-center justify-center gap-2">
+            <span className="text-3xl">🏋️</span>
+            Training Set Confidence Metrics
+          </h4>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
             {confidenceThresholdImages.filter(img => img.category === 'train').map((image) => {
               const imageUrl = `/api/visualizations/${league}/${image.name}`;
               const outcomeColor = 
-                image.outcome === 'win' ? 'from-green-500/10 to-transparent' :
-                image.outcome === 'draw' ? 'from-yellow-500/10 to-transparent' :
-                'from-red-500/10 to-transparent';
+                image.outcome === 'win' ? 'from-green-100 to-white' :
+                image.outcome === 'draw' ? 'from-yellow-100 to-white' :
+                'from-red-100 to-white';
+              const borderColor = 
+                image.outcome === 'win' ? 'border-green-300 hover:border-green-500' :
+                image.outcome === 'draw' ? 'border-yellow-300 hover:border-yellow-500' :
+                'from-red-300 hover:border-red-500';
               
               return (
                 <div 
                   key={image.name} 
-                  className={`bg-gradient-to-br from-gray-800 to-gray-900 p-6 rounded-xl shadow-xl border border-gray-700
-                           flex flex-col transition-all duration-300 ease-in-out hover:scale-105 hover:border-green-500/50`}
+                  className={`bg-gradient-to-br ${outcomeColor} p-6 rounded-xl shadow-xl border-2 border-gray-200
+                           flex flex-col transition-all duration-300 ease-in-out hover:shadow-2xl hover:${borderColor}`}
+                  style={{ minHeight: '500px' }}
                 >
-                  <h5 className="text-lg font-bold text-white mb-4 text-center">{image.title}</h5>
-                  <div className={`flex-grow flex items-center justify-center bg-gradient-to-br ${outcomeColor} rounded-lg p-4 mb-4`}>
-                    <img 
-                      src={imageUrl} 
-                      alt={image.title} 
-                      className="max-w-full h-auto object-contain rounded-md"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = '/placeholder-chart.png';
-                      }}
+                  <h5 className="text-lg font-bold text-gray-800 mb-4 text-center">{image.title}</h5>
+                  <div className="flex-grow flex items-center justify-center bg-white rounded-lg p-4 mb-4 border border-gray-200">
+                    <ImageModal
+                      src={imageUrl}
+                      alt={image.title}
+                      title={image.title}
+                      description={image.description}
                     />
                   </div>
-                  <p className="text-sm text-gray-400 text-center leading-relaxed">{image.description}</p>
+                  <p className="text-sm text-gray-600 text-center leading-relaxed">{image.description}</p>
                 </div>
               );
             })}
@@ -260,34 +316,39 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
 
         {/* Test Set Confidence */}
         <div>
-          <h4 className="text-2xl font-bold text-blue-400 text-center mb-6">Test Set Confidence Metrics (Real-World Performance)</h4>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <h4 className="text-2xl font-bold text-blue-600 text-center mb-6 flex items-center justify-center gap-2">
+            <span className="text-3xl">🧪</span>
+            Test Set Confidence Metrics (Real-World Performance)
+          </h4>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
             {confidenceThresholdImages.filter(img => img.category === 'test').map((image) => {
               const imageUrl = `/api/visualizations/${league}/${image.name}`;
               const outcomeColor = 
-                image.outcome === 'win' ? 'from-green-500/10 to-transparent' :
-                image.outcome === 'draw' ? 'from-yellow-500/10 to-transparent' :
-                'from-red-500/10 to-transparent';
+                image.outcome === 'win' ? 'from-green-100 to-white' :
+                image.outcome === 'draw' ? 'from-yellow-100 to-white' :
+                'from-red-100 to-white';
+              const borderColor = 
+                image.outcome === 'win' ? 'border-green-300 hover:border-green-500' :
+                image.outcome === 'draw' ? 'border-yellow-300 hover:border-yellow-500' :
+                'border-red-300 hover:border-red-500';
               
               return (
                 <div 
                   key={image.name} 
-                  className={`bg-gradient-to-br from-gray-800 to-gray-900 p-6 rounded-xl shadow-xl border border-gray-700
-                           flex flex-col transition-all duration-300 ease-in-out hover:scale-105 hover:border-blue-500/50`}
+                  className={`bg-gradient-to-br ${outcomeColor} p-6 rounded-xl shadow-xl border-2 border-gray-200
+                           flex flex-col transition-all duration-300 ease-in-out hover:shadow-2xl hover:${borderColor}`}
+                  style={{ minHeight: '500px' }}
                 >
-                  <h5 className="text-lg font-bold text-white mb-4 text-center">{image.title}</h5>
-                  <div className={`flex-grow flex items-center justify-center bg-gradient-to-br ${outcomeColor} rounded-lg p-4 mb-4`}>
-                    <img 
-                      src={imageUrl} 
-                      alt={image.title} 
-                      className="max-w-full h-auto object-contain rounded-md"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = '/placeholder-chart.png';
-                      }}
+                  <h5 className="text-lg font-bold text-gray-800 mb-4 text-center">{image.title}</h5>
+                  <div className="flex-grow flex items-center justify-center bg-white rounded-lg p-4 mb-4 border border-gray-200">
+                    <ImageModal
+                      src={imageUrl}
+                      alt={image.title}
+                      title={image.title}
+                      description={image.description}
                     />
                   </div>
-                  <p className="text-sm text-gray-400 text-center leading-relaxed">{image.description}</p>
+                  <p className="text-sm text-gray-600 text-center leading-relaxed">{image.description}</p>
                 </div>
               );
             })}
@@ -296,10 +357,10 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
       </div>
 
       {/* Footer Note */}
-      <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6 text-center">
-        <p className="text-sm text-gray-400">
-          <span className="font-semibold text-white">Note:</span> These visualizations are generated during model training and updated with each retraining cycle. 
-          The model emphasizes data from the last 10 seasons with exponential weighting towards recent years for improved accuracy.
+      <div className="bg-white/80 border-2 border-gray-300 rounded-xl p-6 text-center shadow-lg">
+        <p className="text-sm text-gray-700">
+          <span className="font-semibold text-green-600">⚽ Note:</span> These visualizations are generated during model training and updated with each retraining cycle. 
+          The model emphasizes data from the last 5 seasons with exponential weighting towards recent years for improved accuracy.
         </p>
       </div>
     </div>

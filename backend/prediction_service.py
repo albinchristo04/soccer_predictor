@@ -266,13 +266,34 @@ def predict_scoreline(
         # If away team likely to win: reduce home goals, boost away goals
         # If draw likely: keep closer to averages
         
-        predicted_home_goals = (
-            base_home_goals * (1.0 + 0.3 * home_win_prob - 0.3 * away_win_prob)
-        )
+        # More aggressive adjustment to make scoreline align with probabilities
+        # Use a scaling factor that increases with probability difference
+        prob_diff = abs(home_win_prob - away_win_prob)
+        adjustment_factor = 0.5 + (prob_diff * 1.0)  # Range: 0.5 to 1.5
         
-        predicted_away_goals = (
-            base_away_goals * (1.0 + 0.3 * away_win_prob - 0.3 * home_win_prob)
-        )
+        if home_win_prob > away_win_prob:
+            # Home team favored - boost home goals, reduce away goals
+            predicted_home_goals = base_home_goals * (1.0 + adjustment_factor * home_win_prob)
+            predicted_away_goals = base_away_goals * (1.0 - adjustment_factor * (home_win_prob - draw_prob) * 0.5)
+        elif away_win_prob > home_win_prob:
+            # Away team favored - reduce home goals, boost away goals
+            predicted_home_goals = base_home_goals * (1.0 - adjustment_factor * (away_win_prob - draw_prob) * 0.5)
+            predicted_away_goals = base_away_goals * (1.0 + adjustment_factor * away_win_prob)
+        else:
+            # Draw or very close - use base values with small adjustment
+            predicted_home_goals = base_home_goals * (1.0 + 0.2 * draw_prob)
+            predicted_away_goals = base_away_goals * (1.0 + 0.2 * draw_prob)
+        
+        # Ensure minimum difference when there's a clear favorite
+        if prob_diff > 0.15:  # More than 15% difference
+            if home_win_prob > away_win_prob:
+                # Ensure home team scores more
+                if predicted_home_goals <= predicted_away_goals:
+                    predicted_home_goals = predicted_away_goals + 0.5 + (prob_diff * 2)
+            else:
+                # Ensure away team scores more
+                if predicted_away_goals <= predicted_home_goals:
+                    predicted_away_goals = predicted_home_goals + 0.5 + (prob_diff * 2)
         
         # Round to 1 decimal place for cleaner display
         return {
@@ -546,8 +567,24 @@ def get_upcoming_matches(league: str) -> List[Dict[str, Any]]:
                 continue
 
         print(f"Successfully generated {len(predictions)} predictions")
-        predictions.sort(key=lambda x: x["date"])
-        return predictions
+        
+        # Deduplicate matches based on date, home_team, and away_team
+        seen_matches = set()
+        deduplicated_predictions = []
+        
+        for match in predictions:
+            # Create a unique key for each match
+            match_key = (match["date"], match["home_team"].lower(), match["away_team"].lower())
+            
+            if match_key not in seen_matches:
+                seen_matches.add(match_key)
+                deduplicated_predictions.append(match)
+            else:
+                print(f"Removing duplicate: {match['home_team']} vs {match['away_team']} on {match['date']}")
+        
+        print(f"After deduplication: {len(deduplicated_predictions)} unique matches")
+        deduplicated_predictions.sort(key=lambda x: x["date"])
+        return deduplicated_predictions
 
     except Exception as e:
         print(f"Error getting upcoming matches for league {league}: {str(e)}")

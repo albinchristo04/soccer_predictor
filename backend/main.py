@@ -142,11 +142,18 @@ async def predict_head_to_head(request: HeadToHeadRequest) -> Dict[str, Any]:
         result = ps.predict_head_to_head(
             request.league, request.home_team, request.away_team
         )
+        # Extract scoreline and probabilities from result
         return {
             "success": True,
-            "predictions": result,
-            "home_team": request.home_team,
-            "away_team": request.away_team,
+            "predictions": {
+                "home_win": result["home_win"],
+                "draw": result["draw"],
+                "away_win": result["away_win"],
+            },
+            "predicted_home_goals": result.get("predicted_home_goals"),
+            "predicted_away_goals": result.get("predicted_away_goals"),
+            "home_team": result.get("home_team", request.home_team),
+            "away_team": result.get("away_team", request.away_team),
         }
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -174,11 +181,18 @@ async def predict_cross_league(request: CrossLeagueRequest) -> Dict[str, Any]:
         result = ps.predict_cross_league(
             request.team_a, request.league_a, request.team_b, request.league_b
         )
+        # Extract scoreline and probabilities from result
         return {
             "success": True,
-            "predictions": result,
-            "team_a": request.team_a,
-            "team_b": request.team_b,
+            "predictions": {
+                "team_a_win": result["team_a_win"],
+                "draw": result["draw"],
+                "team_b_win": result["team_b_win"],
+            },
+            "predicted_team_a_goals": result.get("predicted_team_a_goals"),
+            "predicted_team_b_goals": result.get("predicted_team_b_goals"),
+            "team_a": result.get("team_a", request.team_a),
+            "team_b": result.get("team_b", request.team_b),
             "league_a": request.league_a,
             "league_b": request.league_b,
         }
