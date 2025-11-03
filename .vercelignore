@@ -1,37 +1,46 @@
-# Python files
+# Python backend (not needed on Vercel - using Next.js API routes)
+
 backend/
 .venv/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+**pycache**/
+_.pyc
+_.pyo
+\*.pyd
 .Python
+requirements.txt
 
-# Data files
-fbref_data/
-*.csv
-*.pkl
-*.joblib
+# Large model files (will implement lightweight prediction later)
 
-# Scripts
+_.pkl
+_.joblib
+
+# Scripts (not needed in production)
+
 scripts/
 
 # Documentation
+
 docs/
 
 # Logs
-logs/
-*.log
 
-# Local env
+logs/
+\*.log
+
+# Local env files
+
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
 # IDE
+
 .vscode/
 .idea/
 
 # Other
+
 .DS_Store
+node_modules/
+.next/
