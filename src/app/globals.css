@@ -4,51 +4,106 @@
 
 @layer base {
   :root {
-    --background: #f0f9f4;
-    --text: #1f2937;
-    --accent: #10b981;
-    --secondary-bg: #ffffff;
-    --border-color: #d1d5db;
+    /* Light mode - Professional gradient palette */
+    --background: #f8fafc;
+    --background-secondary: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-tertiary: #64748b;
+    --accent-primary: #10b981;
+    --accent-secondary: #059669;
+    --accent-tertiary: #34d399;
+    --card-bg: #ffffff;
+    --card-bg-hover: #f1f5f9;
+    --border-color: #e2e8f0;
+    --border-color-hover: #cbd5e1;
+    --shadow-color: rgba(15, 23, 42, 0.08);
+    --shadow-color-lg: rgba(15, 23, 42, 0.12);
   }
 
   .dark {
-    --background: #111827;
-    --text: #f9fafb;
-    --accent: #34d399;
-    --secondary-bg: #1f2937;
-    --border-color: #374151;
+    /* Dark mode - High contrast professional palette */
+    --background: #0f172a;
+    --background-secondary: #1e293b;
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-tertiary: #94a3b8;
+    --accent-primary: #34d399;
+    --accent-secondary: #10b981;
+    --accent-tertiary: #6ee7b7;
+    --card-bg: #1e293b;
+    --card-bg-hover: #334155;
+    --border-color: #334155;
+    --border-color-hover: #475569;
+    --shadow-color: rgba(0, 0, 0, 0.3);
+    --shadow-color-lg: rgba(0, 0, 0, 0.5);
   }
 
   body {
-    color: var(--text);
+    color: var(--text-primary);
+    background: var(--background);
     min-height: 100vh;
   }
 }
 
+/* Enhanced hover effects */
 .hover-glow {
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .hover-glow:hover {
-  filter: drop-shadow(0 0 8px var(--accent));
+  filter: drop-shadow(0 0 12px var(--accent-primary));
+  transform: translateY(-2px);
 }
 
-/* Soccer field background pattern */
+/* Professional card styles */
+.card-professional {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 1px 3px var(--shadow-color);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-professional:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 4px 12px var(--shadow-color-lg);
+  transform: translateY(-4px);
+}
+
+/* Glassmorphism effect */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.dark .glass-effect {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+/* Premium gradient background */
+.premium-gradient {
+  background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 50%, #dbeafe 100%);
+}
+
+.dark .premium-gradient {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+}
+
+/* Soccer field background pattern - Enhanced */
 .field-pattern {
-  background-image: linear-gradient(
-    rgba(240, 249, 244, 0.95),
-    rgba(224, 242, 254, 0.95)
-  ),
-  url('/soccer-field.svg');
+  background-image: 
+    linear-gradient(135deg, rgba(248, 250, 252, 0.98), rgba(224, 242, 254, 0.98)),
+    url('/soccer-field.svg');
   background-repeat: repeat;
-  background-size: 300px;
+  background-size: 400px;
   background-position: center;
 }
 
 .dark .field-pattern {
-  background-image: linear-gradient(
-    rgba(17, 24, 39, 0.95),
-    rgba(31, 41, 55, 0.95)
-  ),
-  url('/soccer-field.svg');
+  background-image: 
+    linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.98)),
+    url('/soccer-field.svg');
 }
