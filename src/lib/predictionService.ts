@@ -43,18 +43,23 @@ function parseCSV(csvContent: string): MatchData[] {
   
   return lines.slice(1).map(line => {
     const values = line.split(',')
-    const match: any = {}
+    const match: Record<string, string> = {}
     headers.forEach((header, index) => {
       match[header] = values[index]?.trim() || ''
     })
-    return match as MatchData
+    return match as unknown as MatchData
   })
 }
 
 export function loadLeagueData(league: string): MatchData[] {
-  const filePath = path.join(process.cwd(), 'fbref_data', 'processed', `${league}_processed.csv`)
-  const csvContent = fs.readFileSync(filePath, 'utf-8')
-  return parseCSV(csvContent)
+  try {
+    const filePath = path.join(process.cwd(), 'fbref_data', 'processed', `${league}_processed.csv`)
+    const csvContent = fs.readFileSync(filePath, 'utf-8')
+    return parseCSV(csvContent)
+  } catch (error) {
+    console.error(`Error loading league data for ${league}:`, error)
+    throw new Error(`League data for "${league}" not found or could not be loaded`)
+  }
 }
 
 export function calculateTeamStats(matches: MatchData[], teamName: string): TeamStats {
