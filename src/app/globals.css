@@ -2,19 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #f0f9f4;
-  --text: #1f2937;
-  --accent: #10b981;
-  --secondary-bg: #ffffff;
-  --border-color: #d1d5db;
-}
+@layer base {
+  :root {
+    --background: #f0f9f4;
+    --text: #1f2937;
+    --accent: #10b981;
+    --secondary-bg: #ffffff;
+    --border-color: #d1d5db;
+  }
 
-body {
-  background: linear-gradient(135deg, #f0f9f4 0%, #e0f2fe 50%, #fef3c7 100%);
-  background-attachment: fixed;
-  color: var(--text);
-  min-height: 100vh;
+  .dark {
+    --background: #111827;
+    --text: #f9fafb;
+    --accent: #34d399;
+    --secondary-bg: #1f2937;
+    --border-color: #374151;
+  }
+
+  body {
+    color: var(--text);
+    min-height: 100vh;
+  }
 }
 
 .hover-glow {
@@ -35,4 +43,12 @@ body {
   background-repeat: repeat;
   background-size: 300px;
   background-position: center;
+}
+
+.dark .field-pattern {
+  background-image: linear-gradient(
+    rgba(17, 24, 39, 0.95),
+    rgba(31, 41, 55, 0.95)
+  ),
+  url('/soccer-field.svg');
 }
