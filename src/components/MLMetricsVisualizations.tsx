@@ -92,7 +92,7 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
   ];
 
   return (
-    <div className="space-y-16 bg-gradient-to-br from-green-50 via-blue-50 to-white p-8 rounded-3xl relative overflow-hidden">
+    <div className="space-y-16 glass-effect p-8 rounded-3xl relative overflow-hidden shadow-card-lg">
       {/* Soccer-themed background pattern */}
       <div className="absolute inset-0 opacity-5 pointer-events-none">
         <div className="absolute top-10 left-10 text-8xl">⚽</div>
@@ -107,27 +107,27 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
       <div className="text-center relative z-10">
         <div className="flex items-center justify-center gap-4 mb-4">
           <span className="text-5xl">📊</span>
-          <h2 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">
+          <h2 className="text-5xl font-black text-primary">
             Model Performance Metrics
           </h2>
           <span className="text-5xl">📊</span>
         </div>
-        <p className="text-lg text-gray-700 max-w-3xl mx-auto font-medium">
-          Comprehensive analysis of the machine learning model trained on <span className="font-bold text-green-600">{league.replace('_', ' ').toUpperCase()}</span> match data. 
+        <p className="text-lg text-secondary max-w-3xl mx-auto font-medium">
+          Comprehensive analysis of the machine learning model trained on <span className="font-bold text-brand-600 dark:text-brand-400">{league.replace('_', ' ').toUpperCase()}</span> match data. 
           These visualizations show prediction accuracy, feature importance, and model confidence levels.
         </p>
-        <div className="w-48 h-1.5 bg-gradient-to-r from-green-500 via-blue-500 to-green-500 mx-auto mt-4 rounded-full"></div>
+        <div className="w-48 h-1.5 bg-gradient-to-r from-brand-500 via-brand-600 to-brand-500 mx-auto mt-4 rounded-full"></div>
       </div>
 
       {/* Main Performance Metrics */}
       <div className="relative z-10">
         <div className="text-center mb-8">
-          <h3 className="text-3xl font-bold text-gray-800 flex items-center justify-center gap-3">
+          <h3 className="text-3xl font-bold text-primary flex items-center justify-center gap-3">
             <span className="text-4xl">🎯</span>
             Model Performance Analysis
             <span className="text-4xl">🎯</span>
           </h3>
-          <div className="w-32 h-1 bg-green-500 mx-auto mt-3 rounded-full"></div>
+          <div className="w-32 h-1 bg-brand-500 mx-auto mt-3 rounded-full"></div>
         </div>
         
         {/* First Row: Confusion Matrix and Feature Importance */}
@@ -138,12 +138,11 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
             return (
               <div 
                 key={image.name} 
-                className="bg-white p-8 rounded-2xl shadow-xl border-2 border-gray-200 
-                         flex flex-col transition-all duration-300 ease-in-out hover:shadow-2xl hover:border-green-400"
+                className="card-professional p-8 rounded-2xl flex flex-col"
                 style={{ minHeight: '600px' }}
               >
-                <h4 className="text-2xl font-bold mb-6 text-center text-gray-800">{image.title}</h4>
-                <div className="flex-grow flex items-center justify-center bg-gray-50 rounded-lg p-6 mb-6 border border-gray-200">
+                <h4 className="text-2xl font-bold mb-6 text-center text-primary">{image.title}</h4>
+                <div className="flex-grow flex items-center justify-center bg-secondary rounded-lg p-6 mb-6 border border-primary">
                   <ImageModal
                     src={imageUrl}
                     alt={image.title}
@@ -151,7 +150,7 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
                     description={image.description}
                   />
                 </div>
-                <p className="text-base text-gray-600 text-center leading-relaxed">{image.description}</p>
+                <p className="text-base text-secondary text-center leading-relaxed">{image.description}</p>
               </div>
             );
           })}
@@ -164,12 +163,11 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
           return (
             <div key={image.name} className="flex justify-center">
               <div 
-                className="bg-white p-8 rounded-2xl shadow-xl border-2 border-gray-200 
-                         flex flex-col transition-all duration-300 ease-in-out hover:shadow-2xl hover:border-green-400 w-full lg:w-2/3"
+                className="card-professional p-8 rounded-2xl flex flex-col w-full lg:w-2/3"
                 style={{ minHeight: '600px' }}
               >
-                <h4 className="text-2xl font-bold mb-6 text-center text-gray-800">{image.title}</h4>
-                <div className="flex-grow flex items-center justify-center bg-gray-50 rounded-lg p-6 mb-6 border border-gray-200">
+                <h4 className="text-2xl font-bold mb-6 text-center text-primary">{image.title}</h4>
+                <div className="flex-grow flex items-center justify-center bg-secondary rounded-lg p-6 mb-6 border border-primary">
                   <ImageModal
                     src={imageUrl}
                     alt={image.title}
@@ -177,7 +175,7 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
                     description={image.description}
                   />
                 </div>
-                <p className="text-base text-gray-600 text-center leading-relaxed">{image.description}</p>
+                <p className="text-base text-secondary text-center leading-relaxed">{image.description}</p>
               </div>
             </div>
           );
@@ -187,10 +185,10 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
       {/* Divider */}
       <div className="relative z-10">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t-2 border-green-300"></div>
+          <div className="w-full border-t-2 border-brand-300 dark:border-brand-700"></div>
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="px-6 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white font-bold rounded-full shadow-lg">
+          <span className="px-6 py-2 bg-gradient-to-r from-brand-500 to-brand-600 text-white font-bold rounded-full shadow-lg">
             📋 Classification Reports
           </span>
         </div>
@@ -199,39 +197,32 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
       {/* Classification Reports */}
       <div className="relative z-10">
         <div className="text-center mb-8">
-          <h3 className="text-3xl font-bold text-gray-800 flex items-center justify-center gap-3">
+          <h3 className="text-3xl font-bold text-primary flex items-center justify-center gap-3">
             <span className="text-4xl">📈</span>
             Detailed Classification Metrics
             <span className="text-4xl">📈</span>
           </h3>
-          <div className="w-32 h-1 bg-blue-500 mx-auto mt-3 rounded-full"></div>
+          <div className="w-32 h-1 bg-brand-600 mx-auto mt-3 rounded-full"></div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-stretch">
           {classificationReportImages.map((image) => {
             const imageUrl = `/api/visualizations/${league}/${image.name}`;
-            const bgGradient = image.category === 'train' 
-              ? 'from-green-50 to-white' 
-              : 'from-blue-50 to-white';
-            const borderColor = image.category === 'train'
-              ? 'border-green-300 hover:border-green-500'
-              : 'border-blue-300 hover:border-blue-500';
             const badgeColor = image.category === 'train'
-              ? 'bg-green-500 text-white'
+              ? 'bg-brand-500 text-white'
               : 'bg-blue-500 text-white';
             
             return (
               <div 
                 key={image.name} 
-                className={`bg-gradient-to-br ${bgGradient} p-8 rounded-2xl shadow-xl border-2 ${borderColor}
-                         flex flex-col transition-all duration-300 ease-in-out hover:shadow-2xl h-full`}
+                className="card-professional p-8 rounded-2xl flex flex-col h-full"
               >
                 <div className="flex items-center justify-between mb-6">
-                  <h4 className="text-2xl font-bold text-gray-800">{image.title}</h4>
+                  <h4 className="text-2xl font-bold text-primary">{image.title}</h4>
                   <span className={`px-3 py-1 ${badgeColor} rounded-full text-sm font-semibold`}>
                     {image.category === 'train' ? 'Training' : 'Testing'}
                   </span>
                 </div>
-                <div className="flex-grow flex items-center justify-center bg-white rounded-lg p-6 mb-6 border border-gray-200">
+                <div className="flex-grow flex items-center justify-center bg-secondary rounded-lg p-6 mb-6 border border-primary">
                   <ImageModal
                     src={imageUrl}
                     alt={image.title}
@@ -239,7 +230,7 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
                     description={image.description}
                   />
                 </div>
-                <p className="text-base text-gray-600 leading-relaxed">{image.description}</p>
+                <p className="text-base text-secondary leading-relaxed">{image.description}</p>
               </div>
             );
           })}
@@ -249,10 +240,10 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
       {/* Divider */}
       <div className="relative z-10">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t-2 border-blue-300"></div>
+          <div className="w-full border-t-2 border-brand-300 dark:border-brand-700"></div>
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-full shadow-lg">
+          <span className="px-6 py-2 bg-gradient-to-r from-brand-500 to-brand-700 text-white font-bold rounded-full shadow-lg">
             🎚️ Confidence Threshold Analysis
           </span>
         </div>
@@ -261,12 +252,12 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
       {/* Confidence Threshold Visualizations */}
       <div className="relative z-10">
         <div className="text-center mb-8">
-          <h3 className="text-3xl font-bold text-gray-800 flex items-center justify-center gap-3">
+          <h3 className="text-3xl font-bold text-primary flex items-center justify-center gap-3">
             <span className="text-4xl">🎯</span>
             Prediction Confidence Analysis
             <span className="text-4xl">🎯</span>
           </h3>
-          <p className="text-gray-600 mt-2 max-w-3xl mx-auto font-medium">
+          <p className="text-secondary mt-2 max-w-3xl mx-auto font-medium">
             These charts show how model performance (precision, recall, F1-score) changes at different confidence thresholds. 
             Higher confidence means more reliable predictions but fewer total predictions.
           </p>
@@ -275,31 +266,22 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
         
         {/* Training Set Confidence */}
         <div className="mb-12">
-          <h4 className="text-2xl font-bold text-green-600 text-center mb-6 flex items-center justify-center gap-2">
+          <h4 className="text-2xl font-bold text-brand-600 dark:text-brand-400 text-center mb-6 flex items-center justify-center gap-2">
             <span className="text-3xl">🏋️</span>
             Training Set Confidence Metrics
           </h4>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
             {confidenceThresholdImages.filter(img => img.category === 'train').map((image) => {
               const imageUrl = `/api/visualizations/${league}/${image.name}`;
-              const outcomeColor = 
-                image.outcome === 'win' ? 'from-green-100 to-white' :
-                image.outcome === 'draw' ? 'from-yellow-100 to-white' :
-                'from-red-100 to-white';
-              const borderColor = 
-                image.outcome === 'win' ? 'border-green-300 hover:border-green-500' :
-                image.outcome === 'draw' ? 'border-yellow-300 hover:border-yellow-500' :
-                'from-red-300 hover:border-red-500';
               
               return (
                 <div 
                   key={image.name} 
-                  className={`bg-gradient-to-br ${outcomeColor} p-6 rounded-xl shadow-xl border-2 border-gray-200
-                           flex flex-col transition-all duration-300 ease-in-out hover:shadow-2xl hover:${borderColor}`}
+                  className="card-professional p-6 rounded-xl flex flex-col"
                   style={{ minHeight: '500px' }}
                 >
-                  <h5 className="text-lg font-bold text-gray-800 mb-4 text-center">{image.title}</h5>
-                  <div className="flex-grow flex items-center justify-center bg-white rounded-lg p-4 mb-4 border border-gray-200">
+                  <h5 className="text-lg font-bold text-primary mb-4 text-center">{image.title}</h5>
+                  <div className="flex-grow flex items-center justify-center bg-secondary rounded-lg p-4 mb-4 border border-primary">
                     <ImageModal
                       src={imageUrl}
                       alt={image.title}
@@ -307,7 +289,7 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
                       description={image.description}
                     />
                   </div>
-                  <p className="text-sm text-gray-600 text-center leading-relaxed">{image.description}</p>
+                  <p className="text-sm text-secondary text-center leading-relaxed">{image.description}</p>
                 </div>
               );
             })}
@@ -316,31 +298,22 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
 
         {/* Test Set Confidence */}
         <div>
-          <h4 className="text-2xl font-bold text-blue-600 text-center mb-6 flex items-center justify-center gap-2">
+          <h4 className="text-2xl font-bold text-blue-600 dark:text-blue-400 text-center mb-6 flex items-center justify-center gap-2">
             <span className="text-3xl">🧪</span>
             Test Set Confidence Metrics (Real-World Performance)
           </h4>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
             {confidenceThresholdImages.filter(img => img.category === 'test').map((image) => {
               const imageUrl = `/api/visualizations/${league}/${image.name}`;
-              const outcomeColor = 
-                image.outcome === 'win' ? 'from-green-100 to-white' :
-                image.outcome === 'draw' ? 'from-yellow-100 to-white' :
-                'from-red-100 to-white';
-              const borderColor = 
-                image.outcome === 'win' ? 'border-green-300 hover:border-green-500' :
-                image.outcome === 'draw' ? 'border-yellow-300 hover:border-yellow-500' :
-                'border-red-300 hover:border-red-500';
               
               return (
                 <div 
                   key={image.name} 
-                  className={`bg-gradient-to-br ${outcomeColor} p-6 rounded-xl shadow-xl border-2 border-gray-200
-                           flex flex-col transition-all duration-300 ease-in-out hover:shadow-2xl hover:${borderColor}`}
+                  className="card-professional p-6 rounded-xl flex flex-col"
                   style={{ minHeight: '500px' }}
                 >
-                  <h5 className="text-lg font-bold text-gray-800 mb-4 text-center">{image.title}</h5>
-                  <div className="flex-grow flex items-center justify-center bg-white rounded-lg p-4 mb-4 border border-gray-200">
+                  <h5 className="text-lg font-bold text-primary mb-4 text-center">{image.title}</h5>
+                  <div className="flex-grow flex items-center justify-center bg-secondary rounded-lg p-4 mb-4 border border-primary">
                     <ImageModal
                       src={imageUrl}
                       alt={image.title}
@@ -348,7 +321,7 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
                       description={image.description}
                     />
                   </div>
-                  <p className="text-sm text-gray-600 text-center leading-relaxed">{image.description}</p>
+                  <p className="text-sm text-secondary text-center leading-relaxed">{image.description}</p>
                 </div>
               );
             })}
@@ -357,9 +330,9 @@ const MLMetricsVisualizations: React.FC<MLMetricsVisualizationsProps> = ({ leagu
       </div>
 
       {/* Footer Note */}
-      <div className="bg-white/80 border-2 border-gray-300 rounded-xl p-6 text-center shadow-lg">
-        <p className="text-sm text-gray-700">
-          <span className="font-semibold text-green-600">⚽ Note:</span> These visualizations are generated during model training and updated with each retraining cycle. 
+      <div className="glass-effect border-2 border-primary rounded-xl p-6 text-center shadow-card-lg">
+        <p className="text-sm text-secondary">
+          <span className="font-semibold text-brand-600 dark:text-brand-400">⚽ Note:</span> These visualizations are generated during model training and updated with each retraining cycle. 
           The model emphasizes data from the last 5 seasons with exponential weighting towards recent years for improved accuracy.
         </p>
       </div>
