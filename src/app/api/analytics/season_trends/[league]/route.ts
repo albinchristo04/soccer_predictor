@@ -1,21 +1,26 @@
-
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server'
+import { loadLeagueData, getSeasonTrends } from '@/lib/dataService'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { league: string } }
 ) {
-  const league = params.league;
+  const league = params.league
+
   try {
-    const backendResponse = await fetch(`http://127.0.0.1:8000/api/analytics/season_trends/${league}`);
-    const data = await backendResponse.json();
+    const matches = await loadLeagueData(league)
+    const trends = getSeasonTrends(matches)
 
-    if (!backendResponse.ok) {
-      return new NextResponse(JSON.stringify(data), { status: backendResponse.status });
-    }
-
-    return new NextResponse(JSON.stringify(data), { status: 200 });
+    return NextResponse.json({
+      league,
+      trends,
+      seasons_count: trends.length
+    })
   } catch (error) {
-    return new NextResponse('Internal Server Error', { status: 500 });
+    console.error('Error getting season trends:', error)
+    return NextResponse.json(
+      { error: 'Failed to get season trends', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    )
   }
 }

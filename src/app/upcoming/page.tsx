@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, isWithinInterval, parseISO } from 'date-fns'
+import { format, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns'
 import { leagues } from '@/data/leagues'
 import { SoccerSpinner } from '@/components/SoccerSpinner'
 import { PredictionResult } from '@/components/PredictionResult'
@@ -44,11 +44,11 @@ export default function UpcomingMatches() {
 
   const mappedLeague = selectedLeague ? leagueNameMap[selectedLeague] : null
 
-  // Week view: current week and next 3 weeks
+  // Week view starts on Sunday (0) and ends on Saturday (6)
   const today = new Date()
   const weekDays = eachDayOfInterval({
     start: startOfWeek(today, { weekStartsOn: 0 }), // Start from Sunday
-    end: endOfWeek(addWeeks(today, 3), { weekStartsOn: 0 })  // End 3 weeks from now
+    end: endOfWeek(today, { weekStartsOn: 0 })      // End on Saturday
   })
 
   useEffect(() => {
@@ -64,19 +64,7 @@ export default function UpcomingMatches() {
         const response = await fetch(apiUrl)
         if (!response.ok) throw new Error('Failed to fetch matches')
         const data = await response.json()
-        
-        // Filter matches to only show those within the next 4 weeks
-        const fourWeeksFromNow = addWeeks(today, 4)
-        const filteredMatches = data.filter((match: Match) => {
-          try {
-            const matchDate = parseISO(match.date)
-            return isWithinInterval(matchDate, { start: today, end: fourWeeksFromNow })
-          } catch {
-            return false
-          }
-        })
-        
-        setMatches(filteredMatches)
+        setMatches(data)
       } catch (error) {
         console.error('Error fetching matches:', error)
         setMatches([]) // Clear matches on error
@@ -100,10 +88,10 @@ export default function UpcomingMatches() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 animate-fade-in">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="text-center mb-12">
-        <h1 className="text-5xl font-extrabold text-primary sm:text-6xl md:text-7xl">Upcoming Matches</h1>
-        <p className="mt-4 text-xl text-secondary max-w-3xl mx-auto">
+        <h1 className="text-5xl font-extrabold text-gray-800 dark:text-white sm:text-6xl md:text-7xl">Upcoming Matches</h1>
+        <p className="mt-4 text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
           Explore upcoming matches and see AI-powered predictions for various leagues.
         </p>
       </div>
@@ -112,7 +100,7 @@ export default function UpcomingMatches() {
         <div className="relative">
           <select
             onChange={(e) => setSelectedLeague(e.target.value)}
-            className="appearance-none bg-card border-2 border-brand-500 text-primary text-lg rounded-lg py-3 px-5 pr-10 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500 transition duration-300 ease-in-out shadow-card"
+            className="appearance-none bg-white dark:bg-gray-800 border-2 border-green-500 text-gray-800 dark:text-gray-200 text-lg rounded-lg py-3 px-5 pr-10 focus:outline-none focus:border-green-600 focus:ring-2 focus:ring-green-500 transition duration-300 ease-in-out shadow-md"
           >
             <option value="">Select a league</option>
             {leagues.map((league) => (
@@ -121,7 +109,7 @@ export default function UpcomingMatches() {
               </option>
             ))}
           </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-brand-600">
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-green-600 dark:text-green-400">
             <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M5.516 7.548c.436-.446 1.143-.446 1.579 0L10 10.405l2.905-2.857c.436-.446 1.143-.446 1.579 0 .436.445.436 1.167 0 1.612l-3.695 3.63c-.436.446-1.143.446-1.579 0L5.516 9.16c-.436-.445-.436-1.167 0-1.612z"/></svg>
           </div>
         </div>
@@ -132,26 +120,26 @@ export default function UpcomingMatches() {
           <SoccerSpinner />
         </div>
       ) : mappedLeague && matches.length === 0 ? (
-        <div className="text-center card-professional p-8 rounded-2xl shadow-card-lg bg-card">
-          <p className="text-2xl font-semibold text-primary mb-4">No Upcoming Matches</p>
-          <p className="text-secondary">There are no scheduled matches for this league in the next 4 weeks. Please check back later.</p>
+        <div className="text-center bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl border-2 border-gray-200 dark:border-gray-700">
+          <p className="text-2xl font-semibold text-gray-800 dark:text-white mb-4">No Upcoming Matches</p>
+          <p className="text-gray-600 dark:text-gray-400">There are no scheduled matches for this league at the moment. Please check back later.</p>
         </div>
       ) : mappedLeague && (
-        <div className="card-professional p-8 rounded-2xl shadow-card-lg bg-card">
+        <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl border-2 border-gray-200 dark:border-gray-700">
           {/* View Mode Toggle */}
           <div className="flex justify-end mb-6 space-x-2">
             <button
               onClick={() => setViewMode('week')}
-              className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 ${
-                viewMode === 'week' ? 'bg-brand-500 text-white shadow-glow' : 'bg-secondary text-primary hover:bg-card-bg-hover'
+              className={`px-4 py-2 rounded-lg font-semibold transition-colors duration-300 ${
+                viewMode === 'week' ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
               }`}
             >
               Week View
             </button>
             <button
               onClick={() => setViewMode('day')}
-              className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 ${
-                viewMode === 'day' ? 'bg-brand-500 text-white shadow-glow' : 'bg-secondary text-primary hover:bg-card-bg-hover'
+              className={`px-4 py-2 rounded-lg font-semibold transition-colors duration-300 ${
+                viewMode === 'day' ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
               }`}
             >
               Day View
@@ -170,29 +158,29 @@ export default function UpcomingMatches() {
                     key={date.toString()}
                     className={`p-4 rounded-lg transition-all duration-300 cursor-pointer ${
                       isToday 
-                        ? 'bg-brand-100 dark:bg-brand-900/30 border-2 border-brand-500' 
-                        : 'bg-secondary hover:bg-card-bg-hover border-2 border-primary'
+                        ? 'bg-green-100 dark:bg-green-900/30 border-2 border-green-500' 
+                        : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border-2 border-gray-200 dark:border-gray-600'
                     }`}
                     onClick={() => {
                       setSelectedDate(date)
                       setViewMode('day')
                     }}
                   >
-                    <div className="font-bold text-center text-primary mb-3">
+                    <div className="font-bold text-center text-gray-800 dark:text-white mb-3">
                       {format(date, 'EEE')}
                     </div>
-                    <div className="text-center text-secondary mb-4">
+                    <div className="text-center text-gray-600 dark:text-gray-400 mb-4">
                       {format(date, 'MMM d')}
                     </div>
                     <div className="space-y-2">
                       {dayMatches.length > 0 ? (
                         dayMatches.map((match, idx) => (
-                          <div key={idx} className="text-xs text-center text-primary truncate">
+                          <div key={idx} className="text-xs text-center text-gray-700 dark:text-gray-300 truncate">
                             {match.home_team} vs {match.away_team}
                           </div>
                         ))
                       ) : (
-                        <div className="text-xs text-center text-tertiary">No matches</div>
+                        <div className="text-xs text-center text-gray-400 dark:text-gray-500">No matches</div>
                       )}
                     </div>
                   </div>
@@ -203,25 +191,25 @@ export default function UpcomingMatches() {
             // Day View
             <div className="space-y-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-3xl font-bold text-primary">
+                <h2 className="text-3xl font-bold text-gray-800 dark:text-white">
                   {format(selectedDate, 'EEEE, MMMM d, yyyy')}
                 </h2>
                 <button
                   onClick={() => setViewMode('week')}
-                  className="px-4 py-2 bg-secondary text-primary rounded-lg hover:bg-card-bg-hover transition-colors duration-300"
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-300"
                 >
                   ← Back to Week View
                 </button>
               </div>
               {getMatchesForDate(selectedDate).length > 0 ? (
                 getMatchesForDate(selectedDate).map((match, idx) => (
-                  <div key={idx} className="glass-effect p-6 rounded-lg shadow-card-lg border-2 border-primary">
-                    <div className="text-xl font-semibold text-primary mb-4 text-center">
+                  <div key={idx} className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-700 dark:to-gray-800 p-6 rounded-lg shadow-lg border-2 border-gray-200 dark:border-gray-600">
+                    <div className="text-xl font-semibold text-gray-800 dark:text-white mb-4 text-center">
                       {match.home_team} vs {match.away_team}
                     </div>
                     {match.predicted_home_goals !== undefined && match.predicted_away_goals !== undefined && (
                       <div className="text-center mb-4">
-                        <span className="text-lg font-bold text-brand-600 dark:text-brand-400">
+                        <span className="text-lg font-bold text-green-600 dark:text-green-400">
                           Predicted Scoreline: {match.predicted_home_goals} - {match.predicted_away_goals}
                         </span>
                       </div>
@@ -241,7 +229,7 @@ export default function UpcomingMatches() {
                   </div>
                 ))
               ) : (
-                <div className="text-center text-secondary py-8">
+                <div className="text-center text-gray-600 dark:text-gray-400 py-8">
                   No matches scheduled for this day.
                 </div>
               )}

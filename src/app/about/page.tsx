@@ -20,19 +20,19 @@ const AccordionItem = ({ title, children, isOpen, onToggle }: AccordionItemProps
 
   return (
 
-    <div className="border-b border-primary">
+    <div className="border-b border-gray-300 dark:border-gray-600">
 
       <button
 
-        className="w-full py-4 text-left flex justify-between items-center focus:outline-none hover:bg-card-bg-hover transition-colors rounded-lg px-2"
+        className="w-full py-4 text-left flex justify-between items-center focus:outline-none hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded-lg px-2"
 
         onClick={onToggle}
 
       >
 
-        <span className="text-lg font-medium text-primary">{title}</span>
+        <span className="text-lg font-medium text-gray-800 dark:text-gray-200">{title}</span>
 
-        <span className={`transform transition-transform duration-300 text-2xl text-brand-600 dark:text-brand-400 ${isOpen ? 'rotate-45' : ''}`}>
+        <span className={`transform transition-transform duration-300 text-2xl text-green-600 dark:text-green-400 ${isOpen ? 'rotate-45' : ''}`}>
 
           +
 
@@ -44,7 +44,7 @@ const AccordionItem = ({ title, children, isOpen, onToggle }: AccordionItemProps
 
         className={`overflow-hidden transition-all duration-500 ease-in-out ${isOpen ? 'max-h-screen' : 'max-h-0'}`}>
 
-        <div className="py-4 text-secondary px-2">
+        <div className="py-4 text-gray-700 dark:text-gray-300 px-2">
 
           {children}
 
@@ -169,16 +169,16 @@ export default function AboutPage() {
   ]
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 animate-fade-in">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="text-center mb-12">
-        <h1 className="text-5xl font-extrabold text-primary sm:text-6xl md:text-7xl">About Soccer Stats Predictor</h1>
-        <p className="mt-4 text-xl text-secondary max-w-3xl mx-auto">
+        <h1 className="text-5xl font-extrabold text-gray-800 dark:text-white sm:text-6xl md:text-7xl">About Soccer Stats Predictor</h1>
+        <p className="mt-4 text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
           Learn more about the project, the data, and the models behind the predictions.
         </p>
       </div>
       
       <div className="max-w-4xl mx-auto">
-        <div className="card-professional p-8 rounded-2xl bg-card">
+        <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl border-2 border-gray-200 dark:border-gray-700">
           {sections.map((section, index) => (
             <AccordionItem
               key={index}

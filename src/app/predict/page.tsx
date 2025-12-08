@@ -105,10 +105,10 @@ function PredictPageContent() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 animate-fade-in">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="text-center mb-12">
-        <h1 className="text-5xl font-extrabold text-primary sm:text-6xl md:text-7xl">Match Prediction</h1>
-        <p className="mt-4 text-xl text-secondary max-w-3xl mx-auto">
+        <h1 className="text-5xl font-extrabold text-gray-800 dark:text-white sm:text-6xl md:text-7xl">Match Prediction</h1>
+        <p className="mt-4 text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
           Select two teams to see the predicted outcome of a match between them.
         </p>
       </div>
@@ -117,20 +117,20 @@ function PredictPageContent() {
         {/* Mode Toggle */}
         <div className="flex justify-center space-x-4 mb-8">
           <button
-            className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
+            className={`px-6 py-3 rounded-lg font-semibold transition-colors duration-300 ${
               mode === 'head-to-head' 
-                ? 'bg-brand-500 text-white shadow-glow' 
-                : 'bg-secondary text-primary hover:bg-card-bg-hover'
+                ? 'bg-green-500 text-white' 
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
             }`}
             onClick={() => setMode('head-to-head')}
           >
             🏠 Head-to-Head
           </button>
           <button
-            className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
+            className={`px-6 py-3 rounded-lg font-semibold transition-colors duration-300 ${
               mode === 'cross-league' 
-                ? 'bg-brand-500 text-white shadow-glow' 
-                : 'bg-secondary text-primary hover:bg-card-bg-hover'
+                ? 'bg-green-500 text-white' 
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
             }`}
             onClick={() => setMode('cross-league')}
           >
@@ -139,7 +139,7 @@ function PredictPageContent() {
         </div>
 
         {/* Prediction Form */}
-        <div className="card-professional p-8 rounded-2xl mb-8 bg-card">
+        <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl mb-8 border-2 border-gray-200 dark:border-gray-700">
           {mode === 'head-to-head' ? (
             <div className="space-y-6">
               <TeamSelector
@@ -161,7 +161,7 @@ function PredictPageContent() {
           <button
             onClick={handlePredict}
             disabled={loading}
-            className="w-full mt-8 px-6 py-4 bg-brand-500 text-white text-lg font-bold rounded-lg hover:bg-brand-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-card-lg hover:shadow-glow"
+            className="w-full mt-8 px-6 py-4 bg-green-500 text-white text-lg font-bold rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
           >
             {loading ? (
               <div className="flex items-center justify-center">
@@ -180,7 +180,7 @@ function PredictPageContent() {
             <SoccerSpinner />
           </div>
         ) : result && (
-          <div className="card-professional p-8 rounded-2xl bg-card">
+          <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl border-2 border-gray-200 dark:border-gray-700">
             <PredictionResult result={result} mode={mode} />
           </div>
         )}
