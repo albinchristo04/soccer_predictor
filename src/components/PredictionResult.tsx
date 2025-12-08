@@ -24,6 +24,15 @@ interface PredictionResultProps {
 }
 
 export const PredictionResult = ({ result, mode }: PredictionResultProps) => {
+  // Defensive null checks
+  if (!result || !result.predictions) {
+    return (
+      <div className="text-center p-8 text-gray-600 dark:text-gray-400">
+        <p>Unable to load prediction data</p>
+      </div>
+    );
+  }
+
   const { 
     predictions, 
     home_team, 
@@ -38,12 +47,25 @@ export const PredictionResult = ({ result, mode }: PredictionResultProps) => {
     predicted_team_b_goals
   } = result;
 
-  const winProb = mode === 'head-to-head' ? (predictions.home_win ?? 0) : (predictions.team_a_win ?? 0);
-  const drawProb = predictions.draw ?? 0;
-  const lossProb = mode === 'head-to-head' ? (predictions.away_win ?? 0) : (predictions.team_b_win ?? 0);
+  // Check if prediction values are actually present
+  const hasValidPredictions = mode === 'head-to-head' 
+    ? (predictions.home_win !== undefined || predictions.draw !== undefined || predictions.away_win !== undefined)
+    : (predictions.team_a_win !== undefined || predictions.draw !== undefined || predictions.team_b_win !== undefined);
 
-  const homeTeamName = mode === 'head-to-head' ? home_team : team_a;
-  const awayTeamName = mode === 'head-to-head' ? away_team : team_b;
+  if (!hasValidPredictions) {
+    return (
+      <div className="text-center p-8 text-gray-600 dark:text-gray-400">
+        <p>Prediction data is not available for this match</p>
+      </div>
+    );
+  }
+
+  const winProb = mode === 'head-to-head' ? (predictions?.home_win ?? 0) : (predictions?.team_a_win ?? 0);
+  const drawProb = predictions?.draw ?? 0;
+  const lossProb = mode === 'head-to-head' ? (predictions?.away_win ?? 0) : (predictions?.team_b_win ?? 0);
+
+  const homeTeamName = mode === 'head-to-head' ? (home_team || 'Home Team') : (team_a || 'Team A');
+  const awayTeamName = mode === 'head-to-head' ? (away_team || 'Away Team') : (team_b || 'Team B');
   
   const homeGoals = mode === 'head-to-head' ? predicted_home_goals : predicted_team_a_goals;
   const awayGoals = mode === 'head-to-head' ? predicted_away_goals : predicted_team_b_goals;

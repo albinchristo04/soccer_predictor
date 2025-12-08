@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import fs from 'fs/promises';
 
-export async function GET(request: NextRequest, { params }: { params: { path: string[] } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   try {
-    const [leagueName, imageName] = params.path;
+    const { path: pathParts } = await params;
+    const [leagueName, imageName] = pathParts;
 
     if (!leagueName || !imageName) {
       return new NextResponse('League name and image name are required', { status: 400 });

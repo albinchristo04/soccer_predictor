@@ -3,9 +3,9 @@ import { loadLeagueData, getResultDistribution } from '@/lib/dataService'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { league: string } }
+  { params }: { params: Promise<{ league: string }> }
 ) {
-  const league = params.league
+  const { league } = await params
 
   try {
     const matches = await loadLeagueData(league)

@@ -5,9 +5,9 @@ import path from 'path';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { slug: string[] } }
+  { params }: { params: Promise<{ slug: string[] }> }
 ) {
-  const slug = params.slug;
+  const { slug } = await params;
   if (!slug || slug.length < 2) {
     return new NextResponse('Invalid path', { status: 400 });
   }

@@ -3,8 +3,8 @@ import path from 'path'
 import fs from 'fs/promises'
 import * as cheerio from 'cheerio'
 
-export async function GET(request: Request, { params }: { params: { league: string, season: string } }) {
-  const { league, season } = params
+export async function GET(request: Request, { params }: { params: Promise<{ league: string, season: string }> }) {
+  const { league, season } = await params
 
   try {
     const seasonLinksPath = path.join(process.cwd(), 'fbref_data', 'season_links.json')

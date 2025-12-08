@@ -19,20 +19,20 @@ export default function Home() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
         <Link href="/upcoming" className="block group">
           <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg hover:shadow-green-500/50 transition-all duration-300 transform hover:-translate-y-2 cursor-pointer border-4 border-transparent hover:border-green-500 h-full flex flex-col">
-            <h2 className="text-3xl font-bold mb-4 text-gray-800 dark:text-white flex items-center justify-center whitespace-nowrap">📅 Upcoming Matches</h2>
-            <p className="text-lg text-gray-600 dark:text-gray-300">Get predictions for upcoming matches in major leagues</p>
+            <h2 className="text-3xl font-bold mb-4 text-gray-800 dark:text-amber-50 flex items-center justify-center whitespace-nowrap">📅 Upcoming Matches</h2>
+            <p className="text-lg text-gray-600 dark:text-amber-100/80">Get predictions for upcoming matches in major leagues</p>
           </div>
         </Link>
         <Link href="/predict?mode=head-to-head" className="block group">
           <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg hover:shadow-green-500/50 transition-all duration-300 transform hover:-translate-y-2 cursor-pointer border-4 border-transparent hover:border-green-500 h-full flex flex-col">
-            <h2 className="text-3xl font-bold mb-4 text-gray-800 dark:text-white">🏠 Head-to-Head</h2>
-            <p className="text-lg text-gray-600 dark:text-gray-300">Compare teams within the same league and get detailed match predictions</p>
+            <h2 className="text-3xl font-bold mb-4 text-gray-800 dark:text-amber-50">🏠 Head-to-Head</h2>
+            <p className="text-lg text-gray-600 dark:text-amber-100/80">Compare teams within the same league and get detailed match predictions</p>
           </div>
         </Link>
         <Link href="/predict?mode=cross-league" className="block group">
           <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg hover:shadow-green-500/50 transition-all duration-300 transform hover:-translate-y-2 cursor-pointer border-4 border-transparent hover:border-green-500 h-full flex-col">
-            <h2 className="text-3xl font-bold mb-4 text-gray-800 dark:text-white">🌍 Cross-League</h2>
-            <p className="text-lg text-gray-600 dark:text-gray-300">Analyze hypothetical matchups between teams from different leagues</p>
+            <h2 className="text-3xl font-bold mb-4 text-gray-800 dark:text-amber-50">🌍 Cross-League</h2>
+            <p className="text-lg text-gray-600 dark:text-amber-100/80">Analyze hypothetical matchups between teams from different leagues</p>
           </div>
         </Link>
       </div>

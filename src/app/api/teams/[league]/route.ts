@@ -3,9 +3,9 @@ import { loadLeagueData, getLeagueTeams } from '@/lib/predictionService'
 
 export async function GET(
   request: Request,
-  { params }: { params: { league: string } }
+  { params }: { params: Promise<{ league: string }> }
 ) {
-  const { league } = params
+  const { league } = await params
 
   try {
     const matches = loadLeagueData(league)
