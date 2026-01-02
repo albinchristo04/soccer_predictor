@@ -1,7 +1,7 @@
 'use client'
 
 import { useStore } from '@/store/store'
-import { leagues, teams } from '@/data/leagues'
+import { leagueNames as leagues, teams } from '@/data/leagues'
 
 interface TeamSelectorProps {
   type: 'head-to-head' | 'cross-league'
