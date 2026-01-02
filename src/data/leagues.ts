@@ -1,4 +1,4 @@
-export const leagues = [
+export const leagueNames = [
   'Premier League',
   'La Liga',
   'Serie A',
@@ -9,6 +9,30 @@ export const leagues = [
   'MLS',
   'FIFA World Cup'
 ] as const;
+
+// Flag URLs using flagcdn.com
+export const leagueFlagUrls: Record<string, string> = {
+  'ENG': 'https://flagcdn.com/24x18/gb-eng.png',
+  'ES': 'https://flagcdn.com/24x18/es.png',
+  'IT': 'https://flagcdn.com/24x18/it.png',
+  'DE': 'https://flagcdn.com/24x18/de.png',
+  'FR': 'https://flagcdn.com/24x18/fr.png',
+  'EU': 'https://flagcdn.com/24x18/eu.png',
+  'US': 'https://flagcdn.com/24x18/us.png',
+  'WORLD': 'https://flagcdn.com/24x18/un.png'
+};
+
+export const leagues = [
+  { name: 'Premier League', country: 'ENG', matches: '380+' },
+  { name: 'La Liga', country: 'ES', matches: '380+' },
+  { name: 'Serie A', country: 'IT', matches: '380+' },
+  { name: 'Bundesliga', country: 'DE', matches: '306+' },
+  { name: 'Ligue 1', country: 'FR', matches: '380+' },
+  { name: 'Champions League', country: 'EU', matches: '125+' },
+  { name: 'Europa League', country: 'EU', matches: '200+' },
+  { name: 'MLS', country: 'US', matches: '500+' },
+  { name: 'FIFA World Cup', country: 'WORLD', matches: '64' }
+];
 
 // Complete team lists for each league
 export const teams: Record<string, string[]> = {

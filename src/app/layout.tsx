@@ -1,10 +1,17 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { PageLoader } from '@/components/PageLoader'
 import { ThemeProvider } from '@/providers/ThemeProvider'
 import './globals.css'
+
+const inter = Inter({ 
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter'
+})
 
 export const metadata: Metadata = {
   title: 'Soccer Stats Predictor',
@@ -14,11 +21,13 @@ export const metadata: Metadata = {
   },
 }
 
-// Script to prevent flash of wrong theme
+// Script to prevent flash of wrong theme - default to dark like Fotmob
 const themeScript = `
   (function() {
     const stored = localStorage.getItem('theme');
-    if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    if (stored === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else {
       document.documentElement.classList.add('dark');
     }
   })();
@@ -30,18 +39,18 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={inter.variable}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+      <body className="min-h-screen bg-[var(--background)] text-[var(--text-primary)] font-sans antialiased">
         <ThemeProvider>
           <Suspense fallback={null}>
             <PageLoader />
           </Suspense>
           <div className="flex flex-col min-h-screen">
             <Navbar />
-            <main className="flex-grow container mx-auto px-4 py-8">
+            <main className="flex-grow">
               {children}
             </main>
             <Footer />

@@ -10,7 +10,7 @@ export async function GET(
 
   try {
     const response = await fetch(
-      `${BACKEND_URL}/api/upcoming_matches/${league}`,
+      `${BACKEND_URL}/api/recent_results/${league}`,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -23,7 +23,7 @@ export async function GET(
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
       return NextResponse.json(
-        { error: errorData.detail || 'Failed to fetch upcoming matches' },
+        { error: errorData.detail || 'Failed to fetch recent results' },
         { status: response.status }
       )
     }
@@ -31,7 +31,7 @@ export async function GET(
     const data = await response.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error fetching upcoming matches:', error)
+    console.error('Error fetching recent results:', error)
     return NextResponse.json(
       { error: 'Failed to connect to backend server' },
       { status: 500 }

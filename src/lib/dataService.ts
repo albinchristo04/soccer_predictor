@@ -311,15 +311,20 @@ export function predictMatch(
   // Home advantage factor (typically 5-10% boost)
   const homeAdvantage = 0.08
   
-  // Form-based adjustment
+  // Form-based adjustment (more weight on recent form)
   const homeRecentWins = homeStats.recent_form.filter(f => f === 'W').length / 5
   const awayRecentWins = awayStats.recent_form.filter(f => f === 'W').length / 5
-  const formDifference = (homeRecentWins - awayRecentWins) * 0.15
+  const homeRecentLosses = homeStats.recent_form.filter(f => f === 'L').length / 5
+  const awayRecentLosses = awayStats.recent_form.filter(f => f === 'L').length / 5
+  const formDifference = ((homeRecentWins - homeRecentLosses) - (awayRecentWins - awayRecentLosses)) * 0.12
   
-  // Goals-based adjustment
-  const homeGoalRatio = homeStats.avg_goals_scored / (homeStats.avg_goals_conceded || 1)
-  const awayGoalRatio = awayStats.avg_goals_scored / (awayStats.avg_goals_conceded || 1)
-  const goalsAdjustment = ((homeGoalRatio - awayGoalRatio) / (homeGoalRatio + awayGoalRatio || 1)) * 0.1
+  // Goals-based adjustment (stronger impact)
+  const homeGoalRatio = homeStats.avg_goals_scored / Math.max(homeStats.avg_goals_conceded, 0.5)
+  const awayGoalRatio = awayStats.avg_goals_scored / Math.max(awayStats.avg_goals_conceded, 0.5)
+  const goalsAdjustment = ((homeGoalRatio - awayGoalRatio) / (homeGoalRatio + awayGoalRatio + 0.1)) * 0.15
+  
+  // Win rate difference adjustment
+  const winRateAdjustment = (homeWinRate - awayWinRate) * 0.2
   
   // Head-to-head adjustment
   let h2hAdjustment = 0
@@ -332,15 +337,15 @@ export function predictMatch(
     h2hAdjustment = ((h2hWins / h2hMatches.length) - 0.5) * 0.1
   }
   
-  // Calculate raw probabilities
-  let rawHomeWin = 0.33 + homeAdvantage + formDifference + goalsAdjustment + h2hAdjustment
-  let rawAwayWin = 0.33 - homeAdvantage - formDifference - goalsAdjustment - h2hAdjustment
-  let rawDraw = 0.34 - Math.abs(formDifference) * 0.5
+  // Calculate raw probabilities with more variance
+  let rawHomeWin = 0.33 + homeAdvantage + formDifference + goalsAdjustment + h2hAdjustment + winRateAdjustment
+  let rawAwayWin = 0.33 - homeAdvantage - formDifference - goalsAdjustment - h2hAdjustment - winRateAdjustment
+  let rawDraw = 0.34 - Math.abs(formDifference + goalsAdjustment + winRateAdjustment) * 0.3
   
   // Ensure probabilities are within bounds
-  rawHomeWin = Math.max(0.1, Math.min(0.7, rawHomeWin))
-  rawAwayWin = Math.max(0.1, Math.min(0.7, rawAwayWin))
-  rawDraw = Math.max(0.15, Math.min(0.4, rawDraw))
+  rawHomeWin = Math.max(0.08, Math.min(0.75, rawHomeWin))
+  rawAwayWin = Math.max(0.08, Math.min(0.75, rawAwayWin))
+  rawDraw = Math.max(0.12, Math.min(0.45, rawDraw))
   
   // Normalize to sum to 1
   const total = rawHomeWin + rawDraw + rawAwayWin
@@ -348,19 +353,47 @@ export function predictMatch(
   const drawProb = rawDraw / total
   const awayWinProb = rawAwayWin / total
   
-  // Predict goals
+  // Predict goals - ensure they align with winner probabilities
   const leagueAvgGoals = matches.filter(m => m.status.toLowerCase() === 'played')
     .reduce((sum, m) => sum + m.home_goals + m.away_goals, 0) / 
-    matches.filter(m => m.status.toLowerCase() === 'played').length / 2 || 1.3
+    Math.max(matches.filter(m => m.status.toLowerCase() === 'played').length, 1) / 2 || 1.3
   
-  const predictedHomeGoals = Math.max(0.5, 
-    leagueAvgGoals * (homeStats.avg_goals_scored / (homeStats.avg_goals_scored + homeStats.avg_goals_conceded || 1)) * 1.5 +
-    homeAdvantage * 0.5
-  )
+  // Base goal expectations
+  let baseHomeGoals = leagueAvgGoals * (homeStats.avg_goals_scored / Math.max(homeStats.avg_goals_scored + homeStats.avg_goals_conceded, 0.1)) * 2
+  let baseAwayGoals = leagueAvgGoals * (awayStats.avg_goals_scored / Math.max(awayStats.avg_goals_scored + awayStats.avg_goals_conceded, 0.1)) * 2
   
-  const predictedAwayGoals = Math.max(0.3,
-    leagueAvgGoals * (awayStats.avg_goals_scored / (awayStats.avg_goals_scored + awayStats.avg_goals_conceded || 1)) * 1.3
-  )
+  // Home advantage boost for goals
+  baseHomeGoals *= 1.1
+  
+  // Now ENSURE the scoreline matches the predicted winner
+  const probDiff = Math.abs(homeWinProb - awayWinProb)
+  
+  if (homeWinProb > awayWinProb && homeWinProb > drawProb) {
+    // Home team should win - ensure home goals > away goals
+    if (baseHomeGoals <= baseAwayGoals) {
+      baseHomeGoals = baseAwayGoals + 0.3 + probDiff * 2
+    } else {
+      // Increase the margin based on probability difference
+      baseHomeGoals = baseAwayGoals + (baseHomeGoals - baseAwayGoals) * (1 + probDiff)
+    }
+  } else if (awayWinProb > homeWinProb && awayWinProb > drawProb) {
+    // Away team should win - ensure away goals > home goals
+    if (baseAwayGoals <= baseHomeGoals) {
+      baseAwayGoals = baseHomeGoals + 0.3 + probDiff * 2
+    } else {
+      // Increase the margin based on probability difference
+      baseAwayGoals = baseHomeGoals + (baseAwayGoals - baseHomeGoals) * (1 + probDiff)
+    }
+  } else {
+    // Draw is most likely - make goals roughly equal
+    const avgGoals = (baseHomeGoals + baseAwayGoals) / 2
+    baseHomeGoals = avgGoals + 0.1  // Slight home advantage
+    baseAwayGoals = avgGoals
+  }
+  
+  // Ensure reasonable bounds
+  const predictedHomeGoals = Math.max(0.5, Math.min(4.5, baseHomeGoals))
+  const predictedAwayGoals = Math.max(0.3, Math.min(4.0, baseAwayGoals))
   
   // Calculate confidence based on data quality
   const dataPoints = homeStats.matches_played + awayStats.matches_played + h2hMatches.length * 2

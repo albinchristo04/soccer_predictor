@@ -4,26 +4,24 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:8000'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ league: string }> }
+  { params }: { params: Promise<{ league: string; team: string }> }
 ) {
-  const { league } = await params
-
+  const { league, team } = await params
+  
   try {
     const response = await fetch(
-      `${BACKEND_URL}/api/upcoming_matches/${league}`,
+      `${BACKEND_URL}/api/team_form/${league}/${encodeURIComponent(team)}`,
       {
         headers: {
           'Content-Type': 'application/json',
         },
-        // Don't cache, always get fresh data
-        cache: 'no-store',
       }
     )
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
       return NextResponse.json(
-        { error: errorData.detail || 'Failed to fetch upcoming matches' },
+        { error: errorData.detail || 'Failed to fetch team form' },
         { status: response.status }
       )
     }
@@ -31,7 +29,7 @@ export async function GET(
     const data = await response.json()
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error fetching upcoming matches:', error)
+    console.error('Error fetching team form:', error)
     return NextResponse.json(
       { error: 'Failed to connect to backend server' },
       { status: 500 }

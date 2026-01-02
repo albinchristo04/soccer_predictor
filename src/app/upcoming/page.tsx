@@ -1,242 +1,661 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { format, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns'
-import { leagues } from '@/data/leagues'
-import { SoccerSpinner } from '@/components/SoccerSpinner'
-import { PredictionResult } from '@/components/PredictionResult'
+import { useState, useEffect, useCallback } from 'react'
+import { format, parseISO, addMonths, subMonths } from 'date-fns'
+import { leagueNames as leagues, leagueFlagUrls } from '@/data/leagues'
 
-type Match = {
-  date: string
+type MatchData = {
   home_team: string
   away_team: string
-  predicted_home_win: number
-  predicted_draw: number
-  predicted_away_win: number
+  status: string
+  actual_home_goals?: number | null
+  actual_away_goals?: number | null
+  result?: string
+  predicted_home_win?: number
+  predicted_draw?: number
+  predicted_away_win?: number
   predicted_home_goals?: number
   predicted_away_goals?: number
+  prediction_correct?: boolean
+  predicted_result?: string
+  venue?: string
+  home_rating?: number
+  away_rating?: number
+  confidence?: number
 }
 
-type ViewMode = 'week' | 'day'
+type CalendarDay = {
+  day: number
+  date: string
+  matches: MatchData[]
+  match_count: number
+  is_today: boolean
+} | null
 
-function formatDate(date: Date): string {
-  return format(date, 'yyyy-MM-dd')
+type CalendarWeek = CalendarDay[]
+
+type CalendarData = {
+  year: number
+  month: number
+  month_name: string
+  weeks: CalendarWeek[]
+  total_matches: number
 }
 
-export default function UpcomingMatches() {
-  const [selectedLeague, setSelectedLeague] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<ViewMode>('week')
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
-  const [matches, setMatches] = useState<Match[]>([])
-  const [loading, setLoading] = useState(false)
+const leagueNameMap: Record<string, string> = {
+  'Premier League': 'premier_league',
+  'La Liga': 'la_liga',
+  'Serie A': 'serie_a',
+  'Bundesliga': 'bundesliga',
+  'Ligue 1': 'ligue_1',
+  'Champions League (UCL)': 'ucl',
+  'Europa League (UEL)': 'uel',
+  'MLS': 'mls',
+  'FIFA World Cup': 'world_cup'
+}
 
-  const leagueNameMap: Record<string, string> = {
-    'Premier League': 'premier_league',
-    'La Liga': 'la_liga',
-    'Serie A': 'serie_a',
-    'Bundesliga': 'bundesliga',
-    'Ligue 1': 'ligue_1',
-    'Champions League (UCL)': 'ucl',
-    'Europa League (UEL)': 'uel',
-    'MLS': 'mls',
-    'FIFA World Cup': 'world_cup'
-  }
+const leagueFlags: Record<string, string> = {
+  'Premier League': 'https://flagcdn.com/24x18/gb-eng.png',
+  'La Liga': 'https://flagcdn.com/24x18/es.png',
+  'Serie A': 'https://flagcdn.com/24x18/it.png',
+  'Bundesliga': 'https://flagcdn.com/24x18/de.png',
+  'Ligue 1': 'https://flagcdn.com/24x18/fr.png',
+  'Champions League (UCL)': 'https://flagcdn.com/24x18/eu.png',
+  'Europa League (UEL)': 'https://flagcdn.com/24x18/eu.png',
+  'MLS': 'https://flagcdn.com/24x18/us.png',
+  'FIFA World Cup': 'https://flagcdn.com/24x18/un.png'
+}
 
-  const mappedLeague = selectedLeague ? leagueNameMap[selectedLeague] : null
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-  // Week view starts on Sunday (0) and ends on Saturday (6)
-  const today = new Date()
-  const weekDays = eachDayOfInterval({
-    start: startOfWeek(today, { weekStartsOn: 0 }), // Start from Sunday
-    end: endOfWeek(today, { weekStartsOn: 0 })      // End on Saturday
-  })
-
-  useEffect(() => {
-    const fetchMatches = async () => {
-      if (!mappedLeague) return
-      setLoading(true)
-      try {
-        // Use Next.js API route (relative path) in production, Python backend in development
-        const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL 
-          ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/upcoming_matches/${mappedLeague}`
-          : `/api/upcoming_matches/${mappedLeague}`
-        
-        const response = await fetch(apiUrl)
-        if (!response.ok) throw new Error('Failed to fetch matches')
-        const data = await response.json()
-        setMatches(data)
-      } catch (error) {
-        console.error('Error fetching matches:', error)
-        setMatches([]) // Clear matches on error
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchMatches()
-  }, [mappedLeague])
-
-  const matchesByDate = matches.reduce((acc: Record<string, Match[]>, match) => {
-    const date = match.date.split('T')[0]
-    if (!acc[date]) acc[date] = []
-    acc[date].push(match)
-    return acc
-  }, {})
-
-  const getMatchesForDate = (date: Date) => {
-    return matchesByDate[formatDate(date)] || []
-  }
-
+function PredictionBadge({ correct }: { correct?: boolean }) {
+  if (correct === undefined) return null
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="text-center mb-12">
-        <h1 className="text-5xl font-extrabold text-gray-800 dark:text-white sm:text-6xl md:text-7xl">Upcoming Matches</h1>
-        <p className="mt-4 text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-          Explore upcoming matches and see AI-powered predictions for various leagues.
-        </p>
-      </div>
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+      correct 
+        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+        : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+    }`}>
+      {correct ? '✓ Correct' : '✗ Wrong'}
+    </span>
+  )
+}
 
-      <div className="mb-10 flex justify-center">
-        <div className="relative">
-          <select
-            onChange={(e) => setSelectedLeague(e.target.value)}
-            className="appearance-none bg-white dark:bg-gray-800 border-2 border-green-500 text-gray-800 dark:text-gray-200 text-lg rounded-lg py-3 px-5 pr-10 focus:outline-none focus:border-green-600 focus:ring-2 focus:ring-green-500 transition duration-300 ease-in-out shadow-md"
-          >
-            <option value="">Select a league</option>
-            {leagues.map((league) => (
-              <option key={league} value={league}>
-                {league}
-              </option>
-            ))}
-          </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-green-600 dark:text-green-400">
-            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M5.516 7.548c.436-.446 1.143-.446 1.579 0L10 10.405l2.905-2.857c.436-.446 1.143-.446 1.579 0 .436.445.436 1.167 0 1.612l-3.695 3.63c-.436.446-1.143.446-1.579 0L5.516 9.16c-.436-.445-.436-1.167 0-1.612z"/></svg>
+function ScoreDisplay({ 
+  homeScore, 
+  awayScore, 
+  isActual = false,
+  isPredicted = false 
+}: { 
+  homeScore: number | null | undefined
+  awayScore: number | null | undefined
+  isActual?: boolean
+  isPredicted?: boolean
+}) {
+  const label = isActual ? 'FT' : isPredicted ? 'Pred' : ''
+  
+  return (
+    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
+      isActual 
+        ? 'bg-gradient-to-r from-slate-800 to-slate-700' 
+        : 'bg-slate-800/50 border border-slate-700/50'
+    }`}>
+      {label && (
+        <span className={`text-[10px] font-bold uppercase tracking-wider ${
+          isActual ? 'text-emerald-400' : 'text-slate-500'
+        }`}>
+          {label}
+        </span>
+      )}
+      <span className={`font-mono text-lg font-bold ${isActual ? 'text-white' : 'text-slate-400'}`}>
+        {homeScore ?? '-'}
+      </span>
+      <span className="text-slate-600">-</span>
+      <span className={`font-mono text-lg font-bold ${isActual ? 'text-white' : 'text-slate-400'}`}>
+        {awayScore ?? '-'}
+      </span>
+    </div>
+  )
+}
+
+function MatchCard({ match, expanded = false }: { match: MatchData; expanded?: boolean }) {
+  const isPlayed = match.status === 'played'
+  
+  // Determine winner for styling
+  const homeWon = isPlayed && (match.actual_home_goals ?? 0) > (match.actual_away_goals ?? 0)
+  const awayWon = isPlayed && (match.actual_away_goals ?? 0) > (match.actual_home_goals ?? 0)
+  
+  return (
+    <div className={`relative overflow-hidden rounded-xl border transition-all duration-300 ${
+      isPlayed 
+        ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-slate-700/50' 
+        : 'bg-gradient-to-br from-slate-900/50 to-slate-950/50 border-slate-800/50'
+    } ${expanded ? 'shadow-xl shadow-black/20' : 'hover:border-slate-600/50 hover:shadow-lg hover:shadow-black/10'}`}>
+      
+      {/* Status indicator line */}
+      <div className={`absolute top-0 left-0 right-0 h-0.5 ${
+        isPlayed ? 'bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500' :
+        'bg-gradient-to-r from-blue-500 via-blue-400 to-blue-500'
+      }`} />
+      
+      <div className="p-4">
+        {/* Teams */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex-1 text-right pr-4">
+            <span className={`font-semibold text-sm ${homeWon ? 'text-emerald-400' : 'text-slate-200'}`}>
+              {match.home_team}
+            </span>
+          </div>
+          
+          <div className="flex flex-col items-center gap-1">
+            {isPlayed ? (
+              <ScoreDisplay 
+                homeScore={match.actual_home_goals} 
+                awayScore={match.actual_away_goals}
+                isActual 
+              />
+            ) : (
+              <span className="px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium">
+                Scheduled
+              </span>
+            )}
+          </div>
+          
+          <div className="flex-1 text-left pl-4">
+            <span className={`font-semibold text-sm ${awayWon ? 'text-emerald-400' : 'text-slate-200'}`}>
+              {match.away_team}
+            </span>
           </div>
         </div>
-      </div>
-
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <SoccerSpinner />
-        </div>
-      ) : mappedLeague && matches.length === 0 ? (
-        <div className="text-center bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl border-2 border-gray-200 dark:border-gray-700">
-          <p className="text-2xl font-semibold text-gray-800 dark:text-white mb-4">No Upcoming Matches</p>
-          <p className="text-gray-600 dark:text-gray-400">There are no scheduled matches for this league at the moment. Please check back later.</p>
-        </div>
-      ) : mappedLeague && (
-        <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl border-2 border-gray-200 dark:border-gray-700">
-          {/* View Mode Toggle */}
-          <div className="flex justify-end mb-6 space-x-2">
-            <button
-              onClick={() => setViewMode('week')}
-              className={`px-4 py-2 rounded-lg font-semibold transition-colors duration-300 ${
-                viewMode === 'week' ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
-              }`}
-            >
-              Week View
-            </button>
-            <button
-              onClick={() => setViewMode('day')}
-              className={`px-4 py-2 rounded-lg font-semibold transition-colors duration-300 ${
-                viewMode === 'day' ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
-              }`}
-            >
-              Day View
-            </button>
-          </div>
-
-          {viewMode === 'week' ? (
-            // Week View
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-              {weekDays.map((date) => {
-                const dayMatches = getMatchesForDate(date)
-                const isToday = formatDate(date) === formatDate(new Date())
-                
-                return (
-                  <div
-                    key={date.toString()}
-                    className={`p-4 rounded-lg transition-all duration-300 cursor-pointer ${
-                      isToday 
-                        ? 'bg-green-100 dark:bg-green-900/30 border-2 border-green-500' 
-                        : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border-2 border-gray-200 dark:border-gray-600'
-                    }`}
-                    onClick={() => {
-                      setSelectedDate(date)
-                      setViewMode('day')
-                    }}
-                  >
-                    <div className="font-bold text-center text-gray-800 dark:text-white mb-3">
-                      {format(date, 'EEE')}
-                    </div>
-                    <div className="text-center text-gray-600 dark:text-gray-400 mb-4">
-                      {format(date, 'MMM d')}
-                    </div>
-                    <div className="space-y-2">
-                      {dayMatches.length > 0 ? (
-                        dayMatches.map((match, idx) => (
-                          <div key={idx} className="text-xs text-center text-gray-700 dark:text-gray-300 truncate">
-                            {match.home_team} vs {match.away_team}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-xs text-center text-gray-400 dark:text-gray-500">No matches</div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
+        
+        {/* Prediction Section */}
+        {(match.predicted_home_win !== undefined || expanded) && (
+          <div className={`border-t border-slate-700/50 pt-3 mt-3 ${expanded ? '' : 'opacity-80 hover:opacity-100'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                AI Prediction
+              </span>
+              {isPlayed && <PredictionBadge correct={match.prediction_correct} />}
             </div>
-          ) : (
-            // Day View
-            <div className="space-y-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-3xl font-bold text-gray-800 dark:text-white">
-                  {format(selectedDate, 'EEEE, MMMM d, yyyy')}
-                </h2>
-                <button
-                  onClick={() => setViewMode('week')}
-                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-300"
-                >
-                  ← Back to Week View
-                </button>
-              </div>
-              {getMatchesForDate(selectedDate).length > 0 ? (
-                getMatchesForDate(selectedDate).map((match, idx) => (
-                  <div key={idx} className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-700 dark:to-gray-800 p-6 rounded-lg shadow-lg border-2 border-gray-200 dark:border-gray-600">
-                    <div className="text-xl font-semibold text-gray-800 dark:text-white mb-4 text-center">
-                      {match.home_team} vs {match.away_team}
-                    </div>
-                    {match.predicted_home_goals !== undefined && match.predicted_away_goals !== undefined && (
-                      <div className="text-center mb-4">
-                        <span className="text-lg font-bold text-green-600 dark:text-green-400">
-                          Predicted Scoreline: {match.predicted_home_goals} - {match.predicted_away_goals}
-                        </span>
-                      </div>
-                    )}
-                    <PredictionResult
-                      result={{
-                        predictions: {
-                          home_win: match.predicted_home_win,
-                          draw: match.predicted_draw,
-                          away_win: match.predicted_away_win
-                        },
-                        home_team: match.home_team,
-                        away_team: match.away_team
-                      }}
-                      mode="head-to-head"
+            
+            <div className="flex items-center justify-between gap-4">
+              {/* Predicted Score */}
+              <ScoreDisplay 
+                homeScore={match.predicted_home_goals} 
+                awayScore={match.predicted_away_goals}
+                isPredicted 
+              />
+              
+              {/* Win Probabilities */}
+              <div className="flex-1 flex items-center gap-2">
+                <div className="flex-1">
+                  <div className="flex justify-between text-[10px] mb-1">
+                    <span className="text-slate-500">Home</span>
+                    <span className="text-emerald-400 font-bold">
+                      {((match.predicted_home_win ?? 0) * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full"
+                      style={{ width: `${(match.predicted_home_win ?? 0) * 100}%` }}
                     />
                   </div>
-                ))
-              ) : (
-                <div className="text-center text-gray-600 dark:text-gray-400 py-8">
-                  No matches scheduled for this day.
+                </div>
+                <div className="flex-1">
+                  <div className="flex justify-between text-[10px] mb-1">
+                    <span className="text-slate-500">Draw</span>
+                    <span className="text-amber-400 font-bold">
+                      {((match.predicted_draw ?? 0) * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-amber-600 to-amber-400 rounded-full"
+                      style={{ width: `${(match.predicted_draw ?? 0) * 100}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <div className="flex justify-between text-[10px] mb-1">
+                    <span className="text-slate-500">Away</span>
+                    <span className="text-rose-400 font-bold">
+                      {((match.predicted_away_win ?? 0) * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-rose-600 to-rose-400 rounded-full"
+                      style={{ width: `${(match.predicted_away_win ?? 0) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Confidence indicator */}
+            {match.confidence && (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-[10px] text-slate-500">Confidence:</span>
+                <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-full"
+                    style={{ width: `${match.confidence * 100}%` }}
+                  />
+                </div>
+                <span className="text-[10px] font-bold text-indigo-400">
+                  {(match.confidence * 100).toFixed(0)}%
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CalendarCell({ 
+  day, 
+  onClick,
+  isSelected 
+}: { 
+  day: CalendarDay
+  onClick: () => void
+  isSelected: boolean
+}) {
+  if (!day) {
+    return <div className="aspect-square bg-slate-900/30 rounded-lg" />
+  }
+  
+  const hasMatches = day.match_count > 0
+  const hasPlayedMatches = day.matches.some(m => m.status === 'played')
+  const hasUpcomingMatches = day.matches.some(m => m.status === 'scheduled')
+  
+  return (
+    <button
+      onClick={onClick}
+      className={`aspect-square rounded-xl p-2 transition-all duration-200 relative group ${
+        isSelected
+          ? 'bg-gradient-to-br from-indigo-600 to-indigo-800 ring-2 ring-indigo-400 ring-offset-2 ring-offset-slate-900'
+          : day.is_today
+          ? 'bg-gradient-to-br from-emerald-600/20 to-emerald-800/20 border-2 border-emerald-500/50 hover:border-emerald-400'
+          : hasMatches
+          ? 'bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/50 hover:border-slate-600'
+          : 'bg-slate-900/40 hover:bg-slate-800/40 border border-transparent'
+      }`}
+    >
+      <div className="flex flex-col h-full">
+        <span className={`text-sm font-bold ${
+          isSelected ? 'text-white' :
+          day.is_today ? 'text-emerald-400' :
+          hasMatches ? 'text-slate-200' : 'text-slate-500'
+        }`}>
+          {day.day}
+        </span>
+        
+        {hasMatches && (
+          <div className="flex-1 flex flex-col justify-end">
+            <div className="flex items-center gap-1 mt-1">
+              {hasPlayedMatches && (
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Completed" />
+              )}
+              {hasUpcomingMatches && (
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" title="Upcoming" />
+              )}
+            </div>
+            <span className={`text-[10px] font-medium mt-0.5 ${
+              isSelected ? 'text-indigo-200' : 'text-slate-400'
+            }`}>
+              {day.match_count} {day.match_count === 1 ? 'match' : 'matches'}
+            </span>
+          </div>
+        )}
+      </div>
+      
+      {/* Hover preview */}
+      {hasMatches && !isSelected && (
+        <div className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-[10px] text-slate-300 whitespace-nowrap">
+            Click to view
+          </div>
+        </div>
+      )}
+    </button>
+  )
+}
+
+function LiveScoreBanner({ league }: { league: string }) {
+  const [liveMatches, setLiveMatches] = useState<any[]>([])
+  
+  useEffect(() => {
+    const fetchLive = async () => {
+      try {
+        const res = await fetch(`/api/live_scores?league=${league}`)
+        if (res.ok) {
+          const data = await res.json()
+          setLiveMatches(data)
+        }
+      } catch (e) {
+        console.error('Error fetching live scores:', e)
+      }
+    }
+    
+    fetchLive()
+    const interval = setInterval(fetchLive, 30000) // Poll every 30 seconds
+    return () => clearInterval(interval)
+  }, [league])
+  
+  if (liveMatches.length === 0) return null
+  
+  return (
+    <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-red-600/20 via-red-500/10 to-red-600/20 border border-red-500/30 animate-pulse">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+          <span className="text-red-400 font-bold text-sm uppercase tracking-wider">Live Now</span>
+        </div>
+      </div>
+      <div className="flex gap-4 overflow-x-auto pb-2">
+        {liveMatches.map((match, idx) => (
+          <div key={idx} className="flex-shrink-0 bg-slate-900/80 rounded-xl px-4 py-2 border border-red-500/20">
+            <div className="flex items-center gap-3">
+              <span className="text-white font-medium text-sm">{match.home_team}</span>
+              <span className="text-2xl font-bold text-white">{match.home_score}</span>
+              <span className="text-slate-500">-</span>
+              <span className="text-2xl font-bold text-white">{match.away_score}</span>
+              <span className="text-white font-medium text-sm">{match.away_team}</span>
+              <span className="text-red-400 text-xs font-medium">{match.minute}&apos;</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export default function MatchesPage() {
+  const [selectedLeague, setSelectedLeague] = useState<string>('Premier League')
+  const [calendarData, setCalendarData] = useState<CalendarData | null>(null)
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [selectedMatches, setSelectedMatches] = useState<MatchData[]>([])
+  const [loading, setLoading] = useState(false)
+  const [currentDate, setCurrentDate] = useState(new Date())
+  
+  const mappedLeague = leagueNameMap[selectedLeague]
+  
+  const fetchCalendar = useCallback(async () => {
+    if (!mappedLeague) return
+    setLoading(true)
+    
+    try {
+      const year = currentDate.getFullYear()
+      const month = currentDate.getMonth() + 1
+      
+      const res = await fetch(`/api/calendar/${mappedLeague}?year=${year}&month=${month}`)
+      if (res.ok) {
+        const data = await res.json()
+        setCalendarData(data)
+      }
+    } catch (e) {
+      console.error('Error fetching calendar:', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [mappedLeague, currentDate])
+  
+  useEffect(() => {
+    fetchCalendar()
+  }, [fetchCalendar])
+  
+  const fetchMatchesForDate = async (date: string) => {
+    if (!mappedLeague) return
+    
+    try {
+      const res = await fetch(`/api/matches_by_date/${mappedLeague}/${date}`)
+      if (res.ok) {
+        const data = await res.json()
+        setSelectedMatches(data)
+      }
+    } catch (e) {
+      console.error('Error fetching matches:', e)
+    }
+  }
+  
+  const handleDateClick = (day: CalendarDay) => {
+    if (!day || day.match_count === 0) return
+    
+    if (selectedDate === day.date) {
+      setSelectedDate(null)
+      setSelectedMatches([])
+    } else {
+      setSelectedDate(day.date)
+      setSelectedMatches(day.matches)
+      fetchMatchesForDate(day.date)
+    }
+  }
+  
+  const handlePrevMonth = () => {
+    setCurrentDate(subMonths(currentDate, 1))
+    setSelectedDate(null)
+    setSelectedMatches([])
+  }
+  
+  const handleNextMonth = () => {
+    setCurrentDate(addMonths(currentDate, 1))
+    setSelectedDate(null)
+    setSelectedMatches([])
+  }
+  
+  const handleToday = () => {
+    setCurrentDate(new Date())
+    setSelectedDate(null)
+    setSelectedMatches([])
+  }
+  
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+      {/* Premium Header */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 via-purple-600/10 to-indigo-600/10" />
+        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-5" />
+        
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-xl shadow-indigo-500/20">
+              <span className="text-3xl">📅</span>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-white tracking-tight">Match Calendar</h1>
+              <p className="text-slate-400 text-sm mt-1">
+                Browse matches, predictions, and results
+              </p>
+            </div>
+          </div>
+          
+          {/* League Pills */}
+          <div className="flex flex-wrap gap-2">
+            {leagues.map((league) => (
+              <button
+                key={league}
+                onClick={() => {
+                  setSelectedLeague(league)
+                  setSelectedDate(null)
+                  setSelectedMatches([])
+                }}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  selectedLeague === league
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30'
+                    : 'bg-slate-800/60 text-slate-300 border border-slate-700/50 hover:bg-slate-700/60 hover:border-slate-600'
+                }`}
+              >
+                <img src={leagueFlags[league]} alt="" className="w-5 h-auto rounded-sm" />
+                <span className="hidden sm:inline">{league}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Live Score Banner */}
+        {mappedLeague && <LiveScoreBanner league={mappedLeague} />}
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Calendar */}
+          <div className="lg:col-span-2">
+            <div className="bg-slate-900/60 backdrop-blur-xl rounded-3xl border border-slate-800/50 overflow-hidden shadow-2xl">
+              {/* Calendar Header */}
+              <div className="flex items-center justify-between px-6 py-4 bg-slate-800/50 border-b border-slate-700/50">
+                <button
+                  onClick={handlePrevMonth}
+                  className="p-2 rounded-xl bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                
+                <div className="flex items-center gap-4">
+                  <h2 className="text-xl font-bold text-white">
+                    {calendarData?.month_name} {calendarData?.year}
+                  </h2>
+                  <button
+                    onClick={handleToday}
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 text-sm font-medium transition-colors"
+                  >
+                    Today
+                  </button>
+                </div>
+                
+                <button
+                  onClick={handleNextMonth}
+                  className="p-2 rounded-xl bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+              
+              {/* Calendar Grid */}
+              <div className="p-4">
+                {/* Weekday Headers */}
+                <div className="grid grid-cols-7 gap-2 mb-2">
+                  {WEEKDAYS.map((day) => (
+                    <div key={day} className="text-center text-xs font-bold text-slate-500 uppercase tracking-wider py-2">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Calendar Days */}
+                {loading ? (
+                  <div className="flex justify-center items-center py-20">
+                    <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {calendarData?.weeks.map((week, weekIdx) => (
+                      <div key={weekIdx} className="grid grid-cols-7 gap-2">
+                        {week.map((day, dayIdx) => (
+                          <CalendarCell
+                            key={dayIdx}
+                            day={day}
+                            onClick={() => handleDateClick(day)}
+                            isSelected={selectedDate === day?.date}
+                          />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              {/* Legend */}
+              <div className="px-6 py-4 bg-slate-800/30 border-t border-slate-700/50 flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-xs text-slate-400">Completed</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span className="text-xs text-slate-400">Scheduled</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded border-2 border-emerald-500/50" />
+                  <span className="text-xs text-slate-400">Today</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Match Details Panel */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-24">
+              <div className="bg-slate-900/60 backdrop-blur-xl rounded-3xl border border-slate-800/50 overflow-hidden shadow-2xl">
+                {selectedDate ? (
+                  <>
+                    <div className="px-6 py-4 bg-gradient-to-r from-indigo-600/20 to-purple-600/20 border-b border-slate-700/50">
+                      <h3 className="font-bold text-white">
+                        {format(parseISO(selectedDate), 'EEEE, MMMM d')}
+                      </h3>
+                      <p className="text-sm text-slate-400 mt-1">
+                        {selectedMatches.length} {selectedMatches.length === 1 ? 'match' : 'matches'}
+                      </p>
+                    </div>
+                    
+                    <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                      {selectedMatches.length > 0 ? (
+                        selectedMatches.map((match, idx) => (
+                          <MatchCard key={idx} match={match} expanded />
+                        ))
+                      ) : (
+                        <div className="text-center py-8">
+                          <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-3">
+                            <span className="text-2xl">⏳</span>
+                          </div>
+                          <p className="text-slate-400 text-sm">Loading matches...</p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="p-8 text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-700 flex items-center justify-center mx-auto mb-4">
+                      <span className="text-3xl">📆</span>
+                    </div>
+                    <h3 className="font-bold text-white mb-2">Select a Date</h3>
+                    <p className="text-sm text-slate-400">
+                      Click on a date with matches to view detailed predictions and results
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Stats Summary */}
+              {calendarData && (
+                <div className="mt-4 bg-slate-900/60 backdrop-blur-xl rounded-2xl border border-slate-800/50 p-4">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                    {calendarData.month_name} Summary
+                  </h4>
+                  <div className="flex items-center justify-between">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-white">{calendarData.total_matches}</p>
+                      <p className="text-xs text-slate-400">Total Matches</p>
+                    </div>
+                    <div className="h-10 w-px bg-slate-700" />
+                    <div className="text-center">
+                      <img src={leagueFlags[selectedLeague]} alt="" className="w-8 h-auto mx-auto rounded-sm" />
+                      <p className="text-xs text-slate-400 mt-1">{selectedLeague}</p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
-          )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }

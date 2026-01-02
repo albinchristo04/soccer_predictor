@@ -1,21 +1,77 @@
 'use client'
 
+import Link from 'next/link'
+
 export const Footer = () => {
   return (
-    <footer className="bg-white dark:bg-gray-800 border-t-4 border-green-500 py-6 mt-8 shadow-lg transition-colors duration-300">
-      <div className="container mx-auto px-4">
-        <div className="text-center">
-          <p className="text-sm text-gray-700 dark:text-gray-300 mb-2 font-medium">
-            &copy; {new Date().getFullYear()} Ron Oshri Altshuler. All Rights Reserved.
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-            Data source: <a href="https://fbref.com/en/" target="_blank" rel="noopener noreferrer" className="text-green-600 dark:text-green-400 hover:underline font-semibold">FBRef</a> | Terms of Service Apply
-          </p>
-          <p className="text-xs text-gray-500 dark:text-gray-500">
-            ⚠️ This tool is for educational and entertainment purposes only. 
-            Soccer outcomes are inherently unpredictable.
-            The developer disclaims any responsibility for financial or betting outcomes.
-          </p>
+    <footer className="bg-[var(--card-bg)] border-t border-[var(--border-color)] mt-auto">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Brand */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-secondary)] flex items-center justify-center">
+                <span className="text-xl">⚽</span>
+              </div>
+              <span className="text-lg font-bold text-[var(--text-primary)]">
+                Soccer Predictor
+              </span>
+            </div>
+            <p className="text-sm text-[var(--text-secondary)]">
+              AI-powered soccer match prediction and analysis
+            </p>
+          </div>
+
+          {/* Quick Links */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wider">
+              Quick Links
+            </h3>
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              <Link href="/upcoming" className="text-sm text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors">
+                Matches
+              </Link>
+              <Link href="/predict" className="text-sm text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors">
+                Predict
+              </Link>
+              <Link href="/analytics" className="text-sm text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors">
+                Analytics
+              </Link>
+              <Link href="/about" className="text-sm text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors">
+                About
+              </Link>
+            </div>
+          </div>
+
+          {/* Data Source */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wider">
+              Data Source
+            </h3>
+            <p className="text-sm text-[var(--text-secondary)]">
+              Powered by{' '}
+              <a 
+                href="https://fbref.com/en/" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-[var(--accent-primary)] hover:underline font-medium"
+              >
+                FBRef
+              </a>
+            </p>
+          </div>
+        </div>
+
+        {/* Bottom Bar */}
+        <div className="mt-8 pt-6 border-t border-[var(--border-color)]">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-xs text-[var(--text-tertiary)]">
+              &copy; {new Date().getFullYear()} Ron Oshri Altshuler. All Rights Reserved.
+            </p>
+            <p className="text-xs text-[var(--text-tertiary)] text-center">
+              ⚠️ For educational and entertainment purposes only. Soccer outcomes are inherently unpredictable.
+            </p>
+          </div>
         </div>
       </div>
     </footer>

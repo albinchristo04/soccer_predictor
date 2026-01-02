@@ -264,36 +264,37 @@ def predict_scoreline(
         # Adjust based on outcome probabilities
         # If home team likely to win: boost home goals, reduce away goals
         # If away team likely to win: reduce home goals, boost away goals
-        # If draw likely: keep closer to averages
+        # If draw likely: keep goals roughly equal
         
         # More aggressive adjustment to make scoreline align with probabilities
         # Use a scaling factor that increases with probability difference
         prob_diff = abs(home_win_prob - away_win_prob)
         adjustment_factor = 0.5 + (prob_diff * 1.0)  # Range: 0.5 to 1.5
         
-        if home_win_prob > away_win_prob:
+        # Determine the most likely outcome
+        if home_win_prob > draw_prob and home_win_prob > away_win_prob:
             # Home team favored - boost home goals, reduce away goals
             predicted_home_goals = base_home_goals * (1.0 + adjustment_factor * home_win_prob)
             predicted_away_goals = base_away_goals * (1.0 - adjustment_factor * (home_win_prob - draw_prob) * 0.5)
-        elif away_win_prob > home_win_prob:
+            # Guarantee home team scores more when they're favored
+            if predicted_home_goals <= predicted_away_goals:
+                predicted_home_goals = predicted_away_goals + 0.4 + (prob_diff * 1.5)
+        elif away_win_prob > draw_prob and away_win_prob > home_win_prob:
             # Away team favored - reduce home goals, boost away goals
             predicted_home_goals = base_home_goals * (1.0 - adjustment_factor * (away_win_prob - draw_prob) * 0.5)
             predicted_away_goals = base_away_goals * (1.0 + adjustment_factor * away_win_prob)
+            # Guarantee away team scores more when they're favored
+            if predicted_away_goals <= predicted_home_goals:
+                predicted_away_goals = predicted_home_goals + 0.4 + (prob_diff * 1.5)
         else:
-            # Draw or very close - use base values with small adjustment
-            predicted_home_goals = base_home_goals * (1.0 + 0.2 * draw_prob)
-            predicted_away_goals = base_away_goals * (1.0 + 0.2 * draw_prob)
+            # Draw is most likely - make goals roughly equal
+            avg_goals = (base_home_goals + base_away_goals) / 2
+            predicted_home_goals = avg_goals + 0.1  # Slight home advantage
+            predicted_away_goals = avg_goals
         
-        # Ensure minimum difference when there's a clear favorite
-        if prob_diff > 0.15:  # More than 15% difference
-            if home_win_prob > away_win_prob:
-                # Ensure home team scores more
-                if predicted_home_goals <= predicted_away_goals:
-                    predicted_home_goals = predicted_away_goals + 0.5 + (prob_diff * 2)
-            else:
-                # Ensure away team scores more
-                if predicted_away_goals <= predicted_home_goals:
-                    predicted_away_goals = predicted_home_goals + 0.5 + (prob_diff * 2)
+        # Ensure reasonable bounds (0.5 to 4.5 goals)
+        predicted_home_goals = max(0.5, min(4.5, predicted_home_goals))
+        predicted_away_goals = max(0.3, min(4.0, predicted_away_goals))
         
         # Round to 1 decimal place for cleaner display
         return {
