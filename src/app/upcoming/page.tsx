@@ -119,7 +119,8 @@ function ScoreDisplay({
 }
 
 function MatchCard({ match, expanded = false }: { match: MatchData; expanded?: boolean }) {
-  const isPlayed = match.status === 'played'
+  const isPlayed = match.status === 'played' || match.status === 'finished'
+  const isLive = match.status === 'live'
   
   // Determine winner for styling
   const homeWon = isPlayed && (match.actual_home_goals ?? 0) > (match.actual_away_goals ?? 0)
@@ -127,13 +128,16 @@ function MatchCard({ match, expanded = false }: { match: MatchData; expanded?: b
   
   return (
     <div className={`relative overflow-hidden rounded-xl border transition-all duration-300 ${
-      isPlayed 
-        ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-slate-700/50' 
-        : 'bg-gradient-to-br from-slate-900/50 to-slate-950/50 border-slate-800/50'
+      isLive
+        ? 'bg-gradient-to-br from-red-900/30 to-slate-900/80 border-red-700/50 ring-1 ring-red-500/30'
+        : isPlayed 
+          ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-slate-700/50' 
+          : 'bg-gradient-to-br from-slate-900/50 to-slate-950/50 border-slate-800/50'
     } ${expanded ? 'shadow-xl shadow-black/20' : 'hover:border-slate-600/50 hover:shadow-lg hover:shadow-black/10'}`}>
       
       {/* Status indicator line */}
       <div className={`absolute top-0 left-0 right-0 h-0.5 ${
+        isLive ? 'bg-gradient-to-r from-red-500 via-red-400 to-red-500 animate-pulse' :
         isPlayed ? 'bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500' :
         'bg-gradient-to-r from-blue-500 via-blue-400 to-blue-500'
       }`} />
@@ -148,7 +152,19 @@ function MatchCard({ match, expanded = false }: { match: MatchData; expanded?: b
           </div>
           
           <div className="flex flex-col items-center gap-1">
-            {isPlayed ? (
+            {isLive ? (
+              <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-red-400 text-[10px] font-bold uppercase tracking-wider">Live</span>
+                </div>
+                <ScoreDisplay 
+                  homeScore={match.actual_home_goals ?? 0} 
+                  awayScore={match.actual_away_goals ?? 0}
+                  isActual 
+                />
+              </div>
+            ) : isPlayed ? (
               <ScoreDisplay 
                 homeScore={match.actual_home_goals} 
                 awayScore={match.actual_away_goals}

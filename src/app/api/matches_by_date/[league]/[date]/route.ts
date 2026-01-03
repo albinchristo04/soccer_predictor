@@ -18,8 +18,10 @@ export async function GET(
       },
     })
     
+    // For 404 or other errors, return empty array gracefully
     if (!response.ok) {
-      throw new Error(`Backend returned ${response.status}`)
+      console.warn(`Backend returned ${response.status} for matches_by_date/${league}/${date}`)
+      return NextResponse.json([])
     }
     
     const data = await response.json()

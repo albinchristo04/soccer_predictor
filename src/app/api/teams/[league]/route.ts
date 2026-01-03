@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { loadLeagueData, getLeagueTeams } from '@/lib/predictionService'
+
+const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:8000'
 
 export async function GET(
   request: Request,
@@ -8,10 +9,17 @@ export async function GET(
   const { league } = await params
 
   try {
-    const matches = loadLeagueData(league)
-    const teams = getLeagueTeams(matches)
+    const response = await fetch(`${BACKEND_URL}/api/teams/${league}`, {
+      cache: 'no-store',
+    })
     
-    return NextResponse.json({ success: true, teams })
+    if (!response.ok) {
+      throw new Error(`Backend returned ${response.status}`)
+    }
+    
+    const data = await response.json()
+    
+    return NextResponse.json({ success: true, teams: data.teams || [] })
   } catch (error: any) {
     console.error('Error loading teams:', error)
     return NextResponse.json(

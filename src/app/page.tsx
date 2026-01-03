@@ -127,7 +127,11 @@ function TodaysMatchesWidget() {
     return () => clearInterval(interval)
   }, [])
   
-  const totalMatches = matches.live.length + matches.upcoming.length + matches.completed.length
+  // Defensive: ensure matches has the expected structure
+  const live = matches?.live || []
+  const upcoming = matches?.upcoming || []
+  const completed = matches?.completed || []
+  const totalMatches = live.length + upcoming.length + completed.length
   
   if (loading) {
     return (
@@ -153,14 +157,14 @@ function TodaysMatchesWidget() {
       </div>
       
       <div className="p-4 space-y-4">
-        {matches.live.length > 0 && (
+        {live.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-2">
               <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
               <span className="text-xs font-bold text-red-400 uppercase tracking-wider">Live Now</span>
             </div>
             <div className="space-y-2">
-              {matches.live.slice(0, 3).map((match, idx) => (
+              {live.slice(0, 3).map((match, idx) => (
                 <div key={idx} className="grid grid-cols-3 items-center p-3 rounded-xl bg-red-950/20 border border-red-900/30">
                   <span className="text-sm text-white text-left">{match.home_team}</span>
                   <span className="font-bold text-white text-center">{match.home_score} - {match.away_score}</span>
@@ -171,14 +175,14 @@ function TodaysMatchesWidget() {
           </div>
         )}
         
-        {matches.upcoming.length > 0 && (
+        {upcoming.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-2">
               <div className="w-2 h-2 rounded-full bg-blue-500" />
               <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">Upcoming</span>
             </div>
             <div className="space-y-2">
-              {matches.upcoming.slice(0, 3).map((match, idx) => (
+              {upcoming.slice(0, 3).map((match, idx) => (
                 <div key={idx} className="grid grid-cols-3 items-center p-3 rounded-xl bg-slate-800/50 border border-slate-700/50">
                   <span className="text-sm text-slate-300 text-left">{match.home_team}</span>
                   <span className="text-xs text-slate-500 text-center">{match.time || 'TBD'}</span>

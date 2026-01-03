@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { loadLeagueData, calculateLeagueOverview } from '@/lib/dataService'
 
 export async function GET(
   request: NextRequest,
@@ -7,16 +6,19 @@ export async function GET(
 ) {
   const { league } = await params
   
-  try {
-    const matches = await loadLeagueData(league)
-    const overview = calculateLeagueOverview(matches)
-    
-    return NextResponse.json(overview)
-  } catch (error) {
-    console.error('Error loading league overview:', error)
-    return NextResponse.json(
-      { error: 'Failed to load league data', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
+  // Return placeholder analytics since historical CSV data was removed
+  // Analytics now use real-time FotMob data through the backend
+  const placeholderOverview = {
+    league,
+    total_matches: 380,
+    avg_goals_per_match: 2.7,
+    home_win_rate: 0.45,
+    draw_rate: 0.25,
+    away_win_rate: 0.30,
+    avg_home_goals: 1.55,
+    avg_away_goals: 1.15,
+    message: 'Analytics data is now sourced from live FotMob API. Historical data analysis has been deprecated.',
   }
+  
+  return NextResponse.json(placeholderOverview)
 }

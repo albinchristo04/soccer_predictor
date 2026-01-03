@@ -1,927 +1,491 @@
 """
-FastAPI backend server for the Soccer Predictor application.
+Soccer Predictor API v2.0 - FastAPI Backend
 
-This module defines the FastAPI application, including API endpoints for match
-predictions, team data retrieval, and analytics. It uses a prediction service
-to perform the actual calculations and data lookups.
+A streamlined backend that uses FotMob API for all football data.
+Provides endpoints for live scores, match predictions, team data, and league information.
 
-The API includes the following main functionalities:
-- Head-to-head match prediction within a single league.
-- Cross-league match prediction between two teams from different leagues.
-- Retrieval of teams for a given league.
-- A suite of analytics endpoints to provide statistics and trends for each league.
-
-The application is configured with CORS middleware to allow requests from the
-frontend development server. Error handling is implemented to return appropriate
-HTTP status codes and details for various issues, such as file not found or
-invalid input.
+All data is fetched from FotMob in real-time with caching for performance.
 """
 
-from fastapi import FastAPI, HTTPException
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from pydantic import BaseModel, validator
-from typing import Dict, List, Any, Optional
-import os
-import traceback
-import pandas as pd
-from datetime import datetime, timedelta
+from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
+from datetime import datetime
+import logging
 
-from backend import prediction_service as ps
+# Import v1 API router
+from backend.api.v1 import router as v1_router
+
+# Import services
+from backend.services.fotmob import get_fotmob_client, cleanup_fotmob_client
+from backend.services.ratings import get_elo_system
+from backend.config import LEAGUE_IDS, LEAGUE_NAMES
+
+# Import legacy services that still work with FotMob
 from backend import fotmob_service as fm
 from backend import live_score_service as lss
-from backend import unified_model as um
 
-# Constants
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.path.join(BASE_DIR, "fbref_data")
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Soccer Predictor API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan handler for startup and shutdown."""
+    logger.info("Starting Soccer Predictor API v2.0")
+    yield
+    logger.info("Shutting down Soccer Predictor API")
+    await cleanup_fotmob_client()
+
+
+app = FastAPI(
+    title="Soccer Predictor API",
+    description="""
+    Soccer Predictor API provides comprehensive match predictions,
+    live scores, and football data powered by FotMob.
+    
+    ## Features
+    
+    - **Live Scores**: Real-time match updates from FotMob
+    - **Match Predictions**: AI-powered probabilistic predictions
+    - **Team Data**: Comprehensive team statistics, form, and injuries
+    - **League Data**: Standings, top scorers, and fixtures
+    
+    ## API Endpoints
+    
+    - `/api/v1/matches/` - Match data (live, today, upcoming)
+    - `/api/v1/predictions/` - ML predictions for matches
+    - `/api/v1/teams/` - Team data and ratings
+    - `/api/v1/leagues/` - League standings and info
+    """,
+    version="2.0.0",
+    lifespan=lifespan,
+)
 
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://*.vercel.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Include API v1 router with enhanced endpoints
+app.include_router(v1_router)
 
-# Simple health check endpoint
+
+# ==================== ROOT ENDPOINTS ====================
+
+@app.get("/")
+async def root():
+    """API root with available endpoints."""
+    return {
+        "name": "Soccer Predictor API",
+        "version": "2.0.0",
+        "docs": "/docs",
+        "data_source": "FotMob",
+        "endpoints": {
+            "health": "/api/health",
+            "matches": "/api/v1/matches",
+            "predictions": "/api/v1/predictions",
+            "teams": "/api/v1/teams",
+            "leagues": "/api/v1/leagues",
+        },
+        "available_leagues": list(LEAGUE_IDS.keys())
+    }
+
+
 @app.get("/api/health")
 async def health_check():
-    """Simple health check to verify the API is running."""
-    return {"status": "healthy", "message": "Soccer Predictor API is running"}
+    """Health check endpoint."""
+    return {
+        "status": "healthy",
+        "version": "2.0.0",
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 
-# Models for request validation
-class HeadToHeadRequest(BaseModel):
-    """
-    Request model for head-to-head predictions.
+# ==================== LEGACY ENDPOINTS (for backwards compatibility) ====================
 
-    Attributes:
-        league: The league in which the match is played.
-        home_team: The name of the home team.
-        away_team: The name of the away team.
-    """
-
-    league: str
-    home_team: str
-    away_team: str
-
-    @validator("league")
-    def validate_league(cls, v: str) -> str:
-        """
-        Validate that the league is one of the allowed leagues.
-        """
-        allowed_leagues = [
-            "premier_league",
-            "la_liga",
-            "bundesliga",
-            "serie_a",
-            "ligue_1",
-            "mls",
-            "ucl",
-            "uel",
-            "world_cup",
-        ]
-        if v not in allowed_leagues:
-            raise ValueError(f'League must be one of: {", ".join(allowed_leagues)}')
-        return v
-
-
-class CrossLeagueRequest(BaseModel):
-    """
-    Request model for cross-league predictions.
-
-    Attributes:
-        league_a: The league of the first team.
-        team_a: The name of the first team.
-        league_b: The league of the second team.
-        team_b: The name of the second team.
-    """
-
-    league_a: str
-    team_a: str
-    league_b: str
-    team_b: str
-
-    @validator("league_a", "league_b")
-    def validate_leagues(cls, v: str) -> str:
-        """
-        Validate that the leagues are one of the allowed leagues.
-        """
-        allowed_leagues = [
-            "premier_league",
-            "la_liga",
-            "bundesliga",
-            "serie_a",
-            "ligue_1",
-            "mls",
-            "ucl",
-            "uel",
-            "world_cup",
-        ]
-        if v not in allowed_leagues:
-            raise ValueError(f'League must be one of: {", ".join(allowed_leagues)}')
-        return v
-
-
-# Routes with error handling
-@app.post("/api/predict/head-to-head")
-async def predict_head_to_head(request: HeadToHeadRequest) -> Dict[str, Any]:
-    """
-    Predict the outcome of a head-to-head match within a league.
-
-    Args:
-        request: A HeadToHeadRequest object containing the league, home team,
-                 and away team.
-
-    Returns:
-        A dictionary with the prediction results, including win/draw/loss
-        probabilities and team names.
-    """
-    print(f"Received head-to-head prediction request for league: {request.league}, home: {request.home_team}, away: {request.away_team}")
+@app.get("/api/live_scores")
+async def get_live_scores():
+    """Get all currently live matches (legacy endpoint)."""
     try:
-        result = ps.predict_head_to_head(
-            request.league, request.home_team, request.away_team
-        )
-        # Extract scoreline and probabilities from result
-        return {
-            "success": True,
-            "predictions": {
-                "home_win": result["home_win"],
-                "draw": result["draw"],
-                "away_win": result["away_win"],
-            },
-            "predicted_home_goals": result.get("predicted_home_goals"),
-            "predicted_away_goals": result.get("predicted_away_goals"),
-            "home_team": result.get("home_team", request.home_team),
-            "away_team": result.get("away_team", request.away_team),
-        }
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # Use the legacy live score service
+        return lss.get_live_matches()
     except Exception as e:
-        print(f"Unhandled exception in predict_head_to_head: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        logger.error(f"Error fetching live scores: {e}")
+        return []
 
 
-@app.post("/api/predict/cross-league")
-async def predict_cross_league(request: CrossLeagueRequest) -> Dict[str, Any]:
-    """
-    Predict the outcome of a match between two teams from different leagues.
-
-    Args:
-        request: A CrossLeagueRequest object containing the leagues and names
-                 of the two teams.
-
-    Returns:
-        A dictionary with the prediction results, including win probabilities
-        for each team and draw probability.
-    """
+@app.get("/api/todays_matches")
+async def get_todays_matches():
+    """Get all matches for today (legacy endpoint)."""
+    client = get_fotmob_client()
+    today = datetime.now().strftime("%Y%m%d")
+    
     try:
-        result = ps.predict_cross_league(
-            request.team_a, request.league_a, request.team_b, request.league_b
-        )
-        # Extract scoreline and probabilities from result
-        return {
-            "success": True,
-            "predictions": {
-                "team_a_win": result["team_a_win"],
-                "draw": result["draw"],
-                "team_b_win": result["team_b_win"],
-            },
-            "predicted_team_a_goals": result.get("predicted_team_a_goals"),
-            "predicted_team_b_goals": result.get("predicted_team_b_goals"),
-            "team_a": result.get("team_a", request.team_a),
-            "team_b": result.get("team_b", request.team_b),
-            "league_a": request.league_a,
-            "league_b": request.league_b,
-        }
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        data = await client.get_matches_by_date(today)
+        
+        if not data:
+            return {"leagues": []}
+        
+        # Transform to legacy format
+        result = []
+        for league in data.get("leagues", []):
+            for match in league.get("matches", []):
+                status_data = match.get("status", {})
+                is_finished = status_data.get("finished", False)
+                is_started = status_data.get("started", False)
+                
+                result.append({
+                    "home_team": match.get("home", {}).get("name", ""),
+                    "away_team": match.get("away", {}).get("name", ""),
+                    "home_score": match.get("home", {}).get("score") if is_started else None,
+                    "away_score": match.get("away", {}).get("score") if is_started else None,
+                    "time": match.get("time", ""),
+                    "status": "finished" if is_finished else ("live" if is_started else "upcoming"),
+                    "league": league.get("name", ""),
+                    "match_id": match.get("id"),
+                })
+        
+        return result
     except Exception as e:
-        print(f"Unhandled exception in predict_cross_league: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.get("/api/teams/{league}")
-async def get_teams(league: str) -> Dict[str, Any]:
-    """
-    Get a list of all teams in a specific league.
-
-    Args:
-        league: The name of the league.
-
-    Returns:
-        A dictionary containing a list of team names.
-    """
-    try:
-        teams = ps.get_league_teams(league)
-        return {"success": True, "teams": teams}
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        print(f"Unhandled exception in get_teams: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.get("/api/analytics/image")
-async def get_analytics_image(league: str, image_name: str):
-    print(f"Attempting to get image: league={league}, image_name={image_name}")
-    image_path = os.path.join(DATA_DIR, league, "visualizations", image_name)
-    print(f"Constructed image path: {image_path}")
-    if not os.path.exists(image_path):
-        print(f"Image file not found at: {image_path}")
-        raise HTTPException(status_code=404, detail="Image not found")
-    return FileResponse(image_path)
-
-
-@app.get("/api/analytics/model_metrics/{league}")
-async def get_analytics_model_metrics(league: str) -> Dict[str, Any]:
-    """
-    Get model performance metrics for a league.
-
-    Args:
-        league: The name of the league.
-
-    Returns:
-        A dictionary with model performance metrics.
-    """
-    try:
-        return ps.get_model_metrics(league)
-    except Exception as e:
-        print(f"Unhandled exception in get_model_metrics: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/api/analytics/overview/{league}")
-async def get_analytics_overview(league: str) -> Dict[str, Any]:
-    """
-    Get an overview of league statistics.
-
-    Args:
-        league: The name of the league.
-
-    Returns:
-        A dictionary with overall league statistics.
-    """
-    try:
-        return ps.get_league_stats_overview(league)
-    except Exception as e:
-        print(f"Unhandled exception in get_league_stats_overview: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.get("/api/analytics/season_trends/{league}")
-async def get_analytics_season_trends(league: str) -> List[Dict[str, Any]]:
-    """
-    Get season trends for average goals in a league.
-
-    Args:
-        league: The name of the league.
-
-    Returns:
-        A list of dictionaries with season-by-season trend data.
-    """
-    try:
-        return ps.get_season_trends(league)
-    except Exception as e:
-        print(f"Unhandled exception in get_season_trends: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.get("/api/analytics/result_distribution/{league}")
-async def get_analytics_result_distribution(league: str) -> List[Dict[str, Any]]:
-    """
-    Get the distribution of match results (win/draw/loss) for a league.
-
-    Args:
-        league: The name of the league.
-
-    Returns:
-        A list of dictionaries representing the result distribution.
-    """
-    try:
-        return ps.get_result_distribution(league)
-    except Exception as e:
-        print(f"Unhandled exception in get_result_distribution: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.get("/api/analytics/home_away_performance/{league}")
-async def get_analytics_home_away_performance(league: str) -> List[Dict[str, Any]]:
-    """
-    Get home vs. away performance statistics for a league.
-
-    Args:
-        league: The name of the league.
-
-    Returns:
-        A list of dictionaries with home/away performance data.
-    """
-    try:
-        return ps.get_home_away_performance(league)
-    except Exception as e:
-        print(f"Unhandled exception in get_home_away_performance: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.get("/api/analytics/goals_distribution/{league}")
-async def get_analytics_goals_distribution(league: str) -> List[Dict[str, Any]]:
-    """
-    Get the distribution of total goals per match for a league.
-
-    Args:
-        league: The name of the league.
-
-    Returns:
-        A list of dictionaries representing the goals distribution.
-    """
-    try:
-        return ps.get_goals_distribution(league)
-    except Exception as e:
-        print(f"Unhandled exception in get_goals_distribution: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        logger.error(f"Error fetching today's matches: {e}")
+        return []
 
 
 @app.get("/api/upcoming_matches/{league}")
-async def get_upcoming_matches(league: str) -> List[Dict[str, Any]]:
-    """
-    Get upcoming matches for a league with predictions.
-    Tries FotMob API first, falls back to CSV data if unavailable.
-    """
+async def get_upcoming_matches(league: str):
+    """Get upcoming matches for a league (legacy endpoint)."""
+    league_key = league.lower().replace(" ", "_").replace("-", "_")
+    
+    if league_key not in LEAGUE_IDS:
+        raise HTTPException(status_code=404, detail=f"League '{league}' not found")
+    
     try:
-        # Try FotMob API first for real-time data
-        try:
-            matches = fm.get_upcoming_fixtures(league, days_ahead=30)
-            if matches:
-                print(f"Got {len(matches)} upcoming matches from FotMob for {league}")
-                # Add predictions using our model
-                result = []
-                for match in matches:
-                    try:
-                        pred = ps.predict_head_to_head(league, match["home_team"], match["away_team"])
-                        result.append({
-                            "date": match["date"],
-                            "home_team": match["home_team"],
-                            "away_team": match["away_team"],
-                            "predicted_home_win": pred.get("home_win", 0.33),
-                            "predicted_draw": pred.get("draw", 0.33),
-                            "predicted_away_win": pred.get("away_win", 0.33),
-                            "predicted_home_goals": pred.get("predicted_home_goals", 1),
-                            "predicted_away_goals": pred.get("predicted_away_goals", 1),
-                            "status": match.get("status", "scheduled"),
-                        })
-                    except Exception as pred_err:
-                        print(f"Prediction error for {match['home_team']} vs {match['away_team']}: {pred_err}")
-                        # Include match without prediction
-                        result.append({
-                            "date": match["date"],
-                            "home_team": match["home_team"],
-                            "away_team": match["away_team"],
-                            "predicted_home_win": 0.33,
-                            "predicted_draw": 0.34,
-                            "predicted_away_win": 0.33,
-                            "status": match.get("status", "scheduled"),
-                        })
-                return result
-        except Exception as fm_err:
-            print(f"FotMob API error, falling back to CSV: {fm_err}")
-        
-        # Fallback to CSV data
-        return ps.get_upcoming_matches(league)
+        # Use the fotmob_service for upcoming fixtures
+        matches = fm.get_upcoming_fixtures(league_key)
+        return {"matches": matches[:20]}
     except Exception as e:
-        print(f"Unhandled exception in get_upcoming_matches: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        logger.error(f"Error fetching upcoming matches: {e}")
+        return {"matches": []}
 
 
-@app.get("/api/recent_results/{league}")
-async def get_recent_results(league: str) -> List[Dict[str, Any]]:
-    """
-    Get recent match results for a league.
-    Tries FotMob API first, falls back to CSV data if unavailable.
-    """
+@app.get("/api/matches_by_date/{league}/{date}")
+async def get_matches_by_date(league: str, date: str):
+    """Get matches for a specific league on a specific date (legacy endpoint)."""
+    league_key = league.lower().replace(" ", "_").replace("-", "_")
+    
+    if league_key not in LEAGUE_IDS:
+        raise HTTPException(status_code=404, detail=f"League '{league}' not found")
+    
+    league_id = LEAGUE_IDS[league_key]
+    client = get_fotmob_client()
+    
     try:
-        # Try FotMob API first for real-time data
-        try:
-            results = fm.get_recent_results(league, days_back=30)
-            if results:
-                print(f"Got {len(results)} recent results from FotMob for {league}")
-                formatted = []
-                for match in results:
-                    home_goals = match.get("home_goals", 0) or 0
-                    away_goals = match.get("away_goals", 0) or 0
-                    
-                    if home_goals > away_goals:
-                        result = "win"
-                    elif away_goals > home_goals:
-                        result = "loss"
-                    else:
-                        result = "draw"
-                    
-                    formatted.append({
-                        "date": match["date"],
-                        "home_team": match["home_team"],
-                        "away_team": match["away_team"],
-                        "home_goals": home_goals,
-                        "away_goals": away_goals,
-                        "result": result,
-                    })
-                return formatted
-        except Exception as fm_err:
-            print(f"FotMob API error for results, falling back to CSV: {fm_err}")
+        # Get all league matches and filter by date
+        matches = await client.get_league_matches(league_id)
         
-        # Fallback to CSV data - get played matches
-        import pandas as pd
-        from datetime import datetime, timedelta
-        
-        df = ps.load_league_data(league)
-        played = df[df["status"] == "played"].copy()
-        
-        if played.empty:
+        if not matches:
             return []
         
-        played["date"] = pd.to_datetime(played["date"], errors='coerce')
-        # Get unique matches by date, home_team, away_team
-        played = played.drop_duplicates(subset=["date", "home_team", "away_team"])
-        played = played.sort_values("date", ascending=False).head(50)
-        
-        results = []
-        for _, match in played.iterrows():
-            home_goals = int(match.get("home_goals", 0) or 0)
-            away_goals = int(match.get("away_goals", 0) or 0)
+        # Filter matches by date (date format: YYYY-MM-DD)
+        date_matches = []
+        for match in matches:
+            status_info = match.get("status", {})
+            match_time = status_info.get("utcTime", "")
             
-            if home_goals > away_goals:
-                result = "win"
-            elif away_goals > home_goals:
-                result = "loss"
-            else:
-                result = "draw"
-            
-            results.append({
-                "date": match["date"].isoformat() if pd.notna(match["date"]) else "",
-                "home_team": match["home_team"],
-                "away_team": match["away_team"],
-                "home_goals": home_goals,
-                "away_goals": away_goals,
-                "result": result,
-            })
+            # Check if match date matches requested date
+            if match_time and match_time.startswith(date):
+                home = match.get("home", {})
+                away = match.get("away", {})
+                
+                status = "upcoming"
+                if status_info.get("finished"):
+                    status = "finished"
+                elif status_info.get("started"):
+                    status = "live"
+                
+                # Parse score
+                home_score = None
+                away_score = None
+                score_str = status_info.get("scoreStr", "")
+                if " - " in score_str:
+                    parts = score_str.split(" - ")
+                    try:
+                        home_score = int(parts[0])
+                        away_score = int(parts[1])
+                    except ValueError:
+                        pass
+                
+                date_matches.append({
+                    "match_id": match.get("id"),
+                    "home_team": home.get("name", ""),
+                    "away_team": away.get("name", ""),
+                    "date": match_time,
+                    "time": match_time,
+                    "home_score": home_score,
+                    "away_score": away_score,
+                    "status": status,
+                })
         
-        return results
+        return date_matches
     except Exception as e:
-        print(f"Unhandled exception in get_recent_results: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.get("/api/live_matches/{league}")
-async def get_live_matches(league: str) -> Dict[str, Any]:
-    """
-    Get all matches (live, upcoming, and recent results) for display.
-    Uses FotMob API for real-time data.
-    """
-    try:
-        data = fm.get_all_matches_for_display(league, days_range=30)
-        return {
-            "live": data.get("live", []),
-            "upcoming": data.get("upcoming", []),
-            "results": data.get("results", []),
-        }
-    except Exception as e:
-        print(f"Error getting live matches: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        logger.error(f"Error fetching matches by date: {e}")
+        return []
 
 
 @app.get("/api/team_form/{league}/{team}")
-async def get_team_form(league: str, team: str) -> Dict[str, Any]:
-    """
-    Get real-time team form and statistics from FotMob.
-    """
+async def get_team_form(league: str, team: str):
+    """Get recent form and stats for a team (legacy endpoint)."""
+    league_key = league.lower().replace(" ", "_").replace("-", "_")
+    
     try:
-        import urllib.parse
-        team_name = urllib.parse.unquote(team)
+        form = fm.get_team_form(team, league_key, num_matches=10)
         
-        # Try FotMob first
-        try:
-            stats = fm.get_team_season_stats(team_name, league)
-            if stats and stats.get("matches_played", 0) > 0:
-                return stats
-        except Exception as fm_err:
-            print(f"FotMob error for team form: {fm_err}")
+        # Calculate stats from form
+        wins = form.count("W")
+        draws = form.count("D")
+        losses = form.count("L")
+        matches_played = len(form)
         
-        # Fallback to CSV data - FILTER BY CURRENT SEASON
-        df = ps.load_league_data(league)
-        model_data = ps.load_league_model(league)
-        
-        # Filter to current season only (2025-2026)
-        df['date'] = pd.to_datetime(df['date'], errors='coerce')
-        current_season_start = pd.Timestamp('2025-08-01')  # Season typically starts in August
-        df = df[df['date'] >= current_season_start]
-        
-        # Remove duplicate matches
-        df = df.drop_duplicates(subset=['home_team', 'away_team', 'date'])
-        
-        # Calculate stats from CSV
-        team_lower = team_name.lower()
-        home_matches = df[(df["home_team"].str.lower() == team_lower) & (df["status"] == "played")]
-        away_matches = df[(df["away_team"].str.lower() == team_lower) & (df["status"] == "played")]
-        
-        # Also deduplicate the results
-        home_matches = home_matches.drop_duplicates(subset=['home_team', 'away_team', 'date'])
-        away_matches = away_matches.drop_duplicates(subset=['home_team', 'away_team', 'date'])
-        
-        matches_played = len(home_matches) + len(away_matches)
-        if matches_played == 0:
-            raise HTTPException(status_code=404, detail=f"Team '{team_name}' not found")
-        
-        # Calculate wins, draws, losses
-        home_wins = len(home_matches[home_matches["result"] == "win"])
-        home_draws = len(home_matches[home_matches["result"] == "draw"])
-        home_losses = len(home_matches[home_matches["result"] == "loss"])
-        
-        away_wins = len(away_matches[away_matches["result"] == "loss"])  # Away win = home loss
-        away_draws = len(away_matches[away_matches["result"] == "draw"])
-        away_losses = len(away_matches[away_matches["result"] == "win"])  # Away loss = home win
-        
-        wins = home_wins + away_wins
-        draws = home_draws + away_draws
-        losses = home_losses + away_losses
-        
-        # Goals
-        home_scored = home_matches["home_goals"].sum()
-        home_conceded = home_matches["away_goals"].sum()
-        away_scored = away_matches["away_goals"].sum()
-        away_conceded = away_matches["home_goals"].sum()
-        
-        goals_scored = home_scored + away_scored
-        goals_conceded = home_conceded + away_conceded
-        
-        # Recent form - get last 5 matches
-        all_matches = pd.concat([
-            home_matches.assign(is_home=True),
-            away_matches.assign(is_home=False)
-        ])
-        all_matches = all_matches.sort_values("date", ascending=False).head(5)
-        
-        recent_form = []
-        for _, m in all_matches.iterrows():
-            if m["is_home"]:
-                if m["result"] == "win":
-                    recent_form.append("W")
-                elif m["result"] == "draw":
-                    recent_form.append("D")
-                else:
-                    recent_form.append("L")
-            else:
-                if m["result"] == "loss":  # Away team won
-                    recent_form.append("W")
-                elif m["result"] == "draw":
-                    recent_form.append("D")
-                else:
-                    recent_form.append("L")
+        # Calculate rates (avoid division by zero)
+        win_rate = wins / matches_played if matches_played > 0 else 0
         
         return {
+            "team": team,
+            "form": form,
+            "recent_form": form,
+            "points": sum(3 if r == "W" else (1 if r == "D" else 0) for r in form),
             "matches_played": matches_played,
             "wins": wins,
             "draws": draws,
             "losses": losses,
-            "goals_scored": int(goals_scored),
-            "goals_conceded": int(goals_conceded),
-            "win_rate": wins / matches_played if matches_played > 0 else 0,
-            "avg_goals_scored": goals_scored / matches_played if matches_played > 0 else 0,
-            "avg_goals_conceded": goals_conceded / matches_played if matches_played > 0 else 0,
-            "home_win_rate": home_wins / len(home_matches) if len(home_matches) > 0 else 0,
-            "away_win_rate": away_wins / len(away_matches) if len(away_matches) > 0 else 0,
-            "recent_form": recent_form,
+            "goals_scored": 0,  # Not available from form data
+            "goals_conceded": 0,  # Not available from form data
+            "win_rate": win_rate,
+            "avg_goals_scored": 0,  # Not available from form data
+            "avg_goals_conceded": 0,  # Not available from form data
+            "home_win_rate": 0,  # Not available from form data
+            "away_win_rate": 0,  # Not available from form data
         }
-    except HTTPException:
-        raise
     except Exception as e:
-        print(f"Error getting team form: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        logger.error(f"Error fetching team form: {e}")
+        return {
+            "team": team, 
+            "form": [], 
+            "recent_form": [],
+            "matches_played": 0,
+            "wins": 0,
+            "draws": 0,
+            "losses": 0,
+            "goals_scored": 0,
+            "goals_conceded": 0,
+            "win_rate": 0,
+            "avg_goals_scored": 0,
+            "avg_goals_conceded": 0,
+            "home_win_rate": 0,
+            "away_win_rate": 0,
+            "message": f"Error: {str(e)}"
+        }
 
 
-@app.get("/api/upcoming_matches_debug/{league}")
-async def get_upcoming_matches_debug(league: str) -> List[Dict[str, Any]]:
-    """
-    DEBUG endpoint: Get upcoming matches WITHOUT predictions for testing.
-    """
-    try:
-        from datetime import datetime, timedelta
-        import pandas as pd
-        
-        df = ps.load_league_data(league)
-        upcoming = df[df["status"] == "scheduled"].copy()
-        
-        if upcoming.empty:
-            return []
-        
-        upcoming["date"] = pd.to_datetime(upcoming["date"], errors='coerce')
-        today = pd.Timestamp.now().normalize()
-        end_date = today + timedelta(days=7)
-        upcoming = upcoming[(upcoming["date"] >= today) & (upcoming["date"] <= end_date)]
-        
-        if upcoming.empty:
-            return []
-        
-        upcoming = upcoming.sort_values('date').head(20)
-        
-        results = []
-        for idx, match in upcoming.iterrows():
-            results.append({
-                "date": match["date"].isoformat(),
-                "home_team": match["home_team"],
-                "away_team": match["away_team"],
-            })
-        
-        return results
-    except Exception as e:
-        print(f"Debug endpoint error: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+class PredictionRequest(BaseModel):
+    """Request model for predictions."""
+    home_team: str
+    away_team: str
+    league: Optional[str] = None
 
-
-# ==================== LIVE SCORES API ====================
-
-@app.get("/api/live_scores")
-async def get_live_scores(league: Optional[str] = None) -> List[Dict[str, Any]]:
-    """
-    Get live match scores across all leagues or for a specific league.
-    Updates in real-time from FotMob.
-    """
-    try:
-        return lss.get_live_scores(league)
-    except Exception as e:
-        print(f"Error getting live scores: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
-
-
-@app.get("/api/todays_matches")
-async def get_todays_matches(league: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
-    """
-    Get all matches for today grouped by status (live, upcoming, completed).
-    """
-    try:
-        return lss.get_todays_matches(league)
-    except Exception as e:
-        print(f"Error getting today's matches: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
-
-
-# ==================== UNIFIED MODEL API ====================
 
 @app.post("/api/predict/unified")
-async def predict_unified(request: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Make a prediction using the unified model trained on all leagues.
-    Provides more accurate predictions with real-time stats.
-    """
-    try:
-        home_team = request.get("home_team")
-        away_team = request.get("away_team")
-        league = request.get("league")
-        home_league = request.get("home_league", league)
-        away_league = request.get("away_league", league)
-        
-        if not all([home_team, away_team, league]):
-            raise HTTPException(status_code=400, detail="Missing required fields")
-        
-        result = um.predict_match(home_team, away_team, league, home_league, away_league)
-        return {
-            "success": True,
-            **result
+async def predict_match(request: PredictionRequest):
+    """Generate prediction for a match (legacy endpoint)."""
+    elo = get_elo_system()
+    
+    home_elo = elo.get_elo(request.home_team)
+    away_elo = elo.get_elo(request.away_team)
+    
+    outcome = elo.predict_outcome(request.home_team, request.away_team)
+    
+    # Determine prediction
+    if outcome["home_win"] > outcome["draw"] and outcome["home_win"] > outcome["away_win"]:
+        prediction = f"{request.home_team} Win"
+        confidence = outcome["home_win"]
+    elif outcome["away_win"] > outcome["draw"] and outcome["away_win"] > outcome["home_win"]:
+        prediction = f"{request.away_team} Win"
+        confidence = outcome["away_win"]
+    else:
+        prediction = "Draw"
+        confidence = outcome["draw"]
+    
+    return {
+        "home_team": request.home_team,
+        "away_team": request.away_team,
+        "home_elo": round(home_elo, 0),
+        "away_elo": round(away_elo, 0),
+        "prediction": prediction,
+        "confidence": min(99.9, max(0.1, round(confidence * 100, 1))),  # Clamp between 0.1-99.9%
+        "probabilities": {
+            "home_win": round(outcome["home_win"] * 100, 1),
+            "draw": round(outcome["draw"] * 100, 1),
+            "away_win": round(outcome["away_win"] * 100, 1),
         }
-    except Exception as e:
-        print(f"Unified prediction error: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+    }
 
 
 @app.get("/api/team_rating/{league}/{team}")
-async def get_team_rating(league: str, team: str) -> Dict[str, Any]:
-    """
-    Get detailed team rating and performance info from unified model.
-    """
-    try:
-        import urllib.parse
-        team_name = urllib.parse.unquote(team)
-        predictor = um.get_unified_predictor()
-        return predictor.get_team_info(team_name, league)
-    except Exception as e:
-        print(f"Error getting team rating: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+async def get_team_rating(league: str, team: str):
+    """Get ELO rating for a team (legacy endpoint)."""
+    elo = get_elo_system()
+    rating_data = elo.get_rating(team)
+    
+    return {
+        "team": team,
+        "elo": round(rating_data["elo"], 0),
+        "matches": rating_data["matches"],
+    }
 
-
-# ==================== CALENDAR API ====================
 
 @app.get("/api/calendar/{league}")
-async def get_calendar_data(league: str, year: int = None, month: int = None) -> Dict[str, Any]:
-    """
-    Get match data organized by calendar for a specific league.
-    Returns matches grouped by date with predictions vs actual outcomes.
-    """
+async def get_league_calendar(league: str, year: Optional[int] = None, month: Optional[int] = None):
+    """Get calendar of matches for a league (legacy endpoint)."""
+    league_key = league.lower().replace(" ", "_").replace("-", "_")
+    
+    if league_key not in LEAGUE_IDS:
+        raise HTTPException(status_code=404, detail=f"League '{league}' not found")
+    
     try:
-        import pandas as pd
+        # Use v1 FotMob client for league fixtures
+        league_id = LEAGUE_IDS[league_key]
+        client = get_fotmob_client()
+        matches = await client.get_league_matches(league_id)
         
-        if year is None:
-            year = datetime.now().year
-        if month is None:
-            month = datetime.now().month
+        # Get ELO system for predictions
+        elo = get_elo_system()
         
-        # Current date for determining if matches are completed
-        current_date = datetime.now().date()
-        
-        # Get start and end of month
-        start_date = datetime(year, month, 1)
-        if month == 12:
-            end_date = datetime(year + 1, 1, 1) - timedelta(days=1)
-        else:
-            end_date = datetime(year, month + 1, 1) - timedelta(days=1)
-        
-        # Load league data
-        df = ps.load_league_data(league)
-        df['date'] = pd.to_datetime(df['date'], errors='coerce')
-        
-        # Filter to month range
-        mask = (df['date'] >= start_date) & (df['date'] <= end_date)
-        month_matches = df[mask].copy()
-        
-        # Remove duplicates
-        month_matches = month_matches.drop_duplicates(subset=['date', 'home_team', 'away_team'])
-        
-        # Group by date
-        calendar_data = {}
-        
-        for _, row in month_matches.iterrows():
-            date_key = row['date'].strftime('%Y-%m-%d')
-            match_date = row['date'].date()
-            
-            if date_key not in calendar_data:
-                calendar_data[date_key] = {
-                    'date': date_key,
-                    'day': row['date'].day,
-                    'matches': [],
-                    'match_count': 0,
-                }
-            
-            # Determine actual status based on current date
-            # If the match date is before today, it should be marked as played
-            if row['status'] == 'played':
-                actual_status = 'played'
-            elif match_date < current_date:
-                actual_status = 'played'  # Past matches should be considered played
-            else:
-                actual_status = 'scheduled'
-            
-            match_data = {
-                'home_team': row['home_team'],
-                'away_team': row['away_team'],
-                'status': actual_status,
-                'actual_home_goals': int(row['home_goals']) if pd.notna(row['home_goals']) else None,
-                'actual_away_goals': int(row['away_goals']) if pd.notna(row['away_goals']) else None,
-                'result': row['result'] if pd.notna(row.get('result')) else None,
-            }
-            
-            # Add prediction for this match
-            try:
-                predictor = um.get_unified_predictor()
-                pred = predictor.predict(row['home_team'], row['away_team'], league)
-                match_data['predicted_home_win'] = pred['home_win']
-                match_data['predicted_draw'] = pred['draw']
-                match_data['predicted_away_win'] = pred['away_win']
-                match_data['predicted_home_goals'] = pred['predicted_home_goals']
-                match_data['predicted_away_goals'] = pred['predicted_away_goals']
+        calendar = []
+        if matches:
+            for match in matches:  # Get all matches
+                status_info = match.get("status", {})
+                home = match.get("home", {})
+                away = match.get("away", {})
                 
-                # For completed matches, check if prediction was correct
-                if row['status'] == 'played' and match_data['actual_home_goals'] is not None:
-                    actual_result = row['result']
-                    predicted_result = 'win' if pred['home_win'] > pred['away_win'] and pred['home_win'] > pred['draw'] else \
-                                      'loss' if pred['away_win'] > pred['home_win'] and pred['away_win'] > pred['draw'] else 'draw'
-                    match_data['prediction_correct'] = actual_result == predicted_result
-                    match_data['predicted_result'] = predicted_result
-            except Exception as pred_err:
-                print(f"Prediction error: {pred_err}")
-            
-            calendar_data[date_key]['matches'].append(match_data)
-            calendar_data[date_key]['match_count'] += 1
+                home_team = home.get("name", "")
+                away_team = away.get("name", "")
+                
+                status = "upcoming"
+                if status_info.get("finished"):
+                    status = "finished"
+                elif status_info.get("started"):
+                    status = "live"
+                
+                # Parse score from scoreStr if available
+                home_score = None
+                away_score = None
+                score_str = status_info.get("scoreStr", "")
+                if " - " in score_str:
+                    parts = score_str.split(" - ")
+                    try:
+                        home_score = int(parts[0])
+                        away_score = int(parts[1])
+                    except ValueError:
+                        pass
+                
+                # Generate predictions for each match
+                prediction = elo.predict_outcome(home_team, away_team) if home_team and away_team else None
+                
+                calendar.append({
+                    "match_id": match.get("id"),
+                    "home_team": home_team,
+                    "away_team": away_team,
+                    "date": status_info.get("utcTime", ""),
+                    "time": status_info.get("utcTime", ""),
+                    "actual_home_goals": home_score,
+                    "actual_away_goals": away_score,
+                    "status": status,
+                    "round": match.get("round", ""),
+                    "predicted_home_win": prediction["home_win"] if prediction else 0.33,
+                    "predicted_draw": prediction["draw"] if prediction else 0.33,
+                    "predicted_away_win": prediction["away_win"] if prediction else 0.33,
+                })
         
-        # Build calendar grid (6 weeks x 7 days)
-        import calendar
-        cal = calendar.Calendar(firstweekday=6)  # Start on Sunday
-        month_days = list(cal.itermonthdays(year, month))
+        # Build calendar weeks for the requested month
+        now = datetime.now()
+        target_year = year or now.year
+        target_month = month or now.month
         
+        from calendar import Calendar
+        cal = Calendar(firstweekday=6)  # Sunday first
         weeks = []
-        for i in range(0, len(month_days), 7):
-            week = []
-            for day in month_days[i:i+7]:
+        
+        month_matches = [m for m in calendar if m.get("date")]
+        
+        for week in cal.monthdayscalendar(target_year, target_month):
+            week_data = []
+            for day in week:
                 if day == 0:
-                    week.append(None)
+                    week_data.append(None)
                 else:
-                    date_key = f"{year}-{month:02d}-{day:02d}"
-                    week.append({
-                        'day': day,
-                        'date': date_key,
-                        'matches': calendar_data.get(date_key, {}).get('matches', []),
-                        'match_count': calendar_data.get(date_key, {}).get('match_count', 0),
-                        'is_today': date_key == datetime.now().strftime('%Y-%m-%d'),
+                    date_str = f"{target_year}-{target_month:02d}-{day:02d}"
+                    day_matches = [
+                        m for m in month_matches 
+                        if m.get("date", "").startswith(date_str)
+                    ]
+                    week_data.append({
+                        "day": day,
+                        "date": date_str,
+                        "matches": day_matches,
+                        "match_count": len(day_matches),
+                        "is_today": (day == now.day and target_month == now.month and target_year == now.year),
                     })
-            weeks.append(week)
+            weeks.append(week_data)
+        
+        month_names = ["", "January", "February", "March", "April", "May", "June",
+                       "July", "August", "September", "October", "November", "December"]
         
         return {
-            'year': year,
-            'month': month,
-            'month_name': datetime(year, month, 1).strftime('%B'),
-            'weeks': weeks,
-            'total_matches': sum(d['match_count'] for d in calendar_data.values()),
+            "calendar": calendar,
+            "year": target_year,
+            "month": target_month,
+            "month_name": month_names[target_month],
+            "weeks": weeks,
+            "total_matches": len(calendar),
         }
     except Exception as e:
-        print(f"Calendar error: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+        logger.error(f"Error fetching calendar: {e}")
+        return {"calendar": [], "weeks": [], "total_matches": 0}
 
 
-@app.get("/api/matches_by_date/{league}/{date}")
-async def get_matches_by_date(league: str, date: str) -> List[Dict[str, Any]]:
-    """
-    Get all matches for a specific date with predictions and actual outcomes.
-    """
+@app.get("/api/teams/{league}")
+async def get_teams_for_league(league: str):
+    """Get all teams in a league (legacy endpoint)."""
+    league_key = league.lower().replace(" ", "_").replace("-", "_")
+    
+    if league_key not in LEAGUE_IDS:
+        raise HTTPException(status_code=404, detail=f"League '{league}' not found")
+    
+    league_id = LEAGUE_IDS[league_key]
+    client = get_fotmob_client()
+    
     try:
-        import pandas as pd
+        standings = await client.get_league_standings(league_id)
         
-        # Current date for determining if matches are completed
-        current_date = datetime.now().date()
+        if not standings:
+            return {"teams": []}
         
-        df = ps.load_league_data(league)
-        df['date'] = pd.to_datetime(df['date'], errors='coerce')
-        
-        target_date = pd.to_datetime(date)
-        match_date = target_date.date()
-        matches = df[df['date'].dt.date == match_date].copy()
-        matches = matches.drop_duplicates(subset=['home_team', 'away_team'])
-        
-        results = []
-        predictor = um.get_unified_predictor()
-        
-        for _, row in matches.iterrows():
-            # Determine actual status based on current date
-            if row['status'] == 'played':
-                actual_status = 'played'
-            elif match_date < current_date:
-                actual_status = 'played'  # Past matches should be considered played
-            else:
-                actual_status = 'scheduled'
-            
-            match_data = {
-                'home_team': row['home_team'],
-                'away_team': row['away_team'],
-                'date': row['date'].isoformat(),
-                'status': actual_status,
-                'venue': row.get('venue', ''),
-            }
-            
-            # Actual outcome
-            if actual_status == 'played':
-                match_data['actual_home_goals'] = int(row['home_goals']) if pd.notna(row['home_goals']) else None
-                match_data['actual_away_goals'] = int(row['away_goals']) if pd.notna(row['away_goals']) else None
-                match_data['actual_result'] = row.get('result')
-            
-            # Prediction
-            try:
-                pred = predictor.predict(row['home_team'], row['away_team'], league)
-                match_data['predicted_home_win'] = pred['home_win']
-                match_data['predicted_draw'] = pred['draw']
-                match_data['predicted_away_win'] = pred['away_win']
-                match_data['predicted_home_goals'] = pred['predicted_home_goals']
-                match_data['predicted_away_goals'] = pred['predicted_away_goals']
-                match_data['home_rating'] = pred['home_rating']
-                match_data['away_rating'] = pred['away_rating']
-                match_data['confidence'] = pred['confidence']
-                
-                # Determine predicted outcome
-                if pred['home_win'] > pred['away_win'] and pred['home_win'] > pred['draw']:
-                    match_data['predicted_result'] = 'win'
-                elif pred['away_win'] > pred['home_win'] and pred['away_win'] > pred['draw']:
-                    match_data['predicted_result'] = 'loss'
-                else:
-                    match_data['predicted_result'] = 'draw'
-                
-                # Check if prediction was correct
-                if row['status'] == 'played':
-                    match_data['prediction_correct'] = match_data.get('actual_result') == match_data['predicted_result']
-            except Exception:
-                pass
-            
-            results.append(match_data)
-        
-        return sorted(results, key=lambda x: x.get('date', ''))
+        teams = [row.get("name", "") for row in standings]
+        return {"teams": sorted(teams)}
     except Exception as e:
-        print(f"Matches by date error: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+        logger.error(f"Error fetching teams: {e}")
+        return {"teams": []}
 
 
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+# Run with: uvicorn backend.main:app --reload --port 8000

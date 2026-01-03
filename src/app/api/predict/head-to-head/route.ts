@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { loadLeagueData, predictMatch, findTeam } from '@/lib/dataService'
+
+const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:8000'
 
 interface HeadToHeadRequest {
   league: string
@@ -19,29 +20,44 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    const matches = await loadLeagueData(league)
+    // Use the backend API for predictions
+    const response = await fetch(`${BACKEND_URL}/api/predict/unified`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        home_team,
+        away_team,
+        league,
+      }),
+    })
     
-    // Find teams (handles partial matches)
-    const foundHomeTeam = findTeam(home_team, matches)
-    const foundAwayTeam = findTeam(away_team, matches)
-    
-    if (!foundHomeTeam) {
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
       return NextResponse.json(
-        { error: `Home team "${home_team}" not found in ${league}` },
-        { status: 404 }
+        { error: error.detail || 'Backend prediction failed' },
+        { status: response.status }
       )
     }
     
-    if (!foundAwayTeam) {
-      return NextResponse.json(
-        { error: `Away team "${away_team}" not found in ${league}` },
-        { status: 404 }
-      )
-    }
+    const prediction = await response.json()
     
-    const prediction = predictMatch(matches, foundHomeTeam, foundAwayTeam)
-    
-    return NextResponse.json(prediction)
+    // Transform to expected frontend format
+    // Backend returns probabilities as percentages (0-100), frontend expects decimals (0-1)
+    return NextResponse.json({
+      success: true,
+      home_team,
+      away_team,
+      predictions: {
+        home_win: (prediction.probabilities?.home_win || 40) / 100,
+        draw: (prediction.probabilities?.draw || 30) / 100,
+        away_win: (prediction.probabilities?.away_win || 30) / 100,
+      },
+      predicted_home_goals: Math.max(0, Math.round((prediction.home_elo ? (prediction.home_elo - 1500) / 150 + 1.5 : 1.5))),
+      predicted_away_goals: Math.max(0, Math.round((prediction.away_elo ? (prediction.away_elo - 1500) / 150 + 1.2 : 1.2))),
+      confidence: prediction.confidence || 50,
+    })
   } catch (error) {
     console.error('Error predicting match:', error)
     return NextResponse.json(

@@ -78,19 +78,24 @@ function StatBar({
   format?: 'number' | 'percent' | 'decimal'
   higherIsBetter?: boolean
 }) {
-  const maxVal = Math.max(valueA, valueB, 0.01)
-  const percentA = (valueA / maxVal) * 100
-  const percentB = (valueB / maxVal) * 100
+  // Ensure values are valid numbers, default to 0 if undefined/null/NaN
+  const safeA = typeof valueA === 'number' && !isNaN(valueA) ? valueA : 0
+  const safeB = typeof valueB === 'number' && !isNaN(valueB) ? valueB : 0
+  
+  const maxVal = Math.max(safeA, safeB, 0.01)
+  const percentA = (safeA / maxVal) * 100
+  const percentB = (safeB / maxVal) * 100
   
   const formatValue = (val: number) => {
-    if (format === 'percent') return `${(val * 100).toFixed(0)}%`
-    if (format === 'decimal') return val.toFixed(2)
-    return val.toFixed(0)
+    const safeVal = typeof val === 'number' && !isNaN(val) ? val : 0
+    if (format === 'percent') return `${(safeVal * 100).toFixed(0)}%`
+    if (format === 'decimal') return safeVal.toFixed(2)
+    return safeVal.toFixed(0)
   }
   
-  const aIsWinning = higherIsBetter ? valueA > valueB : valueA < valueB
-  const bIsWinning = higherIsBetter ? valueB > valueA : valueB < valueA
-  const isTie = Math.abs(valueA - valueB) < 0.001
+  const aIsWinning = higherIsBetter ? safeA > safeB : safeA < safeB
+  const bIsWinning = higherIsBetter ? safeB > safeA : safeB < safeA
+  const isTie = Math.abs(safeA - safeB) < 0.001
   
   return (
     <div className="py-2">
