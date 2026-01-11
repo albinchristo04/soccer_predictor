@@ -17,7 +17,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const { login, register, loginWithGoogle } = useAuth();
+  const { login, register } = useAuth();
 
   if (!isOpen) return null;
 
@@ -130,7 +130,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+                className="w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                 placeholder="Your name"
               />
             </div>
@@ -145,7 +145,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+              className="w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
               placeholder="you@example.com"
             />
           </div>
@@ -160,7 +160,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={8}
-              className="w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]"
+              className="w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
               placeholder="••••••••"
             />
           </div>
@@ -168,7 +168,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3 bg-[var(--accent-color)] text-white rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="w-full py-3 bg-[var(--accent-primary)] text-white rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {isLoading ? 'Loading...' : (mode === 'login' ? 'Sign In' : 'Create Account')}
           </button>
@@ -181,7 +181,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
               Don&apos;t have an account?{' '}
               <button
                 onClick={() => setMode('register')}
-                className="text-[var(--accent-color)] hover:underline font-medium"
+                className="text-[var(--accent-primary)] hover:underline font-medium"
               >
                 Sign up
               </button>
@@ -191,7 +191,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
               Already have an account?{' '}
               <button
                 onClick={() => setMode('login')}
-                className="text-[var(--accent-color)] hover:underline font-medium"
+                className="text-[var(--accent-primary)] hover:underline font-medium"
               >
                 Sign in
               </button>

@@ -48,7 +48,7 @@ POSITIVE_KEYWORDS = {
 
 NEGATIVE_KEYWORDS = {
     "loss", "defeat", "poor", "struggle", "injury", "injured", "out",
-    "suspended", "ban", "crisis", "crisis", "doubt", "concern", "worry",
+    "suspended", "ban", "crisis", "doubt", "concern", "worry",
     "slump", "decline", "drop", "fall", "miss", "absence", "setback",
     "problem", "issue", "trouble", "disappointing", "frustrating",
     "criticism", "under fire", "pressure", "relegation", "sack", "fired",

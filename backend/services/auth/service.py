@@ -30,7 +30,7 @@ from backend.services.auth.jwt import (
 logger = logging.getLogger(__name__)
 
 # Google OAuth configuration
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")  # None if not configured
 GOOGLE_TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 
 
@@ -133,6 +133,11 @@ class AuthService:
         
         Creates a new user if one doesn't exist for this Google account.
         """
+        # Check if Google OAuth is configured
+        if not GOOGLE_CLIENT_ID:
+            logger.warning("Google OAuth not configured - GOOGLE_CLIENT_ID not set")
+            return None
+        
         try:
             # Verify token with Google
             async with httpx.AsyncClient() as client:
