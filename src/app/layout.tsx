@@ -5,6 +5,7 @@ import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { PageLoader } from '@/components/PageLoader'
 import { ThemeProvider } from '@/providers/ThemeProvider'
+import { AuthProvider } from '@/contexts/AuthContext'
 import './globals.css'
 
 const inter = Inter({ 
@@ -15,7 +16,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: 'Soccer Stats Predictor',
-  description: 'AI-powered soccer match prediction and analysis',
+  description: 'AI-powered soccer match prediction and analysis with real-time data',
   icons: {
     icon: '/soccer-ball.png',
   },
@@ -45,16 +46,18 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-[var(--background)] text-[var(--text-primary)] font-sans antialiased">
         <ThemeProvider>
-          <Suspense fallback={null}>
-            <PageLoader />
-          </Suspense>
-          <div className="flex flex-col min-h-screen">
-            <Navbar />
-            <main className="flex-grow">
-              {children}
-            </main>
-            <Footer />
-          </div>
+          <AuthProvider>
+            <Suspense fallback={null}>
+              <PageLoader />
+            </Suspense>
+            <div className="flex flex-col min-h-screen">
+              <Navbar />
+              <main className="flex-grow">
+                {children}
+              </main>
+              <Footer />
+            </div>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

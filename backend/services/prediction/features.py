@@ -58,6 +58,18 @@ class MatchFeatures:
     is_derby: bool
     match_importance: float  # 0-1
     
+    # News/Sentiment factors (NEW)
+    home_news_sentiment: float  # -1 to 1
+    away_news_sentiment: float  # -1 to 1
+    home_news_factor: float  # Adjusted factor for prediction
+    away_news_factor: float
+    
+    # Player form factors (NEW)
+    home_player_form: float  # 0-1, aggregate player form
+    away_player_form: float
+    home_key_player_available: float  # 0-1, key players availability
+    away_key_player_available: float
+    
     def to_array(self) -> np.ndarray:
         """Convert to numpy array for model input."""
         return np.array([
@@ -94,6 +106,14 @@ class MatchFeatures:
             self.league_position_diff,
             float(self.is_derby),
             self.match_importance,
+            self.home_news_sentiment,
+            self.away_news_sentiment,
+            self.home_news_factor,
+            self.away_news_factor,
+            self.home_player_form,
+            self.away_player_form,
+            self.home_key_player_available,
+            self.away_key_player_available,
         ])
     
     @classmethod
@@ -133,6 +153,14 @@ class MatchFeatures:
             "league_position_diff",
             "is_derby",
             "match_importance",
+            "home_news_sentiment",
+            "away_news_sentiment",
+            "home_news_factor",
+            "away_news_factor",
+            "home_player_form",
+            "away_player_form",
+            "home_key_player_available",
+            "away_key_player_available",
         ]
 
 
@@ -145,6 +173,36 @@ def calculate_form_points(results: List[str]) -> int:
         elif result.upper() == 'D':
             points += 1
     return points
+
+
+def calculate_weighted_form_points(results: List[str]) -> float:
+    """
+    Calculate weighted form points with recency bias.
+    
+    More recent matches have higher weight.
+    """
+    if not results:
+        return 0.0
+    
+    # Weights: most recent = 1.0, decreasing
+    weights = [1.0, 0.85, 0.7, 0.55, 0.4]
+    total_weight = 0.0
+    weighted_points = 0.0
+    
+    for i, result in enumerate(results[:5]):
+        weight = weights[i] if i < len(weights) else 0.3
+        total_weight += weight
+        
+        if result.upper() == 'W':
+            weighted_points += 3 * weight
+        elif result.upper() == 'D':
+            weighted_points += 1 * weight
+    
+    if total_weight == 0:
+        return 0.0
+    
+    # Normalize to 0-15 scale like regular form points
+    return (weighted_points / total_weight) * 5
 
 
 def calculate_form_goals(
@@ -194,6 +252,51 @@ def calculate_injury_impact(
     
     # Normalize: assume 3+ key injuries is maximum impact
     return min(1.0, total_impact / 3.0)
+
+
+def calculate_player_form(
+    squad_data: Optional[Dict] = None,
+    recent_stats: Optional[Dict] = None
+) -> float:
+    """
+    Calculate aggregate player form score (0-1).
+    
+    Uses recent match ratings and statistics.
+    """
+    if not squad_data and not recent_stats:
+        return 0.5  # Neutral default
+    
+    # If we have recent stats, use average player rating
+    if recent_stats:
+        avg_rating = recent_stats.get("avg_player_rating", 6.5)
+        # Convert 1-10 rating to 0-1 scale
+        return min(1.0, max(0.0, (avg_rating - 5) / 5))
+    
+    return 0.5
+
+
+def calculate_key_player_availability(
+    injuries: List[Dict],
+    squad_data: Optional[Dict] = None
+) -> float:
+    """
+    Calculate availability of key players (0-1).
+    
+    1.0 = all key players available
+    0.0 = all key players injured/suspended
+    """
+    if not injuries:
+        return 1.0
+    
+    # Count high-importance injuries
+    key_player_count = 0
+    for injury in injuries:
+        importance = injury.get('importance_score', 0.5)
+        if importance >= 0.7:  # Key player threshold
+            key_player_count += 1
+    
+    # Assume 3 key players missing = 0 availability
+    return max(0.0, 1.0 - (key_player_count / 3.0))
 
 
 def is_derby_match(
@@ -275,7 +378,8 @@ def build_features(
     home_team_data: Dict,
     away_team_data: Dict,
     h2h_data: Optional[Dict] = None,
-    match_context: Optional[Dict] = None
+    match_context: Optional[Dict] = None,
+    news_factors: Optional[Dict] = None,
 ) -> MatchFeatures:
     """
     Build complete feature set for a match prediction.
@@ -285,6 +389,7 @@ def build_features(
         away_team_data: Away team statistics and info
         h2h_data: Head-to-head history
         match_context: Additional context (positions, matchday, etc.)
+        news_factors: News sentiment factors from ESPN service
     
     Returns:
         MatchFeatures instance
@@ -292,6 +397,7 @@ def build_features(
     # Default values
     h2h = h2h_data or {}
     context = match_context or {}
+    news = news_factors or {}
     
     home_elo = home_team_data.get('elo_rating', 1500)
     away_elo = away_team_data.get('elo_rating', 1500)
@@ -355,4 +461,22 @@ def build_features(
             away_team_data.get('name', '')
         ),
         match_importance=context.get('importance', 0.5),
+        
+        # News/Sentiment factors (NEW)
+        home_news_sentiment=news.get('home_sentiment', {}).get('score', 0.0),
+        away_news_sentiment=news.get('away_sentiment', {}).get('score', 0.0),
+        home_news_factor=news.get('home_news_factor', 0.0),
+        away_news_factor=news.get('away_news_factor', 0.0),
+        
+        # Player form factors (NEW)
+        home_player_form=calculate_player_form(
+            home_team_data.get('squad'),
+            home_team_data.get('recent_stats')
+        ),
+        away_player_form=calculate_player_form(
+            away_team_data.get('squad'),
+            away_team_data.get('recent_stats')
+        ),
+        home_key_player_available=calculate_key_player_availability(home_injuries),
+        away_key_player_available=calculate_key_player_availability(away_injuries),
     )

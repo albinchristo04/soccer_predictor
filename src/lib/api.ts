@@ -45,6 +45,19 @@ async function apiRequest<T>(endpoint: string, options: FetchOptions = {}): Prom
   return response.json();
 }
 
+// Authenticated request helper
+async function authRequest<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+  
+  return apiRequest<T>(endpoint, {
+    ...options,
+    headers: {
+      ...options.headers,
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+  });
+}
+
 // ==================== MATCHES API ====================
 
 export interface Match {
@@ -164,6 +177,29 @@ export interface League {
   key: string;
 }
 
+export interface LeagueSimulationResult {
+  league_id: number;
+  league_name: string;
+  n_simulations: number;
+  remaining_matches: number;
+  most_likely_champion: string;
+  champion_probability: number;
+  likely_top_4: string[];
+  relegation_candidates: string[];
+  standings: Array<{
+    team_name: string;
+    team_id: number | null;
+    current_position: number;
+    current_points: number;
+    avg_final_position: number;
+    avg_final_points: number;
+    title_probability: number;
+    top_4_probability: number;
+    europa_probability: number;
+    relegation_probability: number;
+  }>;
+}
+
 export const leaguesApi = {
   list: () => apiRequest<{ leagues: League[] }>('/leagues/'),
   get: (leagueId: number) => apiRequest<any>(`/leagues/${leagueId}`),
@@ -171,6 +207,62 @@ export const leaguesApi = {
   getStandings: (leagueId: number) => apiRequest<any>(`/leagues/${leagueId}/standings`),
   getMatches: (leagueId: number) => apiRequest<any>(`/leagues/${leagueId}/matches`),
   getTopScorers: (leagueId: number) => apiRequest<any>(`/leagues/${leagueId}/top-scorers`),
+  // New endpoints
+  getNews: (leagueId: number, limit = 10) => 
+    apiRequest<{ news: any[]; source: string }>(`/leagues/${leagueId}/news?limit=${limit}`),
+  getEspnStandings: (leagueId: number) => 
+    apiRequest<any>(`/leagues/${leagueId}/espn-standings`),
+  getSimulation: (leagueId: number, nSimulations = 1000) => 
+    apiRequest<LeagueSimulationResult>(`/leagues/${leagueId}/simulation?n_simulations=${nSimulations}`),
+  getTitleRace: (leagueId: number) => 
+    apiRequest<{ title_probabilities: Record<string, number>; most_likely_champion: string }>(`/leagues/${leagueId}/title-race`),
+};
+
+// ==================== AUTH API ====================
+
+export interface UserPrediction {
+  id?: string;
+  match_id: number;
+  predicted_outcome: string;
+  predicted_home_score?: number;
+  predicted_away_score?: number;
+  confidence?: number;
+  home_team: string;
+  away_team: string;
+  league: string;
+  match_date: string;
+  is_correct?: boolean;
+  points_earned?: number;
+}
+
+export interface UserStats {
+  user_id: string;
+  total_predictions: number;
+  correct_predictions: number;
+  accuracy: number;
+  total_points: number;
+  current_streak: number;
+  best_streak: number;
+}
+
+export const authApi = {
+  // Predictions
+  savePrediction: (prediction: Omit<UserPrediction, 'id'>) =>
+    authRequest<UserPrediction>('/auth/predictions', {
+      method: 'POST',
+      body: JSON.stringify(prediction),
+    }),
+  getMyPredictions: (limit = 50) =>
+    authRequest<{ predictions: UserPrediction[] }>(`/auth/predictions?limit=${limit}`),
+  getPredictionForMatch: (matchId: number) =>
+    authRequest<UserPrediction | null>(`/auth/predictions/${matchId}`),
+  
+  // Stats
+  getMyStats: () => authRequest<UserStats>('/auth/stats'),
+  
+  // Leaderboard
+  getLeaderboard: (limit = 20) =>
+    apiRequest<{ leaderboard: any[] }>(`/auth/leaderboard?limit=${limit}`),
 };
 
 // ==================== UTILITY FUNCTIONS ====================

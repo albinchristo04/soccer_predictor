@@ -42,6 +42,22 @@ from backend.models.team import (
     LeagueStandings,
 )
 
+from backend.models.user import (
+    User,
+    UserCreate,
+    UserLogin,
+    UserInDB,
+    UserResponse,
+    UserPrediction,
+    UserPredictionCreate,
+    UserStats,
+    Token,
+    TokenData,
+    AuthProvider,
+    GoogleAuthRequest,
+    LeaderboardEntry,
+)
+
 __all__ = [
     # Match models
     "Match",
@@ -81,4 +97,19 @@ __all__ = [
     "PlayerBasic",
     "StandingsRow",
     "LeagueStandings",
+    
+    # User models
+    "User",
+    "UserCreate",
+    "UserLogin",
+    "UserInDB",
+    "UserResponse",
+    "UserPrediction",
+    "UserPredictionCreate",
+    "UserStats",
+    "Token",
+    "TokenData",
+    "AuthProvider",
+    "GoogleAuthRequest",
+    "LeaderboardEntry",
 ]
