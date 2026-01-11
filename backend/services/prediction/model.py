@@ -22,6 +22,7 @@ from backend.services.prediction.features import (
     build_features,
     calculate_form_points,
     calculate_injury_impact,
+    calculate_weighted_form_points,
 )
 from backend.services.prediction.probabilistic import (
     PoissonModel,
@@ -41,6 +42,8 @@ class PredictionService:
     - Feature engineering from team stats
     - Probabilistic Poisson model for goals
     - ML model for outcome classification (optional)
+    - News sentiment analysis
+    - Player form analysis
     """
     
     def __init__(
@@ -48,7 +51,7 @@ class PredictionService:
         ml_model=None,
         league_avg_goals: float = 1.35,
         home_advantage: float = 0.25,
-        model_version: str = "2.0.0"
+        model_version: str = "3.0.0"
     ):
         self.ml_model = ml_model
         self.league_avg_goals = league_avg_goals
@@ -70,7 +73,8 @@ class PredictionService:
         away_team_data: Dict,
         h2h_data: Optional[Dict] = None,
         match_context: Optional[Dict] = None,
-        kickoff_time: Optional[datetime] = None
+        kickoff_time: Optional[datetime] = None,
+        news_factors: Optional[Dict] = None,
     ) -> MatchPrediction:
         """
         Generate a complete prediction for a match.
@@ -82,16 +86,18 @@ class PredictionService:
             h2h_data: Head-to-head history
             match_context: Additional context (league positions, importance, etc.)
             kickoff_time: Match kickoff time
+            news_factors: News sentiment analysis from ESPN
         
         Returns:
             Complete MatchPrediction
         """
-        # Build features
+        # Build features with news factors
         features = build_features(
             home_team_data,
             away_team_data,
             h2h_data,
-            match_context
+            match_context,
+            news_factors,
         )
         
         # Get core prediction from hybrid model

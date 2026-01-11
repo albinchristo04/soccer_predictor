@@ -1,10 +1,15 @@
 """
-Soccer Predictor API v2.0 - FastAPI Backend
+Soccer Predictor API v3.0 - FastAPI Backend
 
-A streamlined backend that uses FotMob API for all football data.
-Provides endpoints for live scores, match predictions, team data, and league information.
+A comprehensive backend that uses FotMob and ESPN APIs for football data.
+Provides endpoints for live scores, match predictions, team data, league information,
+user authentication, and league standings simulation.
 
-All data is fetched from FotMob in real-time with caching for performance.
+Features:
+- Multi-source data (FotMob + ESPN)
+- User authentication (Email + Google OAuth)
+- Enhanced ML predictions with news sentiment analysis
+- League standings simulation with Monte Carlo
 """
 
 from contextlib import asynccontextmanager
@@ -20,6 +25,7 @@ from backend.api.v1 import router as v1_router
 
 # Import services
 from backend.services.fotmob import get_fotmob_client, cleanup_fotmob_client
+from backend.services.espn import get_espn_client, cleanup_espn_client
 from backend.services.ratings import get_elo_system
 from backend.config import LEAGUE_IDS, LEAGUE_NAMES
 
@@ -35,33 +41,38 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler for startup and shutdown."""
-    logger.info("Starting Soccer Predictor API v2.0")
+    logger.info("Starting Soccer Predictor API v3.0")
     yield
     logger.info("Shutting down Soccer Predictor API")
     await cleanup_fotmob_client()
+    await cleanup_espn_client()
 
 
 app = FastAPI(
     title="Soccer Predictor API",
     description="""
     Soccer Predictor API provides comprehensive match predictions,
-    live scores, and football data powered by FotMob.
+    live scores, and football data powered by FotMob and ESPN.
     
     ## Features
     
-    - **Live Scores**: Real-time match updates from FotMob
-    - **Match Predictions**: AI-powered probabilistic predictions
+    - **Live Scores**: Real-time match updates from FotMob and ESPN
+    - **Match Predictions**: AI-powered probabilistic predictions with news sentiment
     - **Team Data**: Comprehensive team statistics, form, and injuries
-    - **League Data**: Standings, top scorers, and fixtures
+    - **League Data**: Standings, top scorers, fixtures, and news
+    - **User Authentication**: Email/password and Google OAuth
+    - **User Predictions**: Save and track prediction accuracy
+    - **League Simulation**: Monte Carlo simulation for final standings
     
     ## API Endpoints
     
     - `/api/v1/matches/` - Match data (live, today, upcoming)
     - `/api/v1/predictions/` - ML predictions for matches
     - `/api/v1/teams/` - Team data and ratings
-    - `/api/v1/leagues/` - League standings and info
+    - `/api/v1/leagues/` - League standings, news, and simulation
+    - `/api/v1/auth/` - User authentication and predictions
     """,
-    version="2.0.0",
+    version="3.0.0",
     lifespan=lifespan,
 )
 

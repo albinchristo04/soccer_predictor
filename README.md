@@ -1,6 +1,6 @@
-# ⚽ Soccer Predictor v2.0
+# ⚽ Soccer Predictor v3.0
 
-A modern soccer match prediction and live scores application powered by FotMob data. Features real-time match updates, AI-powered predictions, comprehensive league standings, and team analytics.
+A modern soccer match prediction and live scores application powered by FotMob and ESPN data. Features real-time match updates, AI-powered predictions, comprehensive league standings, user authentication, and league standings simulation.
 
 ---
 
@@ -8,6 +8,7 @@ A modern soccer match prediction and live scores application powered by FotMob d
 
 ### 📺 Live Scores & Matches
 - **Real-time Updates:** Live match scores from all major leagues
+- **Multi-source Data:** FotMob + ESPN API integration
 - **Today's Matches:** Complete schedule with live and upcoming games
 - **Match Details:** Lineups, events, and statistics
 
@@ -16,6 +17,7 @@ A modern soccer match prediction and live scores application powered by FotMob d
 - **Expected Goals (xG):** Poisson-based goal predictions
 - **Score Predictions:** Most likely scoreline with alternatives
 - **Over/Under & BTTS:** Betting market predictions
+- **News Sentiment:** Predictions influenced by recent news
 
 ### 🏆 League Coverage
 - **Major European Leagues:**
@@ -37,6 +39,19 @@ A modern soccer match prediction and live scores application powered by FotMob d
 - **Team Form:** Recent results and performance trends
 - **Head-to-Head:** Historical matchup data
 - **ELO Ratings:** Dynamic team strength ratings
+- **League Simulation:** Monte Carlo simulation for final standings prediction
+
+### 🔐 User Authentication
+- **Email/Password:** Traditional account creation
+- **Google OAuth:** Sign in with Google
+- **User Predictions:** Save and track your predictions
+- **Leaderboard:** Compete with other users
+- **Statistics:** Track your prediction accuracy
+
+### 📰 News Integration
+- **League News:** Latest articles from ESPN
+- **Team News:** Team-specific updates
+- **Sentiment Analysis:** News-based prediction factors
 
 ---
 
@@ -45,6 +60,7 @@ A modern soccer match prediction and live scores application powered by FotMob d
 ### Backend
 - **FastAPI** - High-performance async Python API
 - **FotMob API** - Real-time football data source
+- **ESPN API** - Additional data and news
 - **Pydantic** - Data validation and serialization
 - **httpx** - Async HTTP client with rate limiting
 
@@ -57,7 +73,13 @@ A modern soccer match prediction and live scores application powered by FotMob d
 ### ML/Prediction
 - **Poisson Model** - Goal probability distribution
 - **ELO System** - Team strength ratings
-- **Monte Carlo** - Match simulation
+- **Monte Carlo** - Match and league simulation
+- **Sentiment Analysis** - News-based prediction factors
+
+### Authentication
+- **JWT Tokens** - Secure authentication
+- **Google OAuth** - Social login support
+- **In-memory Storage** - Development storage (replace with DB for production)
 
 ---
 
@@ -68,22 +90,25 @@ soccer_predictor/
 ├── backend/
 │   ├── main.py              # FastAPI application
 │   ├── config.py            # Settings and league IDs
-│   ├── fotmob_service.py    # Legacy FotMob service
-│   ├── live_score_service.py # Live score tracking
 │   ├── api/
 │   │   └── v1/
+│   │       ├── auth.py        # Authentication endpoints
 │   │       ├── matches.py     # Match endpoints
 │   │       ├── predictions.py # Prediction endpoints
 │   │       ├── teams.py       # Team endpoints
 │   │       └── leagues.py     # League endpoints
 │   ├── services/
+│   │   ├── auth/            # Authentication service
+│   │   ├── espn/            # ESPN API client
 │   │   ├── fotmob/          # FotMob API client
 │   │   ├── prediction/      # Prediction models
+│   │   ├── simulation/      # League simulation
 │   │   └── ratings/         # ELO rating system
 │   └── models/              # Pydantic models
 ├── src/
 │   ├── app/                 # Next.js pages
 │   ├── components/          # React components
+│   ├── contexts/            # React contexts (Auth)
 │   ├── lib/                 # Utilities and API client
 │   └── hooks/               # Custom React hooks
 └── public/                  # Static assets
@@ -150,6 +175,21 @@ The app will be available at:
 - `GET /api/v1/leagues/{league_id}` - League info
 - `GET /api/v1/leagues/{league_id}/standings` - League standings
 - `GET /api/v1/leagues/{league_id}/matches` - League matches
+- `GET /api/v1/leagues/{league_id}/news` - League news (ESPN)
+- `GET /api/v1/leagues/{league_id}/simulation` - Simulate final standings
+- `GET /api/v1/leagues/{league_id}/title-race` - Title probabilities
+
+### Authentication
+- `POST /api/v1/auth/register` - Create account
+- `POST /api/v1/auth/login` - Email login
+- `POST /api/v1/auth/google` - Google OAuth login
+- `POST /api/v1/auth/refresh` - Refresh tokens
+- `POST /api/v1/auth/logout` - Logout
+- `GET /api/v1/auth/me` - Get current user
+- `POST /api/v1/auth/predictions` - Save prediction
+- `GET /api/v1/auth/predictions` - Get user predictions
+- `GET /api/v1/auth/stats` - Get user stats
+- `GET /api/v1/auth/leaderboard` - Get leaderboard
 
 ### Legacy Endpoints
 - `GET /api/live_scores` - Live match scores
@@ -169,6 +209,13 @@ FOTMOB_CACHE_TTL=300
 
 # Frontend
 NEXT_PUBLIC_API_URL=http://localhost:8000
+
+# Authentication
+JWT_SECRET_KEY=your-secret-key-here
+GOOGLE_CLIENT_ID=your-google-client-id
+
+# Database (optional, for production)
+DATABASE_URL=postgresql://...
 ```
 
 ---
@@ -179,9 +226,11 @@ The prediction system uses a hybrid approach:
 
 1. **ELO Ratings** - Dynamic team strength based on results
 2. **Poisson Distribution** - Expected goals modeling
-3. **Form Analysis** - Recent performance weighting
+3. **Form Analysis** - Recent performance weighting (with recency bias)
 4. **Head-to-Head** - Historical matchup data
 5. **Home Advantage** - Venue factor adjustment
+6. **News Sentiment** - ESPN news analysis for confidence factors
+7. **Player Availability** - Injury and suspension impacts
 
 ### Prediction Output
 ```json
@@ -206,13 +255,32 @@ The prediction system uses a hybrid approach:
 
 ---
 
-## 🔄 Data Source
+## 🏆 League Simulation
 
-All match data is fetched in real-time from **FotMob**, providing:
+Monte Carlo simulation for predicting final standings:
+
+- Simulates all remaining matches using team ELO ratings
+- Uses Poisson distribution for goal outcomes
+- Returns title probabilities for each team
+- Predicts Top 4, Europa qualification, and relegation candidates
+- Position distributions showing range of possible finishes
+
+---
+
+## 🔄 Data Sources
+
+All match data is fetched in real-time from:
+
+**FotMob** - Primary source providing:
 - Live scores and match events
 - Team statistics and form
 - League standings and fixtures
 - Player information and injuries
+
+**ESPN** - Secondary source providing:
+- Live scores and statistics
+- News articles and headlines
+- Team information
 
 ---
 
@@ -225,5 +293,6 @@ MIT License - Feel free to use and modify for your projects.
 ## 🙏 Acknowledgments
 
 - [FotMob](https://www.fotmob.com) - Football data provider
+- [ESPN](https://www.espn.com) - Sports data and news
 - [FastAPI](https://fastapi.tiangolo.com) - Modern Python API framework
 - [Next.js](https://nextjs.org) - React framework
