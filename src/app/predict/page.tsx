@@ -255,7 +255,7 @@ function PredictPageContent() {
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 mb-6">
-              <span className="text-lg">��</span>
+              <span className="text-lg">🤖</span>
               <span className="text-sm font-medium text-indigo-300">AI-Powered Match Predictor</span>
             </div>
             
@@ -273,7 +273,7 @@ function PredictPageContent() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Team Selection */}
         <div className="bg-slate-900/60 backdrop-blur-xl rounded-3xl border border-slate-800/50 p-6 md:p-8 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="relative grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Home Team */}
             <div>
               <TeamSearchInput
@@ -286,7 +286,7 @@ function PredictPageContent() {
             </div>
 
             {/* VS Divider */}
-            <div className="hidden md:flex items-center justify-center absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <div className="hidden md:flex items-center justify-center absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
               <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
                 <span className="text-slate-400 font-bold text-sm">VS</span>
               </div>

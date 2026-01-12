@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:8000'
 
+// Prediction calculation constants
+const DEFAULT_ELO = 1500
+const ELO_SCALING_FACTOR = 300
+const BASE_HOME_GOALS = 1.5
+const BASE_AWAY_GOALS = 1.3
+const DEFAULT_HOME_WIN_PROB = 40
+const DEFAULT_DRAW_PROB = 30
+const DEFAULT_AWAY_WIN_PROB = 30
+const MIN_CONFIDENCE = 30
+const MAX_CONFIDENCE = 99
+const DEFAULT_CONFIDENCE = 50
+const MAX_PREDICTED_GOALS = 5
+
 interface AnyTeamsPredictionRequest {
   home_team: string
   away_team: string
@@ -69,13 +82,13 @@ export async function POST(request: NextRequest) {
     const backendPrediction = await response.json()
     
     // Calculate expected goals based on ELO difference
-    const homeElo = backendPrediction.home_elo || 1500
-    const awayElo = backendPrediction.away_elo || 1500
+    const homeElo = backendPrediction.home_elo || DEFAULT_ELO
+    const awayElo = backendPrediction.away_elo || DEFAULT_ELO
     const eloDiff = homeElo - awayElo
     
     // Base goals calculation with ELO adjustment
-    const homeBaseGoals = 1.5 + (eloDiff / 300)
-    const awayBaseGoals = 1.3 - (eloDiff / 300)
+    const homeBaseGoals = BASE_HOME_GOALS + (eloDiff / ELO_SCALING_FACTOR)
+    const awayBaseGoals = BASE_AWAY_GOALS - (eloDiff / ELO_SCALING_FACTOR)
     
     // Determine if cross-league match
     const isCrossLeague = homeLeagueKey && awayLeagueKey && homeLeagueKey !== awayLeagueKey
@@ -89,13 +102,13 @@ export async function POST(request: NextRequest) {
       away_league: away_league || 'Unknown',
       is_cross_league: isCrossLeague,
       predictions: {
-        home_win: (backendPrediction.probabilities?.home_win || 40) / 100,
-        draw: (backendPrediction.probabilities?.draw || 30) / 100,
-        away_win: (backendPrediction.probabilities?.away_win || 30) / 100,
+        home_win: (backendPrediction.probabilities?.home_win || DEFAULT_HOME_WIN_PROB) / 100,
+        draw: (backendPrediction.probabilities?.draw || DEFAULT_DRAW_PROB) / 100,
+        away_win: (backendPrediction.probabilities?.away_win || DEFAULT_AWAY_WIN_PROB) / 100,
       },
-      predicted_home_goals: Math.max(0, Math.min(5, Math.round(homeBaseGoals * 10) / 10)),
-      predicted_away_goals: Math.max(0, Math.min(5, Math.round(awayBaseGoals * 10) / 10)),
-      confidence: Math.min(99, Math.max(30, backendPrediction.confidence || 50)),
+      predicted_home_goals: Math.max(0, Math.min(MAX_PREDICTED_GOALS, Math.round(homeBaseGoals * 10) / 10)),
+      predicted_away_goals: Math.max(0, Math.min(MAX_PREDICTED_GOALS, Math.round(awayBaseGoals * 10) / 10)),
+      confidence: Math.min(MAX_CONFIDENCE, Math.max(MIN_CONFIDENCE, backendPrediction.confidence || DEFAULT_CONFIDENCE)),
       ratings: {
         home_elo: Math.round(homeElo),
         away_elo: Math.round(awayElo),
