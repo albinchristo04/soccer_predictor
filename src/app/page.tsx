@@ -101,6 +101,48 @@ function LiveScoresTicker() {
   )
 }
 
+// Helper function to group matches by league
+function groupMatchesByLeague(matches: TodayMatch[]): Record<string, TodayMatch[]> {
+  return matches.reduce((acc, match) => {
+    const league = match.league || 'Other'
+    if (!acc[league]) {
+      acc[league] = []
+    }
+    acc[league].push(match)
+    return acc
+  }, {} as Record<string, TodayMatch[]>)
+}
+
+// Helper to format time from ISO string
+function formatMatchTime(timeStr?: string): string {
+  if (!timeStr) return 'TBD'
+  try {
+    const date = new Date(timeStr)
+    return date.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    })
+  } catch {
+    return 'TBD'
+  }
+}
+
+// League flags mapping
+const leagueFlags: Record<string, string> = {
+  'Premier League': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+  'La Liga': '🇪🇸',
+  'LaLiga': '🇪🇸',
+  'Serie A': '🇮🇹',
+  'Bundesliga': '🇩🇪',
+  'Ligue 1': '🇫🇷',
+  'Champions League': '🏆',
+  'Europa League': '🏆',
+  'FA Cup': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+  'Copa del Rey': '🇪🇸',
+  'MLS': '🇺🇸',
+}
+
 function TodaysMatchesWidget() {
   const [matches, setMatches] = useState<{live: TodayMatch[], upcoming: TodayMatch[], completed: TodayMatch[]}>({
     live: [], upcoming: [], completed: []
@@ -131,6 +173,11 @@ function TodaysMatchesWidget() {
   const live = matches?.live || []
   const upcoming = matches?.upcoming || []
   const completed = matches?.completed || []
+  
+  // Combine all matches and group by league
+  const allMatches = [...live, ...upcoming]
+  const matchesByLeague = groupMatchesByLeague(allMatches)
+  const leagueNames = Object.keys(matchesByLeague)
   const totalMatches = live.length + upcoming.length + completed.length
   
   if (loading) {
@@ -139,6 +186,7 @@ function TodaysMatchesWidget() {
         <div className="animate-pulse flex flex-col gap-4">
           <div className="h-6 bg-slate-800 rounded w-1/3" />
           <div className="h-20 bg-slate-800 rounded" />
+          <div className="h-16 bg-slate-800 rounded" />
         </div>
       </div>
     )
@@ -146,64 +194,82 @@ function TodaysMatchesWidget() {
   
   return (
     <div className="bg-gradient-to-br from-slate-900/80 to-slate-950/80 backdrop-blur-xl rounded-3xl border border-slate-800/50 overflow-hidden shadow-2xl">
+      {/* Header */}
       <div className="px-6 py-4 bg-gradient-to-r from-slate-800/50 to-slate-800/30 border-b border-slate-700/50">
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-white flex items-center gap-2">
             <span className="text-xl">📆</span>
-            Today&apos;s Matches
+            Today&apos;s Schedule
           </h3>
-          <span className="text-sm text-slate-400">{totalMatches} total</span>
+          <span className="text-sm text-slate-400">{totalMatches} matches</span>
         </div>
       </div>
       
-      <div className="p-4 space-y-4">
-        {live.length > 0 && (
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-xs font-bold text-red-400 uppercase tracking-wider">Live Now</span>
-            </div>
-            <div className="space-y-2">
-              {live.slice(0, 3).map((match, idx) => (
-                <div key={idx} className="grid grid-cols-3 items-center p-3 rounded-xl bg-red-950/20 border border-red-900/30">
-                  <span className="text-sm text-white text-left">{match.home_team}</span>
-                  <span className="font-bold text-white text-center">{match.home_score} - {match.away_score}</span>
-                  <span className="text-sm text-white text-right">{match.away_team}</span>
+      {/* Matches by League */}
+      <div className="max-h-[450px] overflow-y-auto">
+        {leagueNames.length > 0 ? (
+          <div className="divide-y divide-slate-800/50">
+            {leagueNames.map((league) => (
+              <div key={league} className="bg-slate-900/30">
+                {/* League Header */}
+                <div className="px-4 py-3 bg-slate-800/40 flex items-center gap-2 sticky top-0">
+                  <span className="text-lg">{leagueFlags[league] || '⚽'}</span>
+                  <span className="font-semibold text-white text-sm">{league}</span>
+                  <span className="text-xs text-slate-500 ml-auto">{matchesByLeague[league].length} {matchesByLeague[league].length === 1 ? 'match' : 'matches'}</span>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {upcoming.length > 0 && (
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-blue-500" />
-              <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">Upcoming</span>
-            </div>
-            <div className="space-y-2">
-              {upcoming.slice(0, 3).map((match, idx) => (
-                <div key={idx} className="grid grid-cols-3 items-center p-3 rounded-xl bg-slate-800/50 border border-slate-700/50">
-                  <span className="text-sm text-slate-300 text-left">{match.home_team}</span>
-                  <span className="text-xs text-slate-500 text-center">{match.time || 'TBD'}</span>
-                  <span className="text-sm text-slate-300 text-right">{match.away_team}</span>
+                
+                {/* Matches List */}
+                <div className="divide-y divide-slate-800/30">
+                  {matchesByLeague[league].map((match, idx) => (
+                    <div key={`${league}-${idx}`} className={`px-4 py-3 flex items-center ${match.status === 'live' ? 'bg-red-950/20' : 'hover:bg-slate-800/30'} transition-colors`}>
+                      {/* Home Team */}
+                      <div className="flex-1 text-right pr-3">
+                        <span className="text-sm text-white font-medium">{match.home_team}</span>
+                      </div>
+                      
+                      {/* Score or Time */}
+                      <div className="w-24 flex-shrink-0 text-center">
+                        {match.status === 'live' ? (
+                          <div className="flex items-center justify-center gap-1">
+                            <span className="text-lg font-bold text-white">{match.home_score}</span>
+                            <span className="text-slate-500">-</span>
+                            <span className="text-lg font-bold text-white">{match.away_score}</span>
+                            <span className="ml-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                          </div>
+                        ) : match.status === 'finished' ? (
+                          <div className="flex items-center justify-center gap-1">
+                            <span className="text-lg font-bold text-slate-400">{match.home_score}</span>
+                            <span className="text-slate-600">-</span>
+                            <span className="text-lg font-bold text-slate-400">{match.away_score}</span>
+                          </div>
+                        ) : (
+                          <span className="text-sm font-medium text-indigo-400">{formatMatchTime(match.time)}</span>
+                        )}
+                      </div>
+                      
+                      {/* Away Team */}
+                      <div className="flex-1 text-left pl-3">
+                        <span className="text-sm text-white font-medium">{match.away_team}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
-        )}
-        
-        {totalMatches === 0 && (
-          <div className="text-center py-6">
-            <span className="text-3xl mb-2 block">⚽</span>
-            <p className="text-slate-400 text-sm">No matches scheduled for today</p>
+        ) : (
+          <div className="text-center py-10">
+            <span className="text-4xl mb-3 block">⚽</span>
+            <p className="text-slate-400 text-sm mb-2">No matches scheduled for today</p>
+            <p className="text-slate-500 text-xs">Check back later for updates</p>
           </div>
         )}
       </div>
       
+      {/* Footer */}
       <div className="px-4 py-3 bg-slate-800/30 border-t border-slate-700/50">
         <Link href="/upcoming" className="text-indigo-400 text-sm font-medium hover:text-indigo-300 transition-colors flex items-center justify-center gap-1">
-          View all matches
+          View full schedule
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
