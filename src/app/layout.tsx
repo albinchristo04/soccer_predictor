@@ -9,10 +9,23 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Soccer Stats Predictor',
-  description: 'AI-powered soccer match prediction and analysis with real-time data',
+  description: 'AI-powered soccer match prediction and analysis with real-time data from ESPN and FotMob',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Soccer Predictor',
+  },
   icons: {
     icon: '/soccer-ball.png',
+    apple: '/icons/icon-192x192.png',
   },
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
+  },
+  themeColor: '#4F46E5',
 }
 
 // Script to prevent flash of wrong theme - default to dark like Fotmob
