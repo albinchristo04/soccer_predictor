@@ -137,44 +137,16 @@ async function fetchFotMobMatches(): Promise<Match[]> {
   return matches
 }
 
-// Sample data for when APIs are unavailable
-function getSampleMatches(): Match[] {
-  const now = new Date()
-  const today = now.toISOString()
-  
-  return [
-    // Premier League
-    { home_team: 'Liverpool', away_team: 'Manchester City', home_score: null, away_score: null, time: today, status: 'upcoming', league: 'Premier League', match_id: 'sample-1' },
-    { home_team: 'Arsenal', away_team: 'Chelsea', home_score: null, away_score: null, time: today, status: 'upcoming', league: 'Premier League', match_id: 'sample-2' },
-    { home_team: 'Manchester United', away_team: 'Tottenham', home_score: 2, away_score: 1, time: today, status: 'live', league: 'Premier League', match_id: 'sample-3' },
-    // La Liga
-    { home_team: 'Real Madrid', away_team: 'Barcelona', home_score: null, away_score: null, time: today, status: 'upcoming', league: 'La Liga', match_id: 'sample-4' },
-    { home_team: 'Atletico Madrid', away_team: 'Sevilla', home_score: null, away_score: null, time: today, status: 'upcoming', league: 'La Liga', match_id: 'sample-5' },
-    // Serie A
-    { home_team: 'Inter', away_team: 'AC Milan', home_score: null, away_score: null, time: today, status: 'upcoming', league: 'Serie A', match_id: 'sample-6' },
-    { home_team: 'Juventus', away_team: 'Napoli', home_score: 1, away_score: 1, time: today, status: 'live', league: 'Serie A', match_id: 'sample-7' },
-    // Bundesliga
-    { home_team: 'Bayern Munich', away_team: 'Borussia Dortmund', home_score: null, away_score: null, time: today, status: 'upcoming', league: 'Bundesliga', match_id: 'sample-8' },
-    // Ligue 1
-    { home_team: 'Paris Saint-Germain', away_team: 'Marseille', home_score: 3, away_score: 0, time: today, status: 'completed', league: 'Ligue 1', match_id: 'sample-9' },
-    // Champions League
-    { home_team: 'Real Madrid', away_team: 'Manchester City', home_score: null, away_score: null, time: today, status: 'upcoming', league: 'Champions League', match_id: 'sample-10' },
-  ]
-}
+// Sample data for when APIs are unavailable - no longer used to avoid showing inaccurate data
+// Users will see "No matches" when APIs are blocked
 
 export async function GET() {
   try {
-    // Try ESPN first, then FotMob, then use sample data
+    // Try ESPN first, then FotMob
     let matches = await fetchESPNMatches()
     
     if (matches.length === 0) {
       matches = await fetchFotMobMatches()
-    }
-    
-    // If both APIs fail, use sample data for demonstration
-    if (matches.length === 0) {
-      console.log('Using sample match data as APIs are unavailable')
-      matches = getSampleMatches()
     }
     
     // Categorize matches
@@ -202,14 +174,13 @@ export async function GET() {
     return NextResponse.json(result)
   } catch (error) {
     console.error('Error fetching today\'s matches:', error)
-    // Return sample data as fallback
-    const sampleMatches = getSampleMatches()
+    // Return empty data instead of fake data when APIs fail
     return NextResponse.json({
-      live: sampleMatches.filter(m => m.status === 'live'),
-      upcoming: sampleMatches.filter(m => m.status === 'upcoming'),
-      completed: sampleMatches.filter(m => m.status === 'completed'),
+      live: [],
+      upcoming: [],
+      completed: [],
       leagues: [],
-      source: 'sample'
+      source: 'error'
     })
   }
 }

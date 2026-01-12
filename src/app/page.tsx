@@ -63,7 +63,7 @@ function LiveScoresTicker() {
       <div className="flex items-center justify-center gap-3 py-3 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-800">
         <div className="w-2 h-2 rounded-full bg-slate-500" />
         <span className="text-slate-400 text-sm">No live matches at the moment</span>
-        <Link href="/upcoming" className="text-indigo-400 text-sm hover:text-indigo-300 transition-colors">
+        <Link href="/matches" className="text-indigo-400 text-sm hover:text-indigo-300 transition-colors">
           View upcoming matches →
         </Link>
       </div>
@@ -268,7 +268,7 @@ function TodaysMatchesWidget() {
       
       {/* Footer */}
       <div className="px-4 py-3 bg-slate-800/30 border-t border-slate-700/50">
-        <Link href="/upcoming" className="text-indigo-400 text-sm font-medium hover:text-indigo-300 transition-colors flex items-center justify-center gap-1">
+        <Link href="/matches" className="text-indigo-400 text-sm font-medium hover:text-indigo-300 transition-colors flex items-center justify-center gap-1">
           View full schedule
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -296,7 +296,7 @@ function QuickStatsCard({ icon, value, label, color }: { icon: string; value: st
 export default function Home() {
   const features = [
     {
-      href: '/upcoming',
+      href: '/matches',
       icon: '📅',
       title: 'Match Calendar',
       description: 'Interactive calendar view with predictions and results comparison',
@@ -360,7 +360,7 @@ export default function Home() {
               
               <div className="flex flex-wrap gap-4">
                 <Link 
-                  href="/upcoming" 
+                  href="/matches" 
                   className="group relative px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all duration-300 flex items-center gap-2 overflow-hidden"
                 >
                   <span className="relative z-10">View Calendar</span>
