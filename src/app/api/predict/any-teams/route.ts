@@ -11,6 +11,7 @@ const BASE_AWAY_GOALS = 1.3
 const MIN_CONFIDENCE = 30
 const MAX_CONFIDENCE = 85
 const MAX_PREDICTED_GOALS = 5
+const BACKEND_TIMEOUT_MS = 3000
 
 interface AnyTeamsPredictionRequest {
   home_team: string
@@ -45,7 +46,13 @@ const leagueStrength: Record<string, number> = {
   'world_cup': 1.10,
 }
 
-// Team base ELO ratings (approximate based on historical performance)
+/**
+ * Team base ELO ratings - approximate values based on historical performance.
+ * These ratings are used as fallback when the backend ML model is unavailable.
+ * Ratings are calibrated to a 1500 baseline with top teams ranging from 1550-1800.
+ * Source: Estimated from historical match results and UEFA coefficients.
+ * Last updated: January 2026
+ */
 const teamBaseElo: Record<string, number> = {
   // Premier League top teams
   'manchester city': 1780,
@@ -85,13 +92,18 @@ const teamBaseElo: Record<string, number> = {
   'lyon': 1570,
 }
 
+// Helper to convert league name to API key format
+function normalizeLeagueKey(league: string): string {
+  return leagueNameToKey[league] || league.toLowerCase().replace(/\s+/g, '_')
+}
+
 function getTeamElo(teamName: string, league?: string): number {
   const normalized = teamName.toLowerCase()
   const baseElo = teamBaseElo[normalized] || DEFAULT_ELO
   
   // Apply league strength modifier
   if (league) {
-    const leagueKey = leagueNameToKey[league] || league.toLowerCase().replace(/\s+/g, '_')
+    const leagueKey = normalizeLeagueKey(league)
     const strengthMod = leagueStrength[leagueKey] || 1.0
     return baseElo * strengthMod
   }
@@ -112,17 +124,23 @@ function calculateWinProbabilities(homeElo: number, awayElo: number): { home: nu
   const drawModifier = Math.max(0, 0.15 - Math.abs(eloDiff) / 1000)
   const drawProb = drawBase + drawModifier
   
-  // Normalize probabilities
+  // Calculate raw probabilities
   const awayWinProb = 1 - homeWinProb
   const totalNonDraw = homeWinProb + awayWinProb
   
   const normalizedHome = (homeWinProb / totalNonDraw) * (1 - drawProb)
   const normalizedAway = (awayWinProb / totalNonDraw) * (1 - drawProb)
   
+  // Round and ensure they sum to 100
+  const homeRounded = Math.round(normalizedHome * 100)
+  const drawRounded = Math.round(drawProb * 100)
+  // Away gets the remainder to ensure sum is exactly 100
+  const awayRounded = 100 - homeRounded - drawRounded
+  
   return {
-    home: Math.round(normalizedHome * 100),
-    draw: Math.round(drawProb * 100),
-    away: Math.round(normalizedAway * 100)
+    home: homeRounded,
+    draw: drawRounded,
+    away: Math.max(0, awayRounded)
   }
 }
 
@@ -146,8 +164,8 @@ export async function POST(request: NextRequest) {
     }
     
     // Convert league names if needed
-    const homeLeagueKey = home_league ? (leagueNameToKey[home_league] || home_league.toLowerCase().replace(/\s+/g, '_')) : undefined
-    const awayLeagueKey = away_league ? (leagueNameToKey[away_league] || away_league.toLowerCase().replace(/\s+/g, '_')) : undefined
+    const homeLeagueKey = home_league ? normalizeLeagueKey(home_league) : undefined
+    const awayLeagueKey = away_league ? normalizeLeagueKey(away_league) : undefined
     
     let homeElo: number
     let awayElo: number
@@ -165,7 +183,7 @@ export async function POST(request: NextRequest) {
           away_team,
           league: homeLeagueKey || 'premier_league',
         }),
-        signal: AbortSignal.timeout(3000), // 3 second timeout
+        signal: AbortSignal.timeout(BACKEND_TIMEOUT_MS),
       })
       
       if (response.ok) {
