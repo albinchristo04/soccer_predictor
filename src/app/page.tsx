@@ -128,9 +128,9 @@ function formatMatchTime(timeStr?: string): string {
   }
 }
 
-// League flags mapping
+// League flags mapping - using simple emojis for cross-platform compatibility
 const leagueFlags: Record<string, string> = {
-  'Premier League': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+  'Premier League': '🏴',
   'La Liga': '🇪🇸',
   'LaLiga': '🇪🇸',
   'Serie A': '🇮🇹',
@@ -138,7 +138,7 @@ const leagueFlags: Record<string, string> = {
   'Ligue 1': '🇫🇷',
   'Champions League': '🏆',
   'Europa League': '🏆',
-  'FA Cup': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+  'FA Cup': '🏴',
   'Copa del Rey': '🇪🇸',
   'MLS': '🇺🇸',
 }
@@ -174,8 +174,8 @@ function TodaysMatchesWidget() {
   const upcoming = matches?.upcoming || []
   const completed = matches?.completed || []
   
-  // Combine all matches and group by league
-  const allMatches = [...live, ...upcoming]
+  // Combine all matches (live, upcoming, completed) and group by league
+  const allMatches = [...live, ...upcoming, ...completed]
   const matchesByLeague = groupMatchesByLeague(allMatches)
   const leagueNames = Object.keys(matchesByLeague)
   const totalMatches = live.length + upcoming.length + completed.length
@@ -212,7 +212,7 @@ function TodaysMatchesWidget() {
             {leagueNames.map((league) => (
               <div key={league} className="bg-slate-900/30">
                 {/* League Header */}
-                <div className="px-4 py-3 bg-slate-800/40 flex items-center gap-2 sticky top-0">
+                <div className="px-4 py-3 bg-slate-800/40 flex items-center gap-2 sticky top-0 z-10">
                   <span className="text-lg">{leagueFlags[league] || '⚽'}</span>
                   <span className="font-semibold text-white text-sm">{league}</span>
                   <span className="text-xs text-slate-500 ml-auto">{matchesByLeague[league].length} {matchesByLeague[league].length === 1 ? 'match' : 'matches'}</span>
