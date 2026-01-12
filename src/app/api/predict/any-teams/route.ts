@@ -5,14 +5,11 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:8000'
 // Prediction calculation constants
 const DEFAULT_ELO = 1500
 const ELO_SCALING_FACTOR = 300
+const HOME_ADVANTAGE_ELO = 65
 const BASE_HOME_GOALS = 1.5
 const BASE_AWAY_GOALS = 1.3
-const DEFAULT_HOME_WIN_PROB = 40
-const DEFAULT_DRAW_PROB = 30
-const DEFAULT_AWAY_WIN_PROB = 30
 const MIN_CONFIDENCE = 30
-const MAX_CONFIDENCE = 99
-const DEFAULT_CONFIDENCE = 50
+const MAX_CONFIDENCE = 85
 const MAX_PREDICTED_GOALS = 5
 
 interface AnyTeamsPredictionRequest {
@@ -33,6 +30,100 @@ const leagueNameToKey: Record<string, string> = {
   'Europa League (UEL)': 'europa_league',
   'MLS': 'mls',
   'FIFA World Cup': 'world_cup'
+}
+
+// League strength coefficients (used for cross-league predictions)
+const leagueStrength: Record<string, number> = {
+  'premier_league': 1.15,
+  'la_liga': 1.10,
+  'serie_a': 1.05,
+  'bundesliga': 1.05,
+  'ligue_1': 1.00,
+  'champions_league': 1.20,
+  'europa_league': 1.00,
+  'mls': 0.85,
+  'world_cup': 1.10,
+}
+
+// Team base ELO ratings (approximate based on historical performance)
+const teamBaseElo: Record<string, number> = {
+  // Premier League top teams
+  'manchester city': 1780,
+  'liverpool': 1750,
+  'arsenal': 1730,
+  'chelsea': 1680,
+  'manchester utd': 1660,
+  'tottenham': 1650,
+  'newcastle utd': 1620,
+  'aston villa': 1600,
+  'brighton': 1580,
+  'west ham': 1560,
+  // La Liga
+  'real madrid': 1800,
+  'barcelona': 1770,
+  'atlético madrid': 1700,
+  'sevilla': 1620,
+  'real sociedad': 1600,
+  'villarreal': 1590,
+  // Serie A
+  'inter': 1720,
+  'milan': 1680,
+  'napoli': 1700,
+  'juventus': 1690,
+  'roma': 1620,
+  'lazio': 1600,
+  'atalanta': 1640,
+  // Bundesliga
+  'bayern munich': 1780,
+  'dortmund': 1680,
+  'rb leipzig': 1660,
+  'leverkusen': 1650,
+  // Ligue 1
+  'paris s-g': 1750,
+  'marseille': 1600,
+  'monaco': 1580,
+  'lyon': 1570,
+}
+
+function getTeamElo(teamName: string, league?: string): number {
+  const normalized = teamName.toLowerCase()
+  const baseElo = teamBaseElo[normalized] || DEFAULT_ELO
+  
+  // Apply league strength modifier
+  if (league) {
+    const leagueKey = leagueNameToKey[league] || league.toLowerCase().replace(/\s+/g, '_')
+    const strengthMod = leagueStrength[leagueKey] || 1.0
+    return baseElo * strengthMod
+  }
+  
+  return baseElo
+}
+
+function calculateWinProbabilities(homeElo: number, awayElo: number): { home: number; draw: number; away: number } {
+  // Apply home advantage
+  const adjustedHomeElo = homeElo + HOME_ADVANTAGE_ELO
+  const eloDiff = adjustedHomeElo - awayElo
+  
+  // Use logistic function for win probability
+  const homeWinProb = 1 / (1 + Math.pow(10, -eloDiff / 400))
+  
+  // Estimate draw probability based on ELO closeness
+  const drawBase = 0.25
+  const drawModifier = Math.max(0, 0.15 - Math.abs(eloDiff) / 1000)
+  const drawProb = drawBase + drawModifier
+  
+  // Normalize probabilities
+  const awayWinProb = 1 - homeWinProb
+  const totalNonDraw = homeWinProb + awayWinProb
+  
+  const normalizedHome = (homeWinProb / totalNonDraw) * (1 - drawProb)
+  const normalizedAway = (awayWinProb / totalNonDraw) * (1 - drawProb)
+  
+  return {
+    home: Math.round(normalizedHome * 100),
+    draw: Math.round(drawProb * 100),
+    away: Math.round(normalizedAway * 100)
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -58,40 +149,63 @@ export async function POST(request: NextRequest) {
     const homeLeagueKey = home_league ? (leagueNameToKey[home_league] || home_league.toLowerCase().replace(/\s+/g, '_')) : undefined
     const awayLeagueKey = away_league ? (leagueNameToKey[away_league] || away_league.toLowerCase().replace(/\s+/g, '_')) : undefined
     
-    // Use the unified prediction endpoint from backend
-    const response = await fetch(`${BACKEND_URL}/api/predict/unified`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        home_team,
-        away_team,
-        league: homeLeagueKey || 'premier_league',
-      }),
-    })
+    let homeElo: number
+    let awayElo: number
+    let backendAvailable = false
     
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
-      return NextResponse.json(
-        { error: error.detail || 'Backend prediction failed' },
-        { status: response.status }
-      )
+    // Try to get prediction from backend first
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/predict/unified`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          home_team,
+          away_team,
+          league: homeLeagueKey || 'premier_league',
+        }),
+        signal: AbortSignal.timeout(3000), // 3 second timeout
+      })
+      
+      if (response.ok) {
+        const backendPrediction = await response.json()
+        homeElo = backendPrediction.home_elo || getTeamElo(home_team, home_league)
+        awayElo = backendPrediction.away_elo || getTeamElo(away_team, away_league)
+        backendAvailable = true
+      } else {
+        homeElo = getTeamElo(home_team, home_league)
+        awayElo = getTeamElo(away_team, away_league)
+      }
+    } catch {
+      // Backend not available, use local calculation
+      homeElo = getTeamElo(home_team, home_league)
+      awayElo = getTeamElo(away_team, away_league)
     }
     
-    const backendPrediction = await response.json()
+    // Calculate probabilities
+    const probs = calculateWinProbabilities(homeElo, awayElo)
     
-    // Calculate expected goals based on ELO difference
-    const homeElo = backendPrediction.home_elo || DEFAULT_ELO
-    const awayElo = backendPrediction.away_elo || DEFAULT_ELO
-    const eloDiff = homeElo - awayElo
+    // Calculate ELO difference with home advantage
+    const eloDiff = (homeElo + HOME_ADVANTAGE_ELO) - awayElo
     
     // Base goals calculation with ELO adjustment
     const homeBaseGoals = BASE_HOME_GOALS + (eloDiff / ELO_SCALING_FACTOR)
     const awayBaseGoals = BASE_AWAY_GOALS - (eloDiff / ELO_SCALING_FACTOR)
     
+    // Determine predicted winner
+    let predictedWinner = 'Draw'
+    if (probs.home > probs.draw && probs.home > probs.away) {
+      predictedWinner = home_team
+    } else if (probs.away > probs.draw && probs.away > probs.home) {
+      predictedWinner = away_team
+    }
+    
     // Determine if cross-league match
     const isCrossLeague = homeLeagueKey && awayLeagueKey && homeLeagueKey !== awayLeagueKey
+    
+    // Calculate confidence based on ELO difference
+    const confidence = Math.min(MAX_CONFIDENCE, Math.max(MIN_CONFIDENCE, 50 + Math.abs(eloDiff) / 10))
     
     // Build enhanced prediction response
     const prediction = {
@@ -102,26 +216,27 @@ export async function POST(request: NextRequest) {
       away_league: away_league || 'Unknown',
       is_cross_league: isCrossLeague,
       predictions: {
-        home_win: (backendPrediction.probabilities?.home_win || DEFAULT_HOME_WIN_PROB) / 100,
-        draw: (backendPrediction.probabilities?.draw || DEFAULT_DRAW_PROB) / 100,
-        away_win: (backendPrediction.probabilities?.away_win || DEFAULT_AWAY_WIN_PROB) / 100,
+        home_win: probs.home / 100,
+        draw: probs.draw / 100,
+        away_win: probs.away / 100,
       },
       predicted_home_goals: Math.max(0, Math.min(MAX_PREDICTED_GOALS, Math.round(homeBaseGoals * 10) / 10)),
       predicted_away_goals: Math.max(0, Math.min(MAX_PREDICTED_GOALS, Math.round(awayBaseGoals * 10) / 10)),
-      confidence: Math.min(MAX_CONFIDENCE, Math.max(MIN_CONFIDENCE, backendPrediction.confidence || DEFAULT_CONFIDENCE)),
+      confidence: Math.round(confidence),
       ratings: {
         home_elo: Math.round(homeElo),
         away_elo: Math.round(awayElo),
         elo_difference: Math.round(eloDiff),
       },
       analysis: {
-        predicted_winner: backendPrediction.prediction || 'Draw',
+        predicted_winner: predictedWinner,
         home_advantage_applied: true,
         factors_considered: [
           'ELO rating difference',
-          'Home advantage (+65 ELO points)',
+          `Home advantage (+${HOME_ADVANTAGE_ELO} ELO points)`,
           'Historical performance',
-          'League strength coefficient'
+          ...(isCrossLeague ? ['League strength coefficient'] : []),
+          ...(backendAvailable ? ['Machine learning model'] : ['Statistical estimation'])
         ],
         note: isCrossLeague 
           ? 'Cross-league match: Results adjusted for league strength differences.'
