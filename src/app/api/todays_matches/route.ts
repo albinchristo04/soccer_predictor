@@ -28,9 +28,10 @@ async function fetchESPNMatches(): Promise<Match[]> {
   const allMatches: Match[] = []
   
   // Get today's date boundaries for filtering
+  const MS_PER_DAY = 24 * 60 * 60 * 1000
   const today = new Date()
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
-  const todayEnd = todayStart + 24 * 60 * 60 * 1000 // End of today
+  const todayEnd = todayStart + MS_PER_DAY // End of today
   
   for (const league of ESPN_LEAGUES) {
     try {

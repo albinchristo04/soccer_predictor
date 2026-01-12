@@ -104,13 +104,13 @@ export default function MatchDetailPage() {
             events.push({
               type: 'goal',
               minute: parseInt(play.clock?.displayValue) || 0,
-              player: play.scoringPlay?.scorer?.athlete?.displayName || play.text || 'Unknown',
+              player: play.scoringPlay?.scorer?.athlete?.displayName || play.text?.trim() || 'Unknown',
               team: play.homeAway === 'home' ? 'home' : 'away',
               relatedPlayer: play.scoringPlay?.assists?.[0]?.athlete?.displayName,
             })
           }
           
-          // Extract stats
+          // Extract stats helper function
           const getStatValue = (name: string, teamIndex: number) => {
             const teamStats = data.boxscore?.teams?.[teamIndex]?.statistics || []
             const stat = teamStats.find((s: any) => s.name?.toLowerCase() === name.toLowerCase())
