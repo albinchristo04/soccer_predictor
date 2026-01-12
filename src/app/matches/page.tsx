@@ -151,26 +151,26 @@ export default function MatchesPage() {
   // League selection view
   if (!selectedLeague) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+      <div className="min-h-screen" style={{ backgroundColor: 'var(--background)' }}>
         <div className="max-w-4xl mx-auto px-4 py-12">
-          <h1 className="text-3xl font-bold text-white mb-2">Matches</h1>
-          <p className="text-slate-400 mb-8">Select a league to view fixtures, results, and standings</p>
+          <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Matches</h1>
+          <p className="mb-8" style={{ color: 'var(--text-secondary)' }}>Select a league to view fixtures, results, and standings</p>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {LEAGUES.map((league) => (
               <button
                 key={league.id}
                 onClick={() => setSelectedLeague(league)}
-                className="group flex items-center gap-4 p-5 bg-slate-800/50 rounded-2xl border border-slate-700/50 hover:border-indigo-500/50 hover:bg-slate-800/80 transition-all text-left"
+                className="group flex items-center gap-4 p-5 rounded-2xl border transition-all text-left fm-card"
               >
                 <span className="text-3xl">{league.flag}</span>
                 <div>
-                  <p className="text-lg font-semibold text-white group-hover:text-indigo-300 transition-colors">
+                  <p className="text-lg font-semibold group-hover:text-indigo-300 transition-colors" style={{ color: 'var(--text-primary)' }}>
                     {league.name}
                   </p>
-                  <p className="text-sm text-slate-500">{league.country}</p>
+                  <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{league.country}</p>
                 </div>
-                <svg className="w-5 h-5 text-slate-500 ml-auto group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 ml-auto group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" style={{ color: 'var(--text-tertiary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
@@ -183,13 +183,14 @@ export default function MatchesPage() {
 
   // League detail view
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--background)' }}>
       {/* Header */}
-      <div className="bg-slate-900/80 border-b border-slate-800">
+      <div style={{ backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)' }}>
         <div className="max-w-6xl mx-auto px-4 py-6">
           <button
             onClick={() => setSelectedLeague(null)}
-            className="flex items-center gap-2 text-slate-400 hover:text-white mb-4 transition-colors"
+            className="flex items-center gap-2 hover:opacity-80 mb-4 transition-colors"
+            style={{ color: 'var(--text-secondary)' }}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -200,8 +201,8 @@ export default function MatchesPage() {
           <div className="flex items-center gap-4">
             <span className="text-4xl">{selectedLeague.flag}</span>
             <div>
-              <h1 className="text-2xl font-bold text-white">{selectedLeague.name}</h1>
-              <p className="text-slate-400">{selectedLeague.country}</p>
+              <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{selectedLeague.name}</h1>
+              <p style={{ color: 'var(--text-secondary)' }}>{selectedLeague.country}</p>
             </div>
           </div>
           
@@ -212,8 +213,9 @@ export default function MatchesPage() {
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'fixtures'
                   ? 'bg-indigo-600 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  : 'hover:bg-opacity-50'
               }`}
+              style={activeTab !== 'fixtures' ? { color: 'var(--text-secondary)' } : {}}
             >
               Fixtures & Results
             </button>
@@ -222,8 +224,9 @@ export default function MatchesPage() {
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 activeTab === 'standings'
                   ? 'bg-indigo-600 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  : 'hover:bg-opacity-50'
               }`}
+              style={activeTab !== 'standings' ? { color: 'var(--text-secondary)' } : {}}
             >
               Standings
             </button>
@@ -243,7 +246,7 @@ export default function MatchesPage() {
                 {matches.map((match) => (
                   <Link
                     key={match.id}
-                    href={`/matches/${match.id}`}
+                    href={`/matches/${match.id}?league=${selectedLeague.id}`}
                     className={`block p-4 rounded-xl border transition-all ${
                       match.status === 'live'
                         ? 'bg-red-950/30 border-red-800/50 hover:border-red-600/50'

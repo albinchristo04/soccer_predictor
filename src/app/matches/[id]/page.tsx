@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 interface MatchEvent {
@@ -43,10 +43,17 @@ interface MatchDetails {
   }
 }
 
+// Map league IDs for ESPN API
+const LEAGUE_ENDPOINTS = [
+  'eng.1', 'esp.1', 'ita.1', 'ger.1', 'fra.1', 'usa.1', 'uefa.champions', 'uefa.europa'
+]
+
 export default function MatchDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const matchId = params.id as string
+  const leagueId = searchParams.get('league') || ''
   
   const [match, setMatch] = useState<MatchDetails | null>(null)
   const [loading, setLoading] = useState(true)
@@ -55,10 +62,37 @@ export default function MatchDetailPage() {
   useEffect(() => {
     const fetchMatchDetails = async () => {
       try {
-        // Fetch from ESPN API
-        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${matchId}`)
-        if (res.ok) {
-          const data = await res.json()
+        // Try fetching from different league endpoints until we find the match
+        let matchData = null
+        
+        // If league ID is provided, try that first
+        if (leagueId) {
+          const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueId}/summary?event=${matchId}`)
+          if (res.ok) {
+            matchData = await res.json()
+          }
+        }
+        
+        // If no data yet, try each league endpoint
+        if (!matchData || !matchData.header) {
+          for (const league of LEAGUE_ENDPOINTS) {
+            try {
+              const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/summary?event=${matchId}`)
+              if (res.ok) {
+                const data = await res.json()
+                if (data.header?.competitions?.[0]) {
+                  matchData = data
+                  break
+                }
+              }
+            } catch {
+              continue
+            }
+          }
+        }
+        
+        if (matchData && matchData.header) {
+          const data = matchData
           const competition = data.header?.competitions?.[0]
           const homeTeam = competition?.competitors?.find((c: any) => c.homeAway === 'home')
           const awayTeam = competition?.competitors?.find((c: any) => c.homeAway === 'away')
@@ -70,14 +104,13 @@ export default function MatchDetailPage() {
             events.push({
               type: 'goal',
               minute: parseInt(play.clock?.displayValue) || 0,
-              player: play.scoringPlay?.scorer?.athlete?.displayName || 'Unknown',
+              player: play.scoringPlay?.scorer?.athlete?.displayName || play.text || 'Unknown',
               team: play.homeAway === 'home' ? 'home' : 'away',
               relatedPlayer: play.scoringPlay?.assists?.[0]?.athlete?.displayName,
             })
           }
           
           // Extract stats
-          const statsObj = data.boxscore?.teams?.[0]?.statistics || []
           const getStatValue = (name: string, teamIndex: number) => {
             const teamStats = data.boxscore?.teams?.[teamIndex]?.statistics || []
             const stat = teamStats.find((s: any) => s.name?.toLowerCase() === name.toLowerCase())
@@ -127,7 +160,7 @@ export default function MatchDetailPage() {
     if (matchId) {
       fetchMatchDetails()
     }
-  }, [matchId])
+  }, [matchId, leagueId])
 
   const formatDate = (dateStr: string) => {
     try {
@@ -147,7 +180,7 @@ export default function MatchDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--background)' }}>
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500" />
       </div>
     )
@@ -155,9 +188,9 @@ export default function MatchDetailPage() {
 
   if (!match) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--background)' }}>
         <div className="text-center">
-          <p className="text-slate-400 mb-4">Match not found</p>
+          <p className="mb-4" style={{ color: 'var(--text-secondary)' }}>Match not found</p>
           <Link href="/matches" className="text-indigo-400 hover:text-indigo-300">
             ← Back to matches
           </Link>
@@ -169,13 +202,14 @@ export default function MatchDetailPage() {
   const isLive = match.status.includes('IN_PROGRESS') || match.status.includes('HALF')
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--background)' }}>
       {/* Header */}
-      <div className="bg-slate-900/80 border-b border-slate-800">
+      <div style={{ backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)' }}>
         <div className="max-w-4xl mx-auto px-4 py-4">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-slate-400 hover:text-white mb-4 transition-colors"
+            className="flex items-center gap-2 hover:opacity-80 mb-4 transition-colors"
+            style={{ color: 'var(--text-secondary)' }}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -185,11 +219,11 @@ export default function MatchDetailPage() {
           
           {/* Match Header */}
           <div className="text-center">
-            <p className="text-slate-400 text-sm mb-4">{match.league}</p>
+            <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>{match.league}</p>
             
             <div className="flex items-center justify-center gap-8">
               <div className="text-center">
-                <p className="text-xl font-bold text-white mb-2">{match.home_team}</p>
+                <p className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>{match.home_team}</p>
               </div>
               
               <div className="text-center px-6">
@@ -199,22 +233,22 @@ export default function MatchDetailPage() {
                     <span className="text-red-400 text-sm font-bold">{match.minute}&apos;</span>
                   </div>
                 )}
-                <div className="text-4xl font-bold text-white">
+                <div className="text-4xl font-bold" style={{ color: 'var(--text-primary)' }}>
                   {match.home_score} - {match.away_score}
                 </div>
                 {!isLive && match.status.includes('FINAL') && (
-                  <p className="text-slate-400 text-sm mt-2">Full Time</p>
+                  <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>Full Time</p>
                 )}
               </div>
               
               <div className="text-center">
-                <p className="text-xl font-bold text-white mb-2">{match.away_team}</p>
+                <p className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>{match.away_team}</p>
               </div>
             </div>
             
-            <p className="text-slate-500 text-sm mt-4">{formatDate(match.date)}</p>
+            <p className="text-sm mt-4" style={{ color: 'var(--text-tertiary)' }}>{formatDate(match.date)}</p>
             {match.venue && (
-              <p className="text-slate-500 text-sm">{match.venue}</p>
+              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{match.venue}</p>
             )}
           </div>
         </div>

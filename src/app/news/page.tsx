@@ -51,17 +51,17 @@ export default function NewsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+      <div className="min-h-screen" style={{ backgroundColor: 'var(--background)' }}>
         <div className="max-w-6xl mx-auto px-4 py-12">
-          <h1 className="text-3xl font-bold text-white mb-8">Soccer News</h1>
+          <h1 className="text-3xl font-bold mb-8" style={{ color: 'var(--text-primary)' }}>Soccer News</h1>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="animate-pulse bg-slate-800/50 rounded-2xl overflow-hidden">
-                <div className="h-48 bg-slate-700" />
+              <div key={i} className="animate-pulse rounded-2xl overflow-hidden fm-card">
+                <div className="h-48" style={{ backgroundColor: 'var(--border-color)' }} />
                 <div className="p-5">
-                  <div className="h-4 bg-slate-700 rounded w-3/4 mb-3" />
-                  <div className="h-3 bg-slate-700 rounded w-full mb-2" />
-                  <div className="h-3 bg-slate-700 rounded w-2/3" />
+                  <div className="h-4 rounded w-3/4 mb-3" style={{ backgroundColor: 'var(--border-color)' }} />
+                  <div className="h-3 rounded w-full mb-2" style={{ backgroundColor: 'var(--border-color)' }} />
+                  <div className="h-3 rounded w-2/3" style={{ backgroundColor: 'var(--border-color)' }} />
                 </div>
               </div>
             ))}
@@ -73,9 +73,9 @@ export default function NewsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--background)' }}>
         <div className="text-center">
-          <p className="text-red-400 mb-4">{error}</p>
+          <p className="mb-4" style={{ color: 'var(--danger)' }}>{error}</p>
           <button
             onClick={() => window.location.reload()}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
@@ -88,12 +88,12 @@ export default function NewsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--background)' }}>
       <div className="max-w-6xl mx-auto px-4 py-12">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Soccer News</h1>
-          <p className="text-slate-400">Latest updates from around the football world</p>
+          <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Soccer News</h1>
+          <p style={{ color: 'var(--text-secondary)' }}>Latest updates from around the football world</p>
         </div>
 
         {/* Featured Article */}
@@ -103,7 +103,7 @@ export default function NewsPage() {
               href={articles[0].links?.web?.href || '#'}
               target="_blank"
               rel="noopener noreferrer"
-              className="group block bg-gradient-to-br from-slate-800/80 to-slate-900/80 rounded-3xl overflow-hidden border border-slate-700/50 hover:border-indigo-500/50 transition-all"
+              className="group block rounded-3xl overflow-hidden border transition-all hover:border-indigo-500/50 fm-card"
             >
               <div className="grid grid-cols-1 lg:grid-cols-2">
                 <div className="aspect-video lg:aspect-auto relative">
@@ -114,7 +114,7 @@ export default function NewsPage() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full bg-slate-700 flex items-center justify-center">
+                    <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: 'var(--border-color)' }}>
                       <span className="text-6xl">⚽</span>
                     </div>
                   )}
@@ -125,15 +125,18 @@ export default function NewsPage() {
                   </div>
                 </div>
                 <div className="p-8 flex flex-col justify-center">
-                  <h2 className="text-2xl font-bold text-white mb-4 group-hover:text-indigo-300 transition-colors">
+                  <h2 className="text-2xl font-bold mb-4 group-hover:text-indigo-400 transition-colors" style={{ color: 'var(--text-primary)' }}>
                     {articles[0].headline}
                   </h2>
-                  <p className="text-slate-300 mb-4 line-clamp-3">
+                  <p className="mb-4 line-clamp-3" style={{ color: 'var(--text-secondary)' }}>
                     {articles[0].description}
                   </p>
-                  <p className="text-slate-500 text-sm">
-                    {formatDate(articles[0].published)}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
+                      {formatDate(articles[0].published)}
+                    </p>
+                    <span className="text-indigo-400 text-sm">→ Read full article</span>
+                  </div>
                 </div>
               </div>
             </a>
@@ -148,7 +151,7 @@ export default function NewsPage() {
               href={article.links?.web?.href || '#'}
               target="_blank"
               rel="noopener noreferrer"
-              className="group bg-slate-800/50 rounded-2xl overflow-hidden border border-slate-700/50 hover:border-indigo-500/50 transition-all hover:shadow-lg hover:shadow-indigo-500/10"
+              className="group rounded-2xl overflow-hidden border transition-all hover:shadow-lg hover:shadow-indigo-500/10 fm-card"
             >
               <div className="aspect-video relative">
                 {article.images?.[0]?.url ? (
@@ -158,21 +161,24 @@ export default function NewsPage() {
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 ) : (
-                  <div className="w-full h-full bg-slate-700 flex items-center justify-center">
+                  <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: 'var(--border-color)' }}>
                     <span className="text-4xl">⚽</span>
                   </div>
                 )}
               </div>
               <div className="p-5">
-                <h3 className="text-lg font-semibold text-white mb-2 line-clamp-2 group-hover:text-indigo-300 transition-colors">
+                <h3 className="text-lg font-semibold mb-2 line-clamp-2 group-hover:text-indigo-400 transition-colors" style={{ color: 'var(--text-primary)' }}>
                   {article.headline}
                 </h3>
-                <p className="text-slate-400 text-sm mb-3 line-clamp-2">
+                <p className="text-sm mb-3 line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
                   {article.description}
                 </p>
-                <p className="text-slate-500 text-xs">
-                  {formatDate(article.published)}
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                    {formatDate(article.published)}
+                  </p>
+                  <span className="text-indigo-400 text-xs">Read more →</span>
+                </div>
               </div>
             </a>
           ))}
@@ -181,8 +187,8 @@ export default function NewsPage() {
         {articles.length === 0 && (
           <div className="text-center py-20">
             <span className="text-6xl mb-4 block">📰</span>
-            <p className="text-slate-400 text-lg">No news articles available</p>
-            <p className="text-slate-500 text-sm mt-2">Check back later for updates</p>
+            <p className="text-lg" style={{ color: 'var(--text-secondary)' }}>No news articles available</p>
+            <p className="text-sm mt-2" style={{ color: 'var(--text-tertiary)' }}>Check back later for updates</p>
           </div>
         )}
       </div>
