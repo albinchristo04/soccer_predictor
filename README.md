@@ -2,9 +2,18 @@
 
 A modern soccer match prediction and live scores application powered by FotMob and ESPN data. Features real-time match updates, AI-powered predictions, comprehensive league standings, user authentication, and league standings simulation.
 
+**📱 Now Available as a Progressive Web App (PWA)** - Install on Chrome for the best experience!
+
 ---
 
 ## ✨ Key Features
+
+### 📱 Progressive Web App (PWA)
+- **Installable:** Add to your home screen on desktop and mobile
+- **Offline Support:** Access previously viewed content without internet
+- **Fast Performance:** Service worker caching for instant loads
+- **Native Feel:** Runs in standalone window without browser chrome
+- **Background Sync:** Stay updated with latest scores even offline
 
 ### 📺 Live Scores & Matches
 - **Real-time Updates:** Live match scores from all major leagues
@@ -151,6 +160,47 @@ The app will be available at:
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
+
+### Production Build
+
+```bash
+# Build for production
+npm run build
+
+# Start production server
+npm start
+```
+
+### Testing
+
+```bash
+# Run frontend tests
+npm test
+
+# Run frontend tests with coverage
+npm run test:coverage
+
+# Run backend tests
+source .venv/bin/activate
+pytest backend/tests/
+
+# Run backend tests with coverage
+pytest backend/tests/ --cov=backend
+```
+
+### PWA Installation
+
+Once deployed, the app can be installed as a Progressive Web App:
+
+**Desktop (Chrome/Edge):**
+1. Visit the website
+2. Click the install icon (⊕) in the address bar
+3. Click "Install" in the popup
+
+**Mobile (Chrome/Safari):**
+1. Visit the website
+2. Open browser menu
+3. Select "Add to Home Screen" or "Install App"
 
 ---
 
