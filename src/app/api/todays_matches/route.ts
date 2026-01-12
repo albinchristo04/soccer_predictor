@@ -1,18 +1,7 @@
 import { NextResponse } from 'next/server'
 
-// FotMob API base URL and league IDs
+// FotMob API base URL
 const FOTMOB_BASE_URL = 'https://www.fotmob.com/api'
-
-const LEAGUE_IDS: Record<string, number> = {
-  'Premier League': 47,
-  'La Liga': 87,
-  'Bundesliga': 54,
-  'Serie A': 55,
-  'Ligue 1': 53,
-  'MLS': 130,
-  'Champions League': 42,
-  'Europa League': 73,
-}
 
 interface Match {
   home_team: string

@@ -169,14 +169,14 @@ const teamBaseElo: Record<string, number> = {
 
 /**
  * Team form modifiers - simulated recent form scores.
- * Form score ranges from -20 (poor form) to +20 (excellent form).
+ * Form score ranges from -15 (poor form) to +15 (excellent form).
  * This is used to adjust predictions based on recent results.
  */
 function getTeamFormModifier(teamName: string): number {
   // Simulate form based on team name hash for consistency
   const hash = teamName.split('').reduce((a, b) => {
     a = ((a << 5) - a) + b.charCodeAt(0)
-    return a & a
+    return a & 0xFFFFFFFF
   }, 0)
   // Map to -15 to +15 range based on hash
   return ((Math.abs(hash) % 31) - 15)
