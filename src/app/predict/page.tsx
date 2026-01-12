@@ -119,20 +119,20 @@ function TeamSearchInput({
 
   return (
     <div className="relative">
-      <label className="block text-sm font-medium text-slate-400 mb-2">
+      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
         {label}
       </label>
       
       {value ? (
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-slate-800 to-slate-800/50 border border-slate-700">
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)]">
           <span className="text-2xl">{icon}</span>
           <div className="flex-1">
-            <p className="font-semibold text-white">{value.name}</p>
-            <p className="text-xs text-slate-400">{value.league}</p>
+            <p className="font-semibold text-[var(--text-primary)]">{value.name}</p>
+            <p className="text-xs text-[var(--text-secondary)]">{value.league}</p>
           </div>
           <button
             onClick={handleClear}
-            className="p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            className="p-2 rounded-lg hover:bg-[var(--card-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -154,7 +154,7 @@ function TeamSearchInput({
             }}
             onFocus={() => setIsOpen(true)}
             placeholder={placeholder}
-            className="w-full pl-14 pr-4 py-4 rounded-xl bg-slate-800/80 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full pl-14 pr-4 py-4 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
           />
           {loading && (
             <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -168,18 +168,18 @@ function TeamSearchInput({
       {isOpen && results.length > 0 && !value && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 w-full mt-2 max-h-64 overflow-y-auto rounded-xl bg-slate-800 border border-slate-700 shadow-xl"
+          className="absolute z-50 w-full mt-2 max-h-64 overflow-y-auto rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-xl"
         >
           {results.map((team, idx) => (
             <button
               key={`${team.name}-${team.league}-${idx}`}
               onClick={() => handleSelect(team)}
-              className="w-full px-4 py-3 flex items-center gap-3 hover:bg-slate-700 transition-colors text-left"
+              className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[var(--card-hover)] transition-colors text-left"
             >
               <span className="text-lg">⚽</span>
               <div>
-                <p className="text-white font-medium">{team.name}</p>
-                <p className="text-xs text-slate-400">{team.league}</p>
+                <p className="text-[var(--text-primary)] font-medium">{team.name}</p>
+                <p className="text-xs text-[var(--text-secondary)]">{team.league}</p>
               </div>
             </button>
           ))}
@@ -188,8 +188,8 @@ function TeamSearchInput({
 
       {/* No results message */}
       {isOpen && query.length >= 2 && results.length === 0 && !loading && !value && (
-        <div className="absolute z-50 w-full mt-2 p-4 rounded-xl bg-slate-800 border border-slate-700 text-center">
-          <p className="text-slate-400">No teams found for &quot;{query}&quot;</p>
+        <div className="absolute z-50 w-full mt-2 p-4 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-center">
+          <p className="text-[var(--text-secondary)]">No teams found for &quot;{query}&quot;</p>
         </div>
       )}
     </div>
@@ -246,23 +246,23 @@ function PredictPageContent() {
   const canPredict = homeTeam && awayTeam && homeTeam.name !== awayTeam.name
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-screen bg-[var(--background)]">
       {/* Header */}
       <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 via-purple-600/5 to-slate-900" />
+        <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 via-purple-600/5 to-transparent dark:to-slate-900" />
         <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-5" />
         
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 mb-6">
               <span className="text-lg">🤖</span>
-              <span className="text-sm font-medium text-indigo-300">AI-Powered Match Predictor</span>
+              <span className="text-sm font-medium text-indigo-600 dark:text-indigo-300">AI-Powered Match Predictor</span>
             </div>
             
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+            <h1 className="text-4xl md:text-5xl font-bold text-[var(--text-primary)] mb-4">
               Match Predictor
             </h1>
-            <p className="text-xl text-slate-400 max-w-2xl mx-auto">
+            <p className="text-xl text-[var(--text-secondary)] max-w-2xl mx-auto">
               Enter any two teams from our database to get AI-powered match predictions based on ELO ratings, form, and historical data.
             </p>
           </div>
@@ -272,7 +272,7 @@ function PredictPageContent() {
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Team Selection */}
-        <div className="bg-slate-900/60 backdrop-blur-xl rounded-3xl border border-slate-800/50 p-6 md:p-8 mb-8">
+        <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-3xl border border-[var(--border-color)] p-6 md:p-8 mb-8">
           <div className="relative grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Home Team */}
             <div>
@@ -287,14 +287,14 @@ function PredictPageContent() {
 
             {/* VS Divider */}
             <div className="hidden md:flex items-center justify-center absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-              <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
-                <span className="text-slate-400 font-bold text-sm">VS</span>
+              <div className="w-12 h-12 rounded-full bg-[var(--background-secondary)] border border-[var(--border-color)] flex items-center justify-center">
+                <span className="text-[var(--text-secondary)] font-bold text-sm">VS</span>
               </div>
             </div>
             
             <div className="md:hidden flex justify-center">
-              <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
-                <span className="text-slate-400 font-bold text-sm">VS</span>
+              <div className="w-12 h-12 rounded-full bg-[var(--background-secondary)] border border-[var(--border-color)] flex items-center justify-center">
+                <span className="text-[var(--text-secondary)] font-bold text-sm">VS</span>
               </div>
             </div>
 
@@ -315,7 +315,7 @@ function PredictPageContent() {
             <button
               onClick={handlePredict}
               disabled={loading || !canPredict}
-              className="w-full py-4 px-6 rounded-xl font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed transition-all duration-300 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 flex items-center justify-center gap-3"
+              className="w-full py-4 px-6 rounded-xl font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-gray-400 disabled:to-gray-500 dark:disabled:from-slate-700 dark:disabled:to-slate-700 disabled:text-gray-200 dark:disabled:text-slate-400 disabled:cursor-not-allowed transition-all duration-300 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 flex items-center justify-center gap-3"
             >
               {loading ? (
                 <>
@@ -333,7 +333,7 @@ function PredictPageContent() {
 
           {/* Cross-league indicator */}
           {homeTeam && awayTeam && homeTeam.league !== awayTeam.league && (
-            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-amber-400">
+            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-amber-600 dark:text-amber-400">
               <span>🌍</span>
               <span>Cross-league prediction: {homeTeam.league} vs {awayTeam.league}</span>
             </div>
@@ -344,7 +344,7 @@ function PredictPageContent() {
         {result && !result.error && result.predictions && (
           <div className="space-y-6 animate-fade-in">
             {/* Main Prediction Card */}
-            <div className="bg-slate-900/60 backdrop-blur-xl rounded-3xl border border-slate-800/50 overflow-hidden">
+            <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-3xl border border-[var(--border-color)] overflow-hidden">
               {/* Winner Banner */}
               {(() => {
                 const homeWin = result.predictions.home_win || 0
@@ -365,31 +365,31 @@ function PredictPageContent() {
                       winner.type === 'away' ? 'bg-gradient-to-l from-emerald-600/20 to-transparent' :
                       'bg-gradient-to-r from-amber-500/20 via-transparent to-amber-500/20'
                     }`}>
-                      <p className="text-sm text-slate-400 uppercase tracking-wider mb-2">
+                      <p className="text-sm text-[var(--text-secondary)] uppercase tracking-wider mb-2">
                         Predicted Winner
                       </p>
-                      <h3 className="text-3xl md:text-4xl font-bold text-white mb-2">{winner.team}</h3>
-                      <p className="text-indigo-400 font-semibold text-lg">{winner.prob.toFixed(1)}% probability</p>
+                      <h3 className="text-3xl md:text-4xl font-bold text-[var(--text-primary)] mb-2">{winner.team}</h3>
+                      <p className="text-indigo-600 dark:text-indigo-400 font-semibold text-lg">{winner.prob.toFixed(1)}% probability</p>
                     </div>
 
                     {/* Score Prediction */}
-                    <div className="p-6 border-b border-slate-800">
-                      <p className="text-center text-sm text-slate-400 uppercase tracking-wider mb-4">
+                    <div className="p-6 border-b border-[var(--border-color)]">
+                      <p className="text-center text-sm text-[var(--text-secondary)] uppercase tracking-wider mb-4">
                         Expected Scoreline
                       </p>
                       <div className="flex items-center justify-center gap-8">
                         <div className="text-center flex-1">
-                          <p className="text-sm text-slate-400 mb-2">{result.home_team}</p>
-                          <p className="text-sm text-slate-500 mb-1">{result.home_league}</p>
-                          <div className="text-5xl font-bold text-white">
+                          <p className="text-sm text-[var(--text-secondary)] mb-2">{result.home_team}</p>
+                          <p className="text-sm text-[var(--text-tertiary)] mb-1">{result.home_league}</p>
+                          <div className="text-5xl font-bold text-[var(--text-primary)]">
                             {result.predicted_home_goals?.toFixed(0) || '-'}
                           </div>
                         </div>
-                        <div className="text-2xl text-slate-600">-</div>
+                        <div className="text-2xl text-[var(--text-tertiary)]">-</div>
                         <div className="text-center flex-1">
-                          <p className="text-sm text-slate-400 mb-2">{result.away_team}</p>
-                          <p className="text-sm text-slate-500 mb-1">{result.away_league}</p>
-                          <div className="text-5xl font-bold text-white">
+                          <p className="text-sm text-[var(--text-secondary)] mb-2">{result.away_team}</p>
+                          <p className="text-sm text-[var(--text-tertiary)] mb-1">{result.away_league}</p>
+                          <div className="text-5xl font-bold text-[var(--text-primary)]">
                             {result.predicted_away_goals?.toFixed(0) || '-'}
                           </div>
                         </div>
@@ -398,16 +398,16 @@ function PredictPageContent() {
 
                     {/* Probability Breakdown */}
                     <div className="p-6">
-                      <h4 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
+                      <h4 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-4">
                         Win Probability
                       </h4>
                       <div className="space-y-4">
                         <div>
                           <div className="flex justify-between mb-2">
-                            <span className="text-white font-medium">{result.home_team}</span>
-                            <span className="font-bold text-emerald-400">{hWin.toFixed(1)}%</span>
+                            <span className="text-[var(--text-primary)] font-medium">{result.home_team}</span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400">{hWin.toFixed(1)}%</span>
                           </div>
-                          <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-3 bg-gray-200 dark:bg-slate-800 rounded-full overflow-hidden">
                             <div 
                               className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-500"
                               style={{ width: `${hWin}%` }}
@@ -416,10 +416,10 @@ function PredictPageContent() {
                         </div>
                         <div>
                           <div className="flex justify-between mb-2">
-                            <span className="text-white font-medium">Draw</span>
-                            <span className="font-bold text-amber-400">{d.toFixed(1)}%</span>
+                            <span className="text-[var(--text-primary)] font-medium">Draw</span>
+                            <span className="font-bold text-amber-600 dark:text-amber-400">{d.toFixed(1)}%</span>
                           </div>
-                          <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-3 bg-gray-200 dark:bg-slate-800 rounded-full overflow-hidden">
                             <div 
                               className="h-full bg-gradient-to-r from-amber-600 to-amber-400 rounded-full transition-all duration-500"
                               style={{ width: `${d}%` }}
@@ -428,10 +428,10 @@ function PredictPageContent() {
                         </div>
                         <div>
                           <div className="flex justify-between mb-2">
-                            <span className="text-white font-medium">{result.away_team}</span>
-                            <span className="font-bold text-rose-400">{aWin.toFixed(1)}%</span>
+                            <span className="text-[var(--text-primary)] font-medium">{result.away_team}</span>
+                            <span className="font-bold text-rose-600 dark:text-rose-400">{aWin.toFixed(1)}%</span>
                           </div>
-                          <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-3 bg-gray-200 dark:bg-slate-800 rounded-full overflow-hidden">
                             <div 
                               className="h-full bg-gradient-to-r from-rose-600 to-rose-400 rounded-full transition-all duration-500"
                               style={{ width: `${aWin}%` }}
@@ -447,29 +447,29 @@ function PredictPageContent() {
 
             {/* Ratings & Analysis Card */}
             {result.ratings && (
-              <div className="bg-slate-900/60 backdrop-blur-xl rounded-3xl border border-slate-800/50 p-6">
-                <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-3xl border border-[var(--border-color)] p-6">
+                <h4 className="text-lg font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
                   <span>📊</span>
                   Team Ratings Comparison
                 </h4>
                 
                 <div className="grid grid-cols-3 gap-4 mb-6">
-                  <div className="text-center p-4 rounded-xl bg-slate-800/50">
-                    <p className="text-sm text-slate-400 mb-1">{result.home_team}</p>
-                    <p className="text-2xl font-bold text-white">{result.ratings.home_elo}</p>
-                    <p className="text-xs text-slate-500">ELO Rating</p>
+                  <div className="text-center p-4 rounded-xl bg-[var(--background-secondary)]">
+                    <p className="text-sm text-[var(--text-secondary)] mb-1">{result.home_team}</p>
+                    <p className="text-2xl font-bold text-[var(--text-primary)]">{result.ratings.home_elo}</p>
+                    <p className="text-xs text-[var(--text-tertiary)]">ELO Rating</p>
                   </div>
-                  <div className="text-center p-4 rounded-xl bg-slate-800/50">
-                    <p className="text-sm text-slate-400 mb-1">Difference</p>
-                    <p className={`text-2xl font-bold ${result.ratings.elo_difference >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  <div className="text-center p-4 rounded-xl bg-[var(--background-secondary)]">
+                    <p className="text-sm text-[var(--text-secondary)] mb-1">Difference</p>
+                    <p className={`text-2xl font-bold ${result.ratings.elo_difference >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                       {result.ratings.elo_difference >= 0 ? '+' : ''}{result.ratings.elo_difference}
                     </p>
-                    <p className="text-xs text-slate-500">Home Advantage</p>
+                    <p className="text-xs text-[var(--text-tertiary)]">Home Advantage</p>
                   </div>
-                  <div className="text-center p-4 rounded-xl bg-slate-800/50">
-                    <p className="text-sm text-slate-400 mb-1">{result.away_team}</p>
-                    <p className="text-2xl font-bold text-white">{result.ratings.away_elo}</p>
-                    <p className="text-xs text-slate-500">ELO Rating</p>
+                  <div className="text-center p-4 rounded-xl bg-[var(--background-secondary)]">
+                    <p className="text-sm text-[var(--text-secondary)] mb-1">{result.away_team}</p>
+                    <p className="text-2xl font-bold text-[var(--text-primary)]">{result.ratings.away_elo}</p>
+                    <p className="text-xs text-[var(--text-tertiary)]">ELO Rating</p>
                   </div>
                 </div>
 
@@ -477,10 +477,10 @@ function PredictPageContent() {
                 {result.confidence && (
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-slate-400">Model Confidence</span>
-                      <span className="font-semibold text-indigo-400">{result.confidence.toFixed(0)}%</span>
+                      <span className="text-sm text-[var(--text-secondary)]">Model Confidence</span>
+                      <span className="font-semibold text-indigo-600 dark:text-indigo-400">{result.confidence.toFixed(0)}%</span>
                     </div>
-                    <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-2 bg-gray-200 dark:bg-slate-800 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-full"
                         style={{ width: `${result.confidence}%` }}
@@ -492,10 +492,10 @@ function PredictPageContent() {
                 {/* Factors Considered */}
                 {result.analysis?.factors_considered && (
                   <div>
-                    <p className="text-sm text-slate-400 mb-3">Factors Considered:</p>
+                    <p className="text-sm text-[var(--text-secondary)] mb-3">Factors Considered:</p>
                     <div className="flex flex-wrap gap-2">
                       {result.analysis.factors_considered.map((factor, idx) => (
-                        <span key={idx} className="px-3 py-1 rounded-full bg-slate-800 text-xs text-slate-300">
+                        <span key={idx} className="px-3 py-1 rounded-full bg-[var(--background-secondary)] text-xs text-[var(--text-secondary)]">
                           {factor}
                         </span>
                       ))}
@@ -505,9 +505,9 @@ function PredictPageContent() {
 
                 {/* Analysis Note */}
                 {result.analysis?.note && (
-                  <div className="mt-4 p-4 rounded-xl bg-slate-800/50 border border-slate-700">
-                    <p className="text-sm text-slate-300">
-                      <span className="text-indigo-400">💡 Note:</span> {result.analysis.note}
+                  <div className="mt-4 p-4 rounded-xl bg-[var(--background-secondary)] border border-[var(--border-color)]">
+                    <p className="text-sm text-[var(--text-secondary)]">
+                      <span className="text-indigo-600 dark:text-indigo-400">💡 Note:</span> {result.analysis.note}
                     </p>
                   </div>
                 )}
@@ -516,7 +516,7 @@ function PredictPageContent() {
 
             {/* Disclaimer */}
             <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-              <p className="text-sm text-amber-200/80 text-center">
+              <p className="text-sm text-amber-800 dark:text-amber-200/80 text-center">
                 <span className="font-semibold">⚠️ Disclaimer:</span> Predictions are based on statistical models and historical data. 
                 Football is unpredictable - use for entertainment only, not betting.
               </p>
@@ -526,12 +526,12 @@ function PredictPageContent() {
 
         {/* Error State */}
         {result?.error && (
-          <div className="bg-slate-900/60 backdrop-blur-xl rounded-3xl border border-rose-500/30 p-6">
+          <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-3xl border border-rose-500/30 p-6">
             <div className="flex items-center gap-3">
               <span className="text-2xl">❌</span>
               <div>
-                <p className="font-semibold text-white">Prediction Failed</p>
-                <p className="text-sm text-slate-400">{result.error}</p>
+                <p className="font-semibold text-[var(--text-primary)]">Prediction Failed</p>
+                <p className="text-sm text-[var(--text-secondary)]">{result.error}</p>
               </div>
             </div>
           </div>
@@ -540,32 +540,32 @@ function PredictPageContent() {
         {/* How It Works Section */}
         {!result && (
           <div className="mt-12">
-            <h2 className="text-2xl font-bold text-white text-center mb-8">How It Works</h2>
+            <h2 className="text-2xl font-bold text-[var(--text-primary)] text-center mb-8">How It Works</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl border border-slate-800/50 p-6 text-center">
+              <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-2xl border border-[var(--border-color)] p-6 text-center">
                 <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl">📈</span>
                 </div>
-                <h3 className="font-semibold text-white mb-2">ELO Ratings</h3>
-                <p className="text-sm text-slate-400">
+                <h3 className="font-semibold text-[var(--text-primary)] mb-2">ELO Ratings</h3>
+                <p className="text-sm text-[var(--text-secondary)]">
                   Teams are ranked using an advanced ELO system updated after every match
                 </p>
               </div>
-              <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl border border-slate-800/50 p-6 text-center">
+              <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-2xl border border-[var(--border-color)] p-6 text-center">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl">🏠</span>
                 </div>
-                <h3 className="font-semibold text-white mb-2">Home Advantage</h3>
-                <p className="text-sm text-slate-400">
+                <h3 className="font-semibold text-[var(--text-primary)] mb-2">Home Advantage</h3>
+                <p className="text-sm text-[var(--text-secondary)]">
                   Home teams receive a +65 ELO point boost to reflect historical home advantage
                 </p>
               </div>
-              <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl border border-slate-800/50 p-6 text-center">
+              <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-2xl border border-[var(--border-color)] p-6 text-center">
                 <div className="w-12 h-12 rounded-2xl bg-amber-500/20 flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl">🌍</span>
                 </div>
-                <h3 className="font-semibold text-white mb-2">Cross-League</h3>
-                <p className="text-sm text-slate-400">
+                <h3 className="font-semibold text-[var(--text-primary)] mb-2">Cross-League</h3>
+                <p className="text-sm text-[var(--text-secondary)]">
                   League strength coefficients adjust ratings for cross-league comparisons
                 </p>
               </div>
@@ -580,7 +580,7 @@ function PredictPageContent() {
 export default function PredictPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </div>
     }>
