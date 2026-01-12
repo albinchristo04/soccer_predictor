@@ -83,9 +83,9 @@ export interface MatchesResponse {
 }
 
 export const matchesApi = {
-  getToday: () => apiRequest<MatchesResponse>('/matches/today'),
+  getToday: () => fetch('/api/todays_matches').then(r => r.json()),
   getByDate: (date: string) => apiRequest<MatchesResponse>(`/matches/date/${date}`),
-  getLive: () => apiRequest<{ count: number; matches: Match[] }>('/matches/live'),
+  getLive: () => fetch('/api/live_scores').then(r => r.json()).then(data => ({ count: data.length || 0, matches: data || [] })),
   getUpcoming: (days = 7) => apiRequest<any>(`/matches/upcoming?days=${days}`),
   getDetails: (matchId: number) => apiRequest<any>(`/matches/${matchId}`),
   getEvents: (matchId: number) => apiRequest<any>(`/matches/${matchId}/events`),
