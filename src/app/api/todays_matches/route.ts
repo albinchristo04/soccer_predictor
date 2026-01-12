@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server'
 
-// FotMob API base URL
-const FOTMOB_BASE_URL = 'https://www.fotmob.com/api'
-
 interface Match {
   home_team: string
   away_team: string
@@ -12,6 +9,76 @@ interface Match {
   status: string
   league: string
   match_id: string | number
+  venue?: string
+}
+
+// ESPN league IDs for major leagues
+const ESPN_LEAGUES = [
+  { id: 'eng.1', name: 'Premier League' },
+  { id: 'esp.1', name: 'La Liga' },
+  { id: 'ita.1', name: 'Serie A' },
+  { id: 'ger.1', name: 'Bundesliga' },
+  { id: 'fra.1', name: 'Ligue 1' },
+  { id: 'usa.1', name: 'MLS' },
+  { id: 'uefa.champions', name: 'Champions League' },
+  { id: 'uefa.europa', name: 'Europa League' },
+]
+
+async function fetchESPNMatches(): Promise<Match[]> {
+  const allMatches: Match[] = []
+  
+  for (const league of ESPN_LEAGUES) {
+    try {
+      const response = await fetch(
+        `https://site.api.espn.com/apis/site/v2/sports/soccer/${league.id}/scoreboard`,
+        {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          },
+          next: { revalidate: 60 },
+        }
+      )
+      
+      if (!response.ok) continue
+      
+      const data = await response.json()
+      
+      for (const event of data.events || []) {
+        const competition = event.competitions?.[0]
+        if (!competition) continue
+        
+        const homeTeam = competition.competitors?.find((c: any) => c.homeAway === 'home')
+        const awayTeam = competition.competitors?.find((c: any) => c.homeAway === 'away')
+        
+        if (!homeTeam || !awayTeam) continue
+        
+        const statusType = competition.status?.type?.name || 'STATUS_SCHEDULED'
+        let status = 'upcoming'
+        if (statusType === 'STATUS_FINAL' || statusType === 'STATUS_FULL_TIME') {
+          status = 'completed'
+        } else if (statusType === 'STATUS_IN_PROGRESS' || statusType === 'STATUS_HALFTIME' || statusType === 'STATUS_FIRST_HALF' || statusType === 'STATUS_SECOND_HALF') {
+          status = 'live'
+        }
+        
+        allMatches.push({
+          home_team: homeTeam.team?.displayName || homeTeam.team?.name || '',
+          away_team: awayTeam.team?.displayName || awayTeam.team?.name || '',
+          home_score: status !== 'upcoming' ? parseInt(homeTeam.score || '0') : null,
+          away_score: status !== 'upcoming' ? parseInt(awayTeam.score || '0') : null,
+          time: event.date || '',
+          status,
+          league: league.name,
+          match_id: event.id,
+          venue: competition.venue?.fullName,
+        })
+      }
+    } catch (error) {
+      console.error(`Error fetching ${league.name} from ESPN:`, error)
+    }
+  }
+  
+  return allMatches
 }
 
 async function fetchFotMobMatches(): Promise<Match[]> {
@@ -19,13 +86,14 @@ async function fetchFotMobMatches(): Promise<Match[]> {
   const today = new Date().toISOString().split('T')[0].replace(/-/g, '')
   
   try {
-    // Fetch matches for today from FotMob
-    const response = await fetch(`${FOTMOB_BASE_URL}/matches?date=${today}`, {
+    const response = await fetch(`https://www.fotmob.com/api/matches?date=${today}`, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.fotmob.com/',
       },
-      next: { revalidate: 60 }, // Cache for 1 minute
+      next: { revalidate: 60 },
     })
     
     if (!response.ok) {
@@ -34,7 +102,6 @@ async function fetchFotMobMatches(): Promise<Match[]> {
     
     const data = await response.json()
     
-    // FotMob returns matches grouped by league
     if (data.leagues && Array.isArray(data.leagues)) {
       for (const league of data.leagues) {
         const leagueName = league.name || 'Unknown'
@@ -70,10 +137,45 @@ async function fetchFotMobMatches(): Promise<Match[]> {
   return matches
 }
 
+// Sample data for when APIs are unavailable
+function getSampleMatches(): Match[] {
+  const now = new Date()
+  const today = now.toISOString()
+  
+  return [
+    // Premier League
+    { home_team: 'Liverpool', away_team: 'Manchester City', home_score: null, away_score: null, time: today, status: 'upcoming', league: 'Premier League', match_id: 'sample-1' },
+    { home_team: 'Arsenal', away_team: 'Chelsea', home_score: null, away_score: null, time: today, status: 'upcoming', league: 'Premier League', match_id: 'sample-2' },
+    { home_team: 'Manchester United', away_team: 'Tottenham', home_score: 2, away_score: 1, time: today, status: 'live', league: 'Premier League', match_id: 'sample-3' },
+    // La Liga
+    { home_team: 'Real Madrid', away_team: 'Barcelona', home_score: null, away_score: null, time: today, status: 'upcoming', league: 'La Liga', match_id: 'sample-4' },
+    { home_team: 'Atletico Madrid', away_team: 'Sevilla', home_score: null, away_score: null, time: today, status: 'upcoming', league: 'La Liga', match_id: 'sample-5' },
+    // Serie A
+    { home_team: 'Inter', away_team: 'AC Milan', home_score: null, away_score: null, time: today, status: 'upcoming', league: 'Serie A', match_id: 'sample-6' },
+    { home_team: 'Juventus', away_team: 'Napoli', home_score: 1, away_score: 1, time: today, status: 'live', league: 'Serie A', match_id: 'sample-7' },
+    // Bundesliga
+    { home_team: 'Bayern Munich', away_team: 'Borussia Dortmund', home_score: null, away_score: null, time: today, status: 'upcoming', league: 'Bundesliga', match_id: 'sample-8' },
+    // Ligue 1
+    { home_team: 'Paris Saint-Germain', away_team: 'Marseille', home_score: 3, away_score: 0, time: today, status: 'completed', league: 'Ligue 1', match_id: 'sample-9' },
+    // Champions League
+    { home_team: 'Real Madrid', away_team: 'Manchester City', home_score: null, away_score: null, time: today, status: 'upcoming', league: 'Champions League', match_id: 'sample-10' },
+  ]
+}
+
 export async function GET() {
   try {
-    // Try to fetch from FotMob directly
-    const matches = await fetchFotMobMatches()
+    // Try ESPN first, then FotMob, then use sample data
+    let matches = await fetchESPNMatches()
+    
+    if (matches.length === 0) {
+      matches = await fetchFotMobMatches()
+    }
+    
+    // If both APIs fail, use sample data for demonstration
+    if (matches.length === 0) {
+      console.log('Using sample match data as APIs are unavailable')
+      matches = getSampleMatches()
+    }
     
     // Categorize matches
     const result = {
@@ -81,9 +183,10 @@ export async function GET() {
       upcoming: matches.filter(m => m.status === 'upcoming'),
       completed: matches.filter(m => m.status === 'completed'),
       leagues: [] as { name: string; matches: Match[] }[],
+      source: matches.length > 0 && matches[0].match_id.toString().startsWith('sample') ? 'sample' : 'live'
     }
     
-    // Group by league for the matches page
+    // Group by league
     const leagueMap = new Map<string, Match[]>()
     for (const match of matches) {
       const leagueMatches = leagueMap.get(match.league) || []
@@ -99,12 +202,14 @@ export async function GET() {
     return NextResponse.json(result)
   } catch (error) {
     console.error('Error fetching today\'s matches:', error)
-    // Return empty structure as fallback
+    // Return sample data as fallback
+    const sampleMatches = getSampleMatches()
     return NextResponse.json({
-      live: [],
-      upcoming: [],
-      completed: [],
-      leagues: []
+      live: sampleMatches.filter(m => m.status === 'live'),
+      upcoming: sampleMatches.filter(m => m.status === 'upcoming'),
+      completed: sampleMatches.filter(m => m.status === 'completed'),
+      leagues: [],
+      source: 'sample'
     })
   }
 }
