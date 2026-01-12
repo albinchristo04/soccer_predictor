@@ -146,31 +146,47 @@ async def get_todays_matches():
         data = await client.get_matches_by_date(today)
         
         if not data:
-            return {"leagues": []}
+            # Return structured empty response
+            return {"live": [], "upcoming": [], "completed": []}
         
-        # Transform to legacy format
-        result = []
+        # Categorize matches by status
+        live_matches = []
+        upcoming_matches = []
+        completed_matches = []
+        
         for league in data.get("leagues", []):
             for match in league.get("matches", []):
                 status_data = match.get("status", {})
                 is_finished = status_data.get("finished", False)
                 is_started = status_data.get("started", False)
                 
-                result.append({
+                match_data = {
                     "home_team": match.get("home", {}).get("name", ""),
                     "away_team": match.get("away", {}).get("name", ""),
                     "home_score": match.get("home", {}).get("score") if is_started else None,
                     "away_score": match.get("away", {}).get("score") if is_started else None,
-                    "time": match.get("time", ""),
+                    "time": status_data.get("utcTime", ""),
                     "status": "finished" if is_finished else ("live" if is_started else "upcoming"),
                     "league": league.get("name", ""),
                     "match_id": match.get("id"),
-                })
+                }
+                
+                if is_finished:
+                    completed_matches.append(match_data)
+                elif is_started:
+                    live_matches.append(match_data)
+                else:
+                    upcoming_matches.append(match_data)
         
-        return result
+        return {
+            "live": live_matches,
+            "upcoming": upcoming_matches,
+            "completed": completed_matches
+        }
     except Exception as e:
         logger.error(f"Error fetching today's matches: {e}")
-        return []
+        # Return structured empty response on error
+        return {"live": [], "upcoming": [], "completed": []}
 
 
 @app.get("/api/upcoming_matches/{league}")

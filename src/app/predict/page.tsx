@@ -1,255 +1,232 @@
-  'use client'
+'use client'
 
-import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { leagueNames as leagues, teams } from '@/data/leagues'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 
-type PredictionMode = 'head-to-head' | 'cross-league'
-
-interface TeamStats {
-  matches_played: number
-  wins: number
-  draws: number
-  losses: number
-  goals_scored: number
-  goals_conceded: number
-  win_rate: number
-  avg_goals_scored: number
-  avg_goals_conceded: number
-  home_win_rate: number
-  away_win_rate: number
-  recent_form: string[]
-}
-
-interface HeadToHeadMatch {
-  date: string
-  home_team: string
-  away_team: string
-  home_goals: number
-  away_goals: number
-  result: string
+interface TeamSearchResult {
+  name: string
+  league: string
 }
 
 interface PredictionResult {
+  success?: boolean
   predictions?: {
     home_win?: number
     draw?: number
     away_win?: number
-    team_a_win?: number
-    team_b_win?: number
   }
   home_team?: string
   away_team?: string
-  team_a?: string
-  team_b?: string
-  league_a?: string
-  league_b?: string
+  home_league?: string
+  away_league?: string
+  is_cross_league?: boolean
   predicted_home_goals?: number
   predicted_away_goals?: number
-  predicted_team_a_goals?: number
-  predicted_team_b_goals?: number
   confidence?: number
+  ratings?: {
+    home_elo: number
+    away_elo: number
+    elo_difference: number
+  }
+  analysis?: {
+    predicted_winner: string
+    home_advantage_applied: boolean
+    factors_considered: string[]
+    note: string
+  }
   error?: string
 }
 
-const leagueNameMap: Record<string, string> = {
-  'Premier League': 'premier_league',
-  'La Liga': 'la_liga',
-  'Serie A': 'serie_a',
-  'Bundesliga': 'bundesliga',
-  'Ligue 1': 'ligue_1',
-  'Champions League (UCL)': 'ucl',
-  'Europa League (UEL)': 'uel',
-  'MLS': 'mls',
-  'FIFA World Cup': 'world_cup'
-}
-
-// Stat comparison bar component
-function StatBar({ 
-  label, 
-  valueA, 
-  valueB, 
-  format = 'number',
-  higherIsBetter = true 
-}: { 
+// Team Search Autocomplete Component
+function TeamSearchInput({
+  label,
+  value,
+  onSelect,
+  placeholder,
+  icon
+}: {
   label: string
-  valueA: number
-  valueB: number
-  format?: 'number' | 'percent' | 'decimal'
-  higherIsBetter?: boolean
+  value: { name: string; league: string } | null
+  onSelect: (team: { name: string; league: string } | null) => void
+  placeholder: string
+  icon: string
 }) {
-  // Ensure values are valid numbers, default to 0 if undefined/null/NaN
-  const safeA = typeof valueA === 'number' && !isNaN(valueA) ? valueA : 0
-  const safeB = typeof valueB === 'number' && !isNaN(valueB) ? valueB : 0
-  
-  const maxVal = Math.max(safeA, safeB, 0.01)
-  const percentA = (safeA / maxVal) * 100
-  const percentB = (safeB / maxVal) * 100
-  
-  const formatValue = (val: number) => {
-    const safeVal = typeof val === 'number' && !isNaN(val) ? val : 0
-    if (format === 'percent') return `${(safeVal * 100).toFixed(0)}%`
-    if (format === 'decimal') return safeVal.toFixed(2)
-    return safeVal.toFixed(0)
-  }
-  
-  const aIsWinning = higherIsBetter ? safeA > safeB : safeA < safeB
-  const bIsWinning = higherIsBetter ? safeB > safeA : safeB < safeA
-  const isTie = Math.abs(safeA - safeB) < 0.001
-  
-  return (
-    <div className="py-2">
-      <div className="flex justify-between items-center mb-1">
-        <span className={`font-bold text-sm ${aIsWinning ? 'text-[var(--success)]' : isTie ? 'text-[var(--warning)]' : 'text-[var(--text-secondary)]'}`}>
-          {formatValue(valueA)}
-        </span>
-        <span className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-medium">
-          {label}
-        </span>
-        <span className={`font-bold text-sm ${bIsWinning ? 'text-[var(--success)]' : isTie ? 'text-[var(--warning)]' : 'text-[var(--text-secondary)]'}`}>
-          {formatValue(valueB)}
-        </span>
-      </div>
-      <div className="flex gap-1 h-1.5">
-        <div className="flex-1 bg-[var(--background)] rounded-full overflow-hidden flex justify-end">
-          <div 
-            className={`h-full rounded-full transition-all duration-500 ${aIsWinning ? 'bg-[var(--success)]' : isTie ? 'bg-[var(--warning)]' : 'bg-[var(--text-tertiary)]/30'}`}
-            style={{ width: `${percentA}%` }}
-          />
-        </div>
-        <div className="flex-1 bg-[var(--background)] rounded-full overflow-hidden">
-          <div 
-            className={`h-full rounded-full transition-all duration-500 ${bIsWinning ? 'bg-[var(--success)]' : isTie ? 'bg-[var(--warning)]' : 'bg-[var(--text-tertiary)]/30'}`}
-            style={{ width: `${percentB}%` }}
-          />
-        </div>
-      </div>
-    </div>
-  )
-}
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<TeamSearchResult[]>([])
+  const [isOpen, setIsOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
-function FormDisplay({ form }: { form: string[] }) {
+  // Search teams API
+  const searchTeams = useCallback(async (searchQuery: string) => {
+    if (searchQuery.length < 2) {
+      setResults([])
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/search-teams?q=${encodeURIComponent(searchQuery)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setResults(data.teams || [])
+      }
+    } catch (err) {
+      console.error('Error searching teams:', err)
+      setResults([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (query && !value) {
+        searchTeams(query)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [query, value, searchTeams])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        !inputRef.current?.contains(event.target as Node)
+      ) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleSelect = (team: TeamSearchResult) => {
+    onSelect(team)
+    setQuery('')
+    setResults([])
+    setIsOpen(false)
+  }
+
+  const handleClear = () => {
+    onSelect(null)
+    setQuery('')
+    setResults([])
+  }
+
   return (
-    <div className="flex gap-1 justify-center">
-      {form.slice(0, 5).map((result, idx) => (
-        <span 
-          key={idx}
-          className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold ${
-            result === 'W' ? 'bg-[var(--success)] text-black' :
-            result === 'D' ? 'bg-[var(--warning)] text-black' :
-            'bg-[var(--danger)] text-white'
-          }`}
+    <div className="relative">
+      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+        {label}
+      </label>
+      
+      {value ? (
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)]">
+          <span className="text-2xl">{icon}</span>
+          <div className="flex-1">
+            <p className="font-semibold text-[var(--text-primary)]">{value.name}</p>
+            <p className="text-xs text-[var(--text-secondary)]">{value.league}</p>
+          </div>
+          <button
+            onClick={handleClear}
+            className="p-2 rounded-lg hover:bg-[var(--card-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      ) : (
+        <div className="relative">
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl">
+            {icon}
+          </div>
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setIsOpen(true)
+            }}
+            onFocus={() => setIsOpen(true)}
+            placeholder={placeholder}
+            className="w-full pl-14 pr-4 py-4 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          />
+          {loading && (
+            <div className="absolute right-4 top-1/2 -translate-y-1/2">
+              <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Dropdown Results */}
+      {isOpen && results.length > 0 && !value && (
+        <div
+          ref={dropdownRef}
+          className="absolute z-50 w-full mt-2 max-h-64 overflow-y-auto rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-xl"
         >
-          {result}
-        </span>
-      ))}
+          {results.map((team, idx) => (
+            <button
+              key={`${team.name}-${team.league}-${idx}`}
+              onClick={() => handleSelect(team)}
+              className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[var(--card-hover)] transition-colors text-left"
+            >
+              <span className="text-lg">⚽</span>
+              <div>
+                <p className="text-[var(--text-primary)] font-medium">{team.name}</p>
+                <p className="text-xs text-[var(--text-secondary)]">{team.league}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* No results message */}
+      {isOpen && query.length >= 2 && results.length === 0 && !loading && !value && (
+        <div className="absolute z-50 w-full mt-2 p-4 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-center">
+          <p className="text-[var(--text-secondary)]">No teams found for &quot;{query}&quot;</p>
+        </div>
+      )}
     </div>
   )
 }
 
 function PredictPageContent() {
-  const searchParams = useSearchParams()
-  const [mode, setMode] = useState<PredictionMode>('head-to-head')
+  const [homeTeam, setHomeTeam] = useState<{ name: string; league: string } | null>(null)
+  const [awayTeam, setAwayTeam] = useState<{ name: string; league: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<PredictionResult | null>(null)
-  const [statsA, setStatsA] = useState<TeamStats | null>(null)
-  const [statsB, setStatsB] = useState<TeamStats | null>(null)
-  const [h2hMatches, setH2hMatches] = useState<HeadToHeadMatch[]>([])
-  const [loadingStats, setLoadingStats] = useState(false)
 
-  const [formData, setFormData] = useState({
-    league: '',
-    league_a: '',
-    league_b: '',
-    home_team: '',
-    away_team: '',
-    team_a: '',
-    team_b: ''
-  })
-
-  useEffect(() => {
-    const queryMode = searchParams.get('mode')
-    if (queryMode === 'cross-league') {
-      setMode('cross-league')
-    } else {
-      setMode('head-to-head')
-    }
-  }, [searchParams])
-
+  // Reset result when teams change
   useEffect(() => {
     setResult(null)
-    setStatsA(null)
-    setStatsB(null)
-    setH2hMatches([])
-  }, [formData, mode])
-
-  const fetchTeamStats = async () => {
-    setLoadingStats(true)
-    try {
-      const teamAName = mode === 'head-to-head' ? formData.home_team : formData.team_a
-      const teamBName = mode === 'head-to-head' ? formData.away_team : formData.team_b
-      const leagueA = mode === 'head-to-head' ? leagueNameMap[formData.league] : leagueNameMap[formData.league_a]
-      const leagueB = mode === 'head-to-head' ? leagueNameMap[formData.league] : leagueNameMap[formData.league_b]
-
-      // Try the new team_form endpoint first (uses FotMob for live data), fallback to team_stats
-      const [resA, resB] = await Promise.all([
-        fetch(`/api/team_form/${leagueA}/${encodeURIComponent(teamAName)}`).catch(() => 
-          fetch(`/api/team_stats/${leagueA}/${encodeURIComponent(teamAName)}`)
-        ),
-        fetch(`/api/team_form/${leagueB}/${encodeURIComponent(teamBName)}`).catch(() => 
-          fetch(`/api/team_stats/${leagueB}/${encodeURIComponent(teamBName)}`)
-        )
-      ])
-
-      if (resA.ok) {
-        const dataA = await resA.json()
-        setStatsA(dataA)
-      }
-      if (resB.ok) {
-        const dataB = await resB.json()
-        setStatsB(dataB)
-      }
-
-      // Fetch head-to-head matches for same-league comparisons
-      if (mode === 'head-to-head' && formData.league) {
-        const h2hRes = await fetch(`/api/head_to_head/${leagueA}/${encodeURIComponent(teamAName)}/${encodeURIComponent(teamBName)}`)
-        if (h2hRes.ok) {
-          const h2hData = await h2hRes.json()
-          setH2hMatches(h2hData.slice(0, 10))
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching team stats:', err)
-    } finally {
-      setLoadingStats(false)
-    }
-  }
+  }, [homeTeam, awayTeam])
 
   const handlePredict = async () => {
+    if (!homeTeam || !awayTeam) return
+    if (homeTeam.name === awayTeam.name) {
+      setResult({ error: 'Please select different teams' })
+      return
+    }
+
     setLoading(true)
     setResult(null)
+
     try {
-      const endpoint = mode === 'head-to-head' 
-        ? '/api/predict/head-to-head'
-        : '/api/predict/cross-league'
-
-      const payload = mode === 'head-to-head'
-        ? {
-            league: leagueNameMap[formData.league],
-            home_team: formData.home_team,
-            away_team: formData.away_team
-          }
-        : {
-            league_a: leagueNameMap[formData.league_a],
-            team_a: formData.team_a,
-            league_b: leagueNameMap[formData.league_b],
-            team_b: formData.team_b
-          }
-
-      const response = await fetch(endpoint, {
+      const response = await fetch('/api/predict/any-teams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          home_team: homeTeam.name,
+          away_team: awayTeam.name,
+          home_league: homeTeam.league,
+          away_league: awayTeam.league,
+        }),
       })
 
       if (!response.ok) {
@@ -258,39 +235,7 @@ function PredictPageContent() {
       }
 
       const data = await response.json()
-      
-      if (mode === 'cross-league' && data) {
-        setResult({
-          predictions: {
-            team_a_win: data.predicted_team_a_win,
-            draw: data.predicted_draw,
-            team_b_win: data.predicted_team_b_win
-          },
-          team_a: data.team_a,
-          team_b: data.team_b,
-          league_a: data.league_a,
-          league_b: data.league_b,
-          predicted_team_a_goals: data.predicted_team_a_goals,
-          predicted_team_b_goals: data.predicted_team_b_goals,
-          confidence: data.confidence
-        })
-      } else if (mode === 'head-to-head' && data) {
-        setResult({
-          predictions: {
-            home_win: data.predicted_home_win,
-            draw: data.predicted_draw,
-            away_win: data.predicted_away_win
-          },
-          home_team: data.home_team,
-          away_team: data.away_team,
-          predicted_home_goals: data.predicted_home_goals,
-          predicted_away_goals: data.predicted_away_goals,
-          confidence: data.confidence
-        })
-      }
-
-      // Also fetch team stats after prediction
-      await fetchTeamStats()
+      setResult(data)
     } catch (error) {
       setResult({ error: error instanceof Error ? error.message : 'Prediction failed' })
     } finally {
@@ -298,245 +243,154 @@ function PredictPageContent() {
     }
   }
 
-  const canPredict = mode === 'head-to-head' 
-    ? formData.league && formData.home_team && formData.away_team && formData.home_team !== formData.away_team
-    : formData.league_a && formData.team_a && formData.league_b && formData.team_b
-
-  // Get team names for display
-  const teamAName = mode === 'head-to-head' ? (result?.home_team || formData.home_team) : (result?.team_a || formData.team_a)
-  const teamBName = mode === 'head-to-head' ? (result?.away_team || formData.away_team) : (result?.team_b || formData.team_b)
+  const canPredict = homeTeam && awayTeam && homeTeam.name !== awayTeam.name
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[var(--background)]">
       {/* Header */}
-      <div className="bg-[var(--card-bg)] border-b border-[var(--border-color)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-2">Match Predictor</h1>
-          <p className="text-[var(--text-secondary)]">
-            Get AI-powered predictions with detailed team analysis and head-to-head history
-          </p>
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 via-purple-600/5 to-transparent dark:to-slate-900" />
+        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-5" />
+        
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 mb-6">
+              <span className="text-lg">🤖</span>
+              <span className="text-sm font-medium text-indigo-600 dark:text-indigo-300">AI-Powered Match Predictor</span>
+            </div>
+            
+            <h1 className="text-4xl md:text-5xl font-bold text-[var(--text-primary)] mb-4">
+              Match Predictor
+            </h1>
+            <p className="text-xl text-[var(--text-secondary)] max-w-2xl mx-auto">
+              Enter any two teams from our database to get AI-powered match predictions based on ELO ratings, form, and historical data.
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Mode Toggle */}
-        <div className="tab-nav mb-8 p-1 inline-flex">
-          <button
-            onClick={() => setMode('head-to-head')}
-            className={`tab-item ${mode === 'head-to-head' ? 'active' : ''}`}
-          >
-            🎯 Head-to-Head
-          </button>
-          <button
-            onClick={() => setMode('cross-league')}
-            className={`tab-item ${mode === 'cross-league' ? 'active' : ''}`}
-          >
-            🌍 Cross-League
-          </button>
-        </div>
+      {/* Main Content */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Team Selection */}
+        <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-3xl border border-[var(--border-color)] p-6 md:p-8 mb-8">
+          <div className="relative grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Home Team */}
+            <div>
+              <TeamSearchInput
+                label="Home Team"
+                value={homeTeam}
+                onSelect={setHomeTeam}
+                placeholder="Search for home team..."
+                icon="🏠"
+              />
+            </div>
 
-        {/* Prediction Form */}
-        <div className="fm-card p-6 mb-8">
-          {mode === 'head-to-head' ? (
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                  Select League
-                </label>
-                <select
-                  value={formData.league}
-                  onChange={(e) => setFormData({ ...formData, league: e.target.value, home_team: '', away_team: '' })}
-                  className="fm-select"
-                >
-                  <option value="">Choose a league...</option>
-                  {leagues.map(league => (
-                    <option key={league} value={league}>{league}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                    Home Team
-                  </label>
-                  <select
-                    value={formData.home_team}
-                    onChange={(e) => setFormData({ ...formData, home_team: e.target.value })}
-                    disabled={!formData.league}
-                    className="fm-select"
-                  >
-                    <option value="">Select team...</option>
-                    {formData.league && teams[formData.league]?.map(team => (
-                      <option key={team} value={team}>{team}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                    Away Team
-                  </label>
-                  <select
-                    value={formData.away_team}
-                    onChange={(e) => setFormData({ ...formData, away_team: e.target.value })}
-                    disabled={!formData.league}
-                    className="fm-select"
-                  >
-                    <option value="">Select team...</option>
-                    {formData.league && teams[formData.league]?.filter(t => t !== formData.home_team).map(team => (
-                      <option key={team} value={team}>{team}</option>
-                    ))}
-                  </select>
-                </div>
+            {/* VS Divider */}
+            <div className="hidden md:flex items-center justify-center absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+              <div className="w-12 h-12 rounded-full bg-[var(--background-secondary)] border border-[var(--border-color)] flex items-center justify-center">
+                <span className="text-[var(--text-secondary)] font-bold text-sm">VS</span>
               </div>
             </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                    League A
-                  </label>
-                  <select
-                    value={formData.league_a}
-                    onChange={(e) => setFormData({ ...formData, league_a: e.target.value, team_a: '' })}
-                    className="fm-select"
-                  >
-                    <option value="">Choose a league...</option>
-                    {leagues.map(league => (
-                      <option key={league} value={league}>{league}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                    Team A
-                  </label>
-                  <select
-                    value={formData.team_a}
-                    onChange={(e) => setFormData({ ...formData, team_a: e.target.value })}
-                    disabled={!formData.league_a}
-                    className="fm-select"
-                  >
-                    <option value="">Select team...</option>
-                    {formData.league_a && teams[formData.league_a]?.map(team => (
-                      <option key={team} value={team}>{team}</option>
-                    ))}
-                  </select>
-                </div>
+            
+            <div className="md:hidden flex justify-center">
+              <div className="w-12 h-12 rounded-full bg-[var(--background-secondary)] border border-[var(--border-color)] flex items-center justify-center">
+                <span className="text-[var(--text-secondary)] font-bold text-sm">VS</span>
               </div>
+            </div>
 
-              <div className="flex items-center justify-center">
-                <span className="text-2xl">⚔️</span>
-              </div>
+            {/* Away Team */}
+            <div>
+              <TeamSearchInput
+                label="Away Team"
+                value={awayTeam}
+                onSelect={setAwayTeam}
+                placeholder="Search for away team..."
+                icon="✈️"
+              />
+            </div>
+          </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                    League B
-                  </label>
-                  <select
-                    value={formData.league_b}
-                    onChange={(e) => setFormData({ ...formData, league_b: e.target.value, team_b: '' })}
-                    className="fm-select"
-                  >
-                    <option value="">Choose a league...</option>
-                    {leagues.map(league => (
-                      <option key={league} value={league}>{league}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                    Team B
-                  </label>
-                  <select
-                    value={formData.team_b}
-                    onChange={(e) => setFormData({ ...formData, team_b: e.target.value })}
-                    disabled={!formData.league_b}
-                    className="fm-select"
-                  >
-                    <option value="">Select team...</option>
-                    {formData.league_b && teams[formData.league_b]?.map(team => (
-                      <option key={team} value={team}>{team}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+          {/* Predict Button */}
+          <div className="mt-8">
+            <button
+              onClick={handlePredict}
+              disabled={loading || !canPredict}
+              className="w-full py-4 px-6 rounded-xl font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-gray-400 disabled:to-gray-500 dark:disabled:from-slate-700 dark:disabled:to-slate-700 disabled:text-gray-200 dark:disabled:text-slate-400 disabled:cursor-not-allowed transition-all duration-300 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 flex items-center justify-center gap-3"
+            >
+              {loading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Analyzing Match...</span>
+                </>
+              ) : (
+                <>
+                  <span>🎯</span>
+                  <span>Get Prediction</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Cross-league indicator */}
+          {homeTeam && awayTeam && homeTeam.league !== awayTeam.league && (
+            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+              <span>🌍</span>
+              <span>Cross-league prediction: {homeTeam.league} vs {awayTeam.league}</span>
             </div>
           )}
-
-          <button
-            onClick={handlePredict}
-            disabled={loading || !canPredict}
-            className="btn-primary w-full mt-8 flex items-center justify-center gap-3"
-          >
-            {loading ? (
-              <>
-                <div className="spinner w-5 h-5 border-2"></div>
-                <span>Analyzing...</span>
-              </>
-            ) : (
-              <>
-                <span>🎯</span>
-                <span>Get Prediction</span>
-              </>
-            )}
-          </button>
         </div>
 
-        {/* Results Section */}
+        {/* Prediction Results */}
         {result && !result.error && result.predictions && (
           <div className="space-y-6 animate-fade-in">
-            {/* Prediction Result Card */}
-            <div className="fm-card overflow-hidden">
+            {/* Main Prediction Card */}
+            <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-3xl border border-[var(--border-color)] overflow-hidden">
               {/* Winner Banner */}
               {(() => {
-                const homeWin = mode === 'head-to-head' ? result.predictions.home_win : result.predictions.team_a_win
-                const awayWin = mode === 'head-to-head' ? result.predictions.away_win : result.predictions.team_b_win
-                const draw = result.predictions.draw
-                const hWin = (homeWin || 0) * 100
-                const aWin = (awayWin || 0) * 100
-                const d = (draw || 0) * 100
+                const homeWin = result.predictions.home_win || 0
+                const draw = result.predictions.draw || 0
+                const awayWin = result.predictions.away_win || 0
+                const hWin = homeWin * 100
+                const d = draw * 100
+                const aWin = awayWin * 100
                 
                 let winner = { team: 'Draw', type: 'draw', prob: d }
-                if (hWin > d && hWin > aWin) winner = { team: teamAName, type: 'home', prob: hWin }
-                else if (aWin > d && aWin > hWin) winner = { team: teamBName, type: 'away', prob: aWin }
-                
-                const homeGoals = mode === 'head-to-head' ? result.predicted_home_goals : result.predicted_team_a_goals
-                const awayGoals = mode === 'head-to-head' ? result.predicted_away_goals : result.predicted_team_b_goals
+                if (hWin > d && hWin > aWin) winner = { team: result.home_team || '', type: 'home', prob: hWin }
+                else if (aWin > d && aWin > hWin) winner = { team: result.away_team || '', type: 'away', prob: aWin }
 
                 return (
                   <>
-                    <div className={`p-6 text-center ${
-                      winner.type === 'home' ? 'bg-gradient-to-r from-[var(--success)]/20 to-transparent' :
-                      winner.type === 'away' ? 'bg-gradient-to-l from-[var(--success)]/20 to-transparent' :
-                      'bg-gradient-to-r from-[var(--warning)]/20 via-transparent to-[var(--warning)]/20'
+                    <div className={`p-8 text-center ${
+                      winner.type === 'home' ? 'bg-gradient-to-r from-emerald-600/20 to-transparent' :
+                      winner.type === 'away' ? 'bg-gradient-to-l from-emerald-600/20 to-transparent' :
+                      'bg-gradient-to-r from-amber-500/20 via-transparent to-amber-500/20'
                     }`}>
-                      <p className="text-sm text-[var(--text-tertiary)] mb-2 uppercase tracking-wider font-medium">
+                      <p className="text-sm text-[var(--text-secondary)] uppercase tracking-wider mb-2">
                         Predicted Winner
                       </p>
-                      <h3 className="text-3xl font-bold text-[var(--text-primary)] mb-1">{winner.team}</h3>
-                      <p className="text-[var(--accent-primary)] font-semibold">{winner.prob.toFixed(1)}% probability</p>
+                      <h3 className="text-3xl md:text-4xl font-bold text-[var(--text-primary)] mb-2">{winner.team}</h3>
+                      <p className="text-indigo-600 dark:text-indigo-400 font-semibold text-lg">{winner.prob.toFixed(1)}% probability</p>
                     </div>
 
                     {/* Score Prediction */}
                     <div className="p-6 border-b border-[var(--border-color)]">
-                      <p className="text-center text-sm text-[var(--text-tertiary)] uppercase tracking-wider mb-4">
+                      <p className="text-center text-sm text-[var(--text-secondary)] uppercase tracking-wider mb-4">
                         Expected Scoreline
                       </p>
                       <div className="flex items-center justify-center gap-8">
                         <div className="text-center flex-1">
-                          <p className="text-sm text-[var(--text-secondary)] mb-2">{teamAName}</p>
+                          <p className="text-sm text-[var(--text-secondary)] mb-2">{result.home_team}</p>
+                          <p className="text-sm text-[var(--text-tertiary)] mb-1">{result.home_league}</p>
                           <div className="text-5xl font-bold text-[var(--text-primary)]">
-                            {homeGoals?.toFixed(0) || '-'}
+                            {result.predicted_home_goals?.toFixed(0) || '-'}
                           </div>
                         </div>
                         <div className="text-2xl text-[var(--text-tertiary)]">-</div>
                         <div className="text-center flex-1">
-                          <p className="text-sm text-[var(--text-secondary)] mb-2">{teamBName}</p>
+                          <p className="text-sm text-[var(--text-secondary)] mb-2">{result.away_team}</p>
+                          <p className="text-sm text-[var(--text-tertiary)] mb-1">{result.away_league}</p>
                           <div className="text-5xl font-bold text-[var(--text-primary)]">
-                            {awayGoals?.toFixed(0) || '-'}
+                            {result.predicted_away_goals?.toFixed(0) || '-'}
                           </div>
                         </div>
                       </div>
@@ -544,165 +398,176 @@ function PredictPageContent() {
 
                     {/* Probability Breakdown */}
                     <div className="p-6">
-                      <h4 className="text-sm font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-4">
+                      <h4 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-4">
                         Win Probability
                       </h4>
                       <div className="space-y-4">
                         <div>
                           <div className="flex justify-between mb-2">
-                            <span className="text-[var(--text-primary)] font-medium">{teamAName}</span>
-                            <span className="font-bold text-[var(--success)]">{hWin.toFixed(1)}%</span>
+                            <span className="text-[var(--text-primary)] font-medium">{result.home_team}</span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400">{hWin.toFixed(1)}%</span>
                           </div>
-                          <div className="prediction-bar h-3">
-                            <div className="prediction-bar-fill home h-full" style={{ width: `${hWin}%` }}></div>
+                          <div className="h-3 bg-gray-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-500"
+                              style={{ width: `${hWin}%` }}
+                            />
                           </div>
                         </div>
                         <div>
                           <div className="flex justify-between mb-2">
                             <span className="text-[var(--text-primary)] font-medium">Draw</span>
-                            <span className="font-bold text-[var(--warning)]">{d.toFixed(1)}%</span>
+                            <span className="font-bold text-amber-600 dark:text-amber-400">{d.toFixed(1)}%</span>
                           </div>
-                          <div className="prediction-bar h-3">
-                            <div className="prediction-bar-fill draw h-full" style={{ width: `${d}%` }}></div>
+                          <div className="h-3 bg-gray-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-amber-600 to-amber-400 rounded-full transition-all duration-500"
+                              style={{ width: `${d}%` }}
+                            />
                           </div>
                         </div>
                         <div>
                           <div className="flex justify-between mb-2">
-                            <span className="text-[var(--text-primary)] font-medium">{teamBName}</span>
-                            <span className="font-bold text-[var(--danger)]">{aWin.toFixed(1)}%</span>
+                            <span className="text-[var(--text-primary)] font-medium">{result.away_team}</span>
+                            <span className="font-bold text-rose-600 dark:text-rose-400">{aWin.toFixed(1)}%</span>
                           </div>
-                          <div className="prediction-bar h-3">
-                            <div className="prediction-bar-fill away h-full" style={{ width: `${aWin}%` }}></div>
+                          <div className="h-3 bg-gray-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-rose-600 to-rose-400 rounded-full transition-all duration-500"
+                              style={{ width: `${aWin}%` }}
+                            />
                           </div>
                         </div>
                       </div>
                     </div>
-
-                    {/* Confidence Score */}
-                    {result.confidence && (
-                      <div className="px-6 pb-6">
-                        <div className="flex items-center justify-between p-4 rounded-lg bg-[var(--background)]">
-                          <span className="text-sm text-[var(--text-secondary)]">Model Confidence</span>
-                          <span className="font-semibold text-[var(--accent-primary)]">
-                            {(result.confidence * 100).toFixed(0)}%
-                          </span>
-                        </div>
-                      </div>
-                    )}
                   </>
                 )
               })()}
             </div>
 
-            {/* Team Stats Comparison */}
-            {(statsA || statsB) && (
-              <div className="fm-card overflow-hidden">
-                <div className="p-4 bg-[var(--background)] border-b border-[var(--border-color)]">
-                  <h3 className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
-                    <span>📊</span> Team Statistics Comparison
-                  </h3>
-                </div>
+            {/* Ratings & Analysis Card */}
+            {result.ratings && (
+              <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-3xl border border-[var(--border-color)] p-6">
+                <h4 className="text-lg font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+                  <span>📊</span>
+                  Team Ratings Comparison
+                </h4>
                 
-                {loadingStats ? (
-                  <div className="p-8 flex justify-center">
-                    <div className="spinner"></div>
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="text-center p-4 rounded-xl bg-[var(--background-secondary)]">
+                    <p className="text-sm text-[var(--text-secondary)] mb-1">{result.home_team}</p>
+                    <p className="text-2xl font-bold text-[var(--text-primary)]">{result.ratings.home_elo}</p>
+                    <p className="text-xs text-[var(--text-tertiary)]">ELO Rating</p>
                   </div>
-                ) : statsA && statsB ? (
-                  <div className="p-6">
-                    {/* Team Headers */}
-                    <div className="flex justify-between items-center mb-6">
-                      <div className="text-center flex-1">
-                        <h4 className="font-bold text-[var(--text-primary)]">{teamAName}</h4>
-                        <p className="text-xs text-[var(--text-tertiary)]">{statsA.matches_played} matches</p>
-                      </div>
-                      <div className="px-4 text-[var(--text-tertiary)]">vs</div>
-                      <div className="text-center flex-1">
-                        <h4 className="font-bold text-[var(--text-primary)]">{teamBName}</h4>
-                        <p className="text-xs text-[var(--text-tertiary)]">{statsB.matches_played} matches</p>
-                      </div>
-                    </div>
+                  <div className="text-center p-4 rounded-xl bg-[var(--background-secondary)]">
+                    <p className="text-sm text-[var(--text-secondary)] mb-1">Difference</p>
+                    <p className={`text-2xl font-bold ${result.ratings.elo_difference >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                      {result.ratings.elo_difference >= 0 ? '+' : ''}{result.ratings.elo_difference}
+                    </p>
+                    <p className="text-xs text-[var(--text-tertiary)]">Home Advantage</p>
+                  </div>
+                  <div className="text-center p-4 rounded-xl bg-[var(--background-secondary)]">
+                    <p className="text-sm text-[var(--text-secondary)] mb-1">{result.away_team}</p>
+                    <p className="text-2xl font-bold text-[var(--text-primary)]">{result.ratings.away_elo}</p>
+                    <p className="text-xs text-[var(--text-tertiary)]">ELO Rating</p>
+                  </div>
+                </div>
 
-                    {/* Stats Bars */}
-                    <div className="space-y-1 divide-y divide-[var(--border-color)]">
-                      <StatBar label="Wins" valueA={statsA.wins} valueB={statsB.wins} />
-                      <StatBar label="Win Rate" valueA={statsA.win_rate} valueB={statsB.win_rate} format="percent" />
-                      <StatBar label="Goals Scored" valueA={statsA.goals_scored} valueB={statsB.goals_scored} />
-                      <StatBar label="Goals/Game" valueA={statsA.avg_goals_scored} valueB={statsB.avg_goals_scored} format="decimal" />
-                      <StatBar label="Goals Conceded" valueA={statsA.goals_conceded} valueB={statsB.goals_conceded} higherIsBetter={false} />
-                      <StatBar label="Conceded/Game" valueA={statsA.avg_goals_conceded} valueB={statsB.avg_goals_conceded} format="decimal" higherIsBetter={false} />
-                      <StatBar label="Home Win Rate" valueA={statsA.home_win_rate} valueB={statsB.home_win_rate} format="percent" />
-                      <StatBar label="Away Win Rate" valueA={statsA.away_win_rate} valueB={statsB.away_win_rate} format="percent" />
+                {/* Confidence Score */}
+                {result.confidence && (
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-[var(--text-secondary)]">Model Confidence</span>
+                      <span className="font-semibold text-indigo-600 dark:text-indigo-400">{result.confidence.toFixed(0)}%</span>
                     </div>
-
-                    {/* Recent Form */}
-                    <div className="mt-6 pt-6 border-t border-[var(--border-color)]">
-                      <p className="text-center text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-4">Recent Form (Last 5)</p>
-                      <div className="flex justify-between items-center">
-                        <div className="flex-1">
-                          <FormDisplay form={statsA.recent_form} />
-                        </div>
-                        <div className="px-4 text-[var(--text-tertiary)]">vs</div>
-                        <div className="flex-1">
-                          <FormDisplay form={statsB.recent_form} />
-                        </div>
-                      </div>
+                    <div className="h-2 bg-gray-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-full"
+                        style={{ width: `${result.confidence}%` }}
+                      />
                     </div>
                   </div>
-                ) : (
-                  <div className="p-6 text-center text-[var(--text-secondary)]">
-                    Unable to load team statistics
+                )}
+
+                {/* Factors Considered */}
+                {result.analysis?.factors_considered && (
+                  <div>
+                    <p className="text-sm text-[var(--text-secondary)] mb-3">Factors Considered:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {result.analysis.factors_considered.map((factor, idx) => (
+                        <span key={idx} className="px-3 py-1 rounded-full bg-[var(--background-secondary)] text-xs text-[var(--text-secondary)]">
+                          {factor}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Analysis Note */}
+                {result.analysis?.note && (
+                  <div className="mt-4 p-4 rounded-xl bg-[var(--background-secondary)] border border-[var(--border-color)]">
+                    <p className="text-sm text-[var(--text-secondary)]">
+                      <span className="text-indigo-600 dark:text-indigo-400">💡 Note:</span> {result.analysis.note}
+                    </p>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Head-to-Head History */}
-            {h2hMatches.length > 0 && (
-              <div className="fm-card overflow-hidden">
-                <div className="p-4 bg-[var(--background)] border-b border-[var(--border-color)]">
-                  <h3 className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
-                    <span>⚔️</span> Head-to-Head History
-                  </h3>
-                </div>
-                <div className="divide-y divide-[var(--border-color)]">
-                  {h2hMatches.map((match, idx) => {
-                    const homeWon = match.home_goals > match.away_goals
-                    const awayWon = match.away_goals > match.home_goals
-                    return (
-                      <div key={idx} className="p-4 flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <span className={`text-sm font-medium ${homeWon ? 'text-[var(--success)]' : 'text-[var(--text-primary)]'}`}>
-                              {match.home_team}
-                            </span>
-                            <span className="font-bold text-[var(--text-primary)]">
-                              {match.home_goals} - {match.away_goals}
-                            </span>
-                            <span className={`text-sm font-medium ${awayWon ? 'text-[var(--success)]' : 'text-[var(--text-primary)]'}`}>
-                              {match.away_team}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-xs text-[var(--text-tertiary)]">
-                          {new Date(match.date).toLocaleDateString()}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+            {/* Disclaimer */}
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+              <p className="text-sm text-amber-800 dark:text-amber-200/80 text-center">
+                <span className="font-semibold">⚠️ Disclaimer:</span> Predictions are based on statistical models and historical data. 
+                Football is unpredictable - use for entertainment only, not betting.
+              </p>
+            </div>
           </div>
         )}
 
         {/* Error State */}
         {result?.error && (
-          <div className="fm-card p-6 border-l-4 border-l-[var(--danger)]">
+          <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-3xl border border-rose-500/30 p-6">
             <div className="flex items-center gap-3">
               <span className="text-2xl">❌</span>
               <div>
                 <p className="font-semibold text-[var(--text-primary)]">Prediction Failed</p>
                 <p className="text-sm text-[var(--text-secondary)]">{result.error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* How It Works Section */}
+        {!result && (
+          <div className="mt-12">
+            <h2 className="text-2xl font-bold text-[var(--text-primary)] text-center mb-8">How It Works</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-2xl border border-[var(--border-color)] p-6 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">📈</span>
+                </div>
+                <h3 className="font-semibold text-[var(--text-primary)] mb-2">ELO Ratings</h3>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Teams are ranked using an advanced ELO system updated after every match
+                </p>
+              </div>
+              <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-2xl border border-[var(--border-color)] p-6 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">🏠</span>
+                </div>
+                <h3 className="font-semibold text-[var(--text-primary)] mb-2">Home Advantage</h3>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Home teams receive a +65 ELO point boost to reflect historical home advantage
+                </p>
+              </div>
+              <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-2xl border border-[var(--border-color)] p-6 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/20 flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">🌍</span>
+                </div>
+                <h3 className="font-semibold text-[var(--text-primary)] mb-2">Cross-League</h3>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  League strength coefficients adjust ratings for cross-league comparisons
+                </p>
               </div>
             </div>
           </div>
@@ -715,8 +580,8 @@ function PredictPageContent() {
 export default function PredictPage() {
   return (
     <Suspense fallback={
-      <div className="flex justify-center items-center h-64">
-        <div className="spinner"></div>
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </div>
     }>
       <PredictPageContent />
