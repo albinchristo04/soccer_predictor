@@ -1,6 +1,5 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { PageLoader } from '@/components/PageLoader'
@@ -8,18 +7,25 @@ import { ThemeProvider } from '@/providers/ThemeProvider'
 import { AuthProvider } from '@/contexts/AuthContext'
 import './globals.css'
 
-const inter = Inter({ 
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-inter'
-})
-
 export const metadata: Metadata = {
   title: 'Soccer Stats Predictor',
-  description: 'AI-powered soccer match prediction and analysis with real-time data',
+  description: 'AI-powered soccer match prediction and analysis with real-time data from ESPN and FotMob',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Soccer Predictor',
+  },
   icons: {
     icon: '/soccer-ball.png',
+    apple: '/icons/icon-192x192.png',
   },
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
+  },
+  themeColor: '#4F46E5',
 }
 
 // Script to prevent flash of wrong theme - default to dark like Fotmob
@@ -40,7 +46,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={inter.variable}>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

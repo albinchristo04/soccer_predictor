@@ -53,6 +53,11 @@ __pycache__/
 *.pyc
 *.pyo
 
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
 # models
 *.pkl
 
@@ -60,3 +65,11 @@ __pycache__/
 gemini.md
 
 .gemini/
+
+# PWA files
+public/sw.js
+public/sw.js.map
+public/workbox-*.js
+public/workbox-*.js.map
+public/swe-worker-*.js
+public/swe-worker-*.js.map
