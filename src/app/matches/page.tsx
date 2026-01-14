@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import MatchCalendar from '@/components/match/MatchCalendar';
 
 // League configuration with ESPN IDs
 const LEAGUES = [
@@ -15,18 +14,6 @@ const LEAGUES = [
   { id: 'uefa.champions', name: 'Champions League', country: 'Europe', flag: '🏆' },
   { id: 'uefa.europa', name: 'Europa League', country: 'Europe', flag: '🏆' },
 ];
-
-interface Match {
-  id: string;
-  home_team: string;
-  away_team: string;
-  home_score: number | null;
-  away_score: number | null;
-  time: string;
-  status: string;
-  minute?: number;
-  venue?: string;
-}
 
 interface Standing {
   position: number;
@@ -42,60 +29,14 @@ interface Standing {
 }
 
 export default function MatchesPage() {
-  const router = useRouter();
   const [selectedLeague, setSelectedLeague] = useState<typeof LEAGUES[0] | null>(null);
-  const [matches, setMatches] = useState<Match[]>([]);
   const [standings, setStandings] = useState<Standing[]>([]);
-  const [loadingMatches, setLoadingMatches] = useState(false);
   const [loadingStandings, setLoadingStandings] = useState(false);
   const [activeTab, setActiveTab] = useState<'fixtures' | 'standings'>('fixtures');
-  const [dateFilter, setDateFilter] = useState<'past' | 'today' | 'upcoming'>('today');
 
-  // Fetch matches when league is selected
+  // Fetch standings when league is selected
   useEffect(() => {
     if (!selectedLeague) return;
-
-    const fetchMatches = async () => {
-      setLoadingMatches(true);
-      try {
-        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${selectedLeague.id}/scoreboard`);
-        if (res.ok) {
-          const data = await res.json();
-          const matchList: Match[] = (data.events || []).map((event: any) => {
-            const competition = event.competitions?.[0];
-            const homeTeam = competition?.competitors?.find((c: any) => c.homeAway === 'home');
-            const awayTeam = competition?.competitors?.find((c: any) => c.homeAway === 'away');
-            const statusType = competition?.status?.type?.name || 'STATUS_SCHEDULED';
-            
-            let status = 'upcoming';
-            let minute: number | undefined;
-            if (statusType === 'STATUS_FINAL' || statusType === 'STATUS_FULL_TIME') {
-              status = 'completed';
-            } else if (statusType === 'STATUS_IN_PROGRESS' || statusType === 'STATUS_HALFTIME' || statusType.includes('HALF')) {
-              status = 'live';
-              minute = competition?.status?.displayClock ? parseInt(competition.status.displayClock) : undefined;
-            }
-
-            return {
-              id: event.id,
-              home_team: homeTeam?.team?.displayName || '',
-              away_team: awayTeam?.team?.displayName || '',
-              home_score: status !== 'upcoming' ? parseInt(homeTeam?.score || '0') : null,
-              away_score: status !== 'upcoming' ? parseInt(awayTeam?.score || '0') : null,
-              time: event.date || '',
-              status,
-              minute,
-              venue: competition?.venue?.fullName,
-            };
-          });
-          setMatches(matchList);
-        }
-      } catch (e) {
-        console.error('Error fetching matches:', e);
-      } finally {
-        setLoadingMatches(false);
-      }
-    };
 
     const fetchStandings = async () => {
       setLoadingStandings(true);
@@ -126,27 +67,8 @@ export default function MatchesPage() {
       }
     };
 
-    fetchMatches();
     fetchStandings();
   }, [selectedLeague]);
-
-  const formatMatchTime = (timeStr: string): string => {
-    try {
-      const date = new Date(timeStr);
-      return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-    } catch {
-      return 'TBD';
-    }
-  };
-
-  const formatMatchDate = (timeStr: string): string => {
-    try {
-      const date = new Date(timeStr);
-      return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    } catch {
-      return '';
-    }
-  };
 
   // League selection view
   if (!selectedLeague) {
@@ -236,78 +158,7 @@ export default function MatchesPage() {
 
       <div className="max-w-6xl mx-auto px-4 py-6">
         {activeTab === 'fixtures' ? (
-          <div>
-            {loadingMatches ? (
-              <div className="flex justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500" />
-              </div>
-            ) : matches.length > 0 ? (
-              <div className="space-y-3">
-                {matches.map((match) => (
-                  <Link
-                    key={match.id}
-                    href={`/matches/${match.id}?league=${selectedLeague.id}`}
-                    className={`block p-4 rounded-xl border transition-all ${
-                      match.status === 'live'
-                        ? 'bg-red-950/30 border-red-800/50 hover:border-red-600/50'
-                        : 'bg-slate-800/50 border-slate-700/50 hover:border-indigo-500/50'
-                    }`}
-                  >
-                    <div className="flex items-center">
-                      {/* Date/Time */}
-                      <div className="w-20 text-center flex-shrink-0">
-                        {match.status === 'live' ? (
-                          <div className="flex flex-col items-center">
-                            <span className="text-red-400 font-bold text-sm animate-pulse">LIVE</span>
-                            {match.minute && (
-                              <span className="text-red-400 text-xs">{match.minute}&apos;</span>
-                            )}
-                          </div>
-                        ) : match.status === 'completed' ? (
-                          <span className="text-slate-500 text-sm">FT</span>
-                        ) : (
-                          <div className="flex flex-col items-center">
-                            <span className="text-slate-500 text-xs">{formatMatchDate(match.time)}</span>
-                            <span className="text-indigo-400 font-medium text-sm">{formatMatchTime(match.time)}</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Teams & Score */}
-                      <div className="flex-1 flex items-center justify-center gap-4">
-                        <span className="flex-1 text-right text-white font-medium">{match.home_team}</span>
-                        <div className="w-16 text-center">
-                          {match.status === 'upcoming' ? (
-                            <span className="text-slate-500">vs</span>
-                          ) : (
-                            <span className={`font-bold text-lg ${match.status === 'live' ? 'text-white' : 'text-slate-300'}`}>
-                              {match.home_score} - {match.away_score}
-                            </span>
-                          )}
-                        </div>
-                        <span className="flex-1 text-left text-white font-medium">{match.away_team}</span>
-                      </div>
-                      
-                      {/* Arrow */}
-                      <div className="w-8 text-right">
-                        <svg className="w-5 h-5 text-slate-500 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
-                    </div>
-                    {match.venue && (
-                      <p className="text-center text-slate-500 text-xs mt-2">{match.venue}</p>
-                    )}
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-slate-400">
-                <span className="text-4xl mb-4 block">📅</span>
-                <p>No fixtures available for this league</p>
-              </div>
-            )}
-          </div>
+          <MatchCalendar leagueId={selectedLeague.id} leagueName={selectedLeague.name} />
         ) : (
           <div>
             {loadingStandings ? (

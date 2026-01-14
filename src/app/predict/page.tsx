@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import SeasonSimulator from '@/components/prediction/SeasonSimulator'
 
 interface TeamSearchResult {
   name: string
@@ -197,6 +198,7 @@ function TeamSearchInput({
 }
 
 function PredictPageContent() {
+  const [activeTab, setActiveTab] = useState<'match' | 'season'>('match')
   const [homeTeam, setHomeTeam] = useState<{ name: string; league: string } | null>(null)
   const [awayTeam, setAwayTeam] = useState<{ name: string; league: string } | null>(null)
   const [loading, setLoading] = useState(false)
@@ -256,21 +258,58 @@ function PredictPageContent() {
           <div className="text-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 mb-6">
               <span className="text-lg">🤖</span>
-              <span className="text-sm font-medium text-indigo-600 dark:text-indigo-300">AI-Powered Match Predictor</span>
+              <span className="text-sm font-medium text-indigo-600 dark:text-indigo-300">AI-Powered Predictions</span>
             </div>
             
             <h1 className="text-4xl md:text-5xl font-bold text-[var(--text-primary)] mb-4">
-              Match Predictor
+              {activeTab === 'match' ? 'Match Predictor' : 'Season Simulation'}
             </h1>
             <p className="text-xl text-[var(--text-secondary)] max-w-2xl mx-auto">
-              Enter any two teams from our database to get AI-powered match predictions based on ELO ratings, form, and historical data.
+              {activeTab === 'match' 
+                ? 'Enter any two teams from our database to get AI-powered match predictions based on ELO ratings, form, and historical data.'
+                : 'Simulate the rest of the season using Monte Carlo methods to predict final standings, title races, and relegation battles.'
+              }
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-[var(--border-color)] bg-[var(--card-bg)]">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex gap-4">
+            <button
+              onClick={() => setActiveTab('match')}
+              className={`py-4 px-4 font-medium transition-colors border-b-2 ${
+                activeTab === 'match'
+                  ? 'text-indigo-400 border-indigo-400'
+                  : 'text-[var(--text-secondary)] border-transparent hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <span className="mr-2">🎯</span>
+              Match Predictor
+            </button>
+            <button
+              onClick={() => setActiveTab('season')}
+              className={`py-4 px-4 font-medium transition-colors border-b-2 ${
+                activeTab === 'season'
+                  ? 'text-indigo-400 border-indigo-400'
+                  : 'text-[var(--text-secondary)] border-transparent hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <span className="mr-2">🏆</span>
+              Season Simulation
+            </button>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {activeTab === 'season' ? (
+          <SeasonSimulator />
+        ) : (
+          <>
         {/* Team Selection */}
         <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-3xl border border-[var(--border-color)] p-6 md:p-8 mb-8">
           <div className="relative grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -571,6 +610,8 @@ function PredictPageContent() {
               </div>
             </div>
           </div>
+        )}
+        </>
         )}
       </div>
     </div>
