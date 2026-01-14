@@ -3,47 +3,59 @@
 @tailwind utilities;
 
 :root {
-  /* Fotmob-inspired Light Theme */
-  --background: #f5f5f5;
+  /* Light Theme - Clean & Neutral */
+  --background: #f8f9fa;
   --background-secondary: #ffffff;
-  --text-primary: #1a1a1a;
-  --text-secondary: #666666;
-  --text-tertiary: #999999;
-  --accent-primary: #00c853;
-  --accent-secondary: #00e676;
-  --border-color: #e0e0e0;
-  --border-hover: #c0c0c0;
+  --background-tertiary: #e9ecef;
+  --text-primary: #212529;
+  --text-secondary: #495057;
+  --text-tertiary: #6c757d;
+  --accent-primary: #10b981;
+  --accent-secondary: #34d399;
+  --border-color: #dee2e6;
+  --border-hover: #adb5bd;
   --card-bg: #ffffff;
-  --card-hover: #fafafa;
+  --card-hover: #f8f9fa;
+  --input-bg: #ffffff;
   --shadow-color: rgba(0, 0, 0, 0.08);
   --shadow-lg: rgba(0, 0, 0, 0.12);
   --match-card-bg: #ffffff;
-  --success: #00c853;
-  --warning: #ffc107;
-  --danger: #ff5252;
-  --info: #2196f3;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+  --live-bg: #fef2f2;
+  --live-border: #fecaca;
+  --live-text: #dc2626;
+  --muted-bg: #f1f5f9;
 }
 
 .dark {
-  /* Fotmob-inspired Dark Theme */
-  --background: #1a1a2e;
-  --background-secondary: #16213e;
-  --text-primary: #ffffff;
-  --text-secondary: #b0b0b0;
-  --text-tertiary: #707070;
-  --accent-primary: #00e676;
-  --accent-secondary: #69f0ae;
-  --border-color: #2a2a4a;
-  --border-hover: #3a3a5a;
-  --card-bg: #1e1e3f;
-  --card-hover: #252550;
+  /* Dark Theme */
+  --background: #0f172a;
+  --background-secondary: #1e293b;
+  --background-tertiary: #334155;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+  --accent-primary: #10b981;
+  --accent-secondary: #34d399;
+  --border-color: #334155;
+  --border-hover: #475569;
+  --card-bg: #1e293b;
+  --card-hover: #334155;
+  --input-bg: #1e293b;
   --shadow-color: rgba(0, 0, 0, 0.3);
   --shadow-lg: rgba(0, 0, 0, 0.5);
-  --match-card-bg: #1e1e3f;
-  --success: #00e676;
-  --warning: #ffca28;
-  --danger: #ff5252;
-  --info: #40c4ff;
+  --match-card-bg: #1e293b;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+  --live-bg: rgba(239, 68, 68, 0.1);
+  --live-border: rgba(239, 68, 68, 0.3);
+  --live-text: #f87171;
+  --muted-bg: #1e293b;
 }
 
 html {

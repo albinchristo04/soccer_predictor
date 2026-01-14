@@ -255,7 +255,7 @@ export default function MatchDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="bg-slate-900/50 border-b border-slate-800 sticky top-16 z-10">
+      <div className="bg-[var(--background-secondary)] border-b sticky top-16 z-10" style={{ borderColor: 'var(--border-color)' }}>
         <div className="max-w-4xl mx-auto px-4">
           <div className="flex gap-4 overflow-x-auto">
             {['summary', 'lineup', 'stats', 'h2h'].map((tab) => (
@@ -264,8 +264,8 @@ export default function MatchDetailPage() {
                 onClick={() => setActiveTab(tab as any)}
                 className={`py-4 px-2 font-medium capitalize transition-colors border-b-2 ${
                   activeTab === tab
-                    ? 'text-indigo-400 border-indigo-400'
-                    : 'text-slate-400 border-transparent hover:text-white'
+                    ? 'text-[var(--accent-primary)] border-[var(--accent-primary)]'
+                    : 'text-[var(--text-secondary)] border-transparent hover:text-[var(--text-primary)]'
                 }`}
               >
                 {tab === 'h2h' ? 'Head to Head' : tab}
@@ -279,33 +279,34 @@ export default function MatchDetailPage() {
       <div className="max-w-4xl mx-auto px-4 py-6">
         {activeTab === 'summary' && (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white mb-4">Match Events</h3>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Match Events</h3>
             {match.events.length > 0 ? (
               <div className="space-y-3">
                 {match.events.map((event, idx) => (
                   <div
                     key={idx}
-                    className={`flex items-center gap-4 p-4 rounded-xl bg-slate-800/50 ${
+                    className={`flex items-center gap-4 p-4 rounded-xl bg-[var(--card-bg)] border ${
                       event.team === 'home' ? 'flex-row' : 'flex-row-reverse'
                     }`}
+                    style={{ borderColor: 'var(--border-color)' }}
                   >
                     <div className={`flex-1 ${event.team === 'home' ? 'text-left' : 'text-right'}`}>
-                      <p className="text-white font-medium">
+                      <p className="text-[var(--text-primary)] font-medium">
                         {event.type === 'goal' && '⚽ '}
                         {event.player}
                       </p>
                       {event.relatedPlayer && (
-                        <p className="text-slate-400 text-sm">Assist: {event.relatedPlayer}</p>
+                        <p className="text-[var(--text-secondary)] text-sm">Assist: {event.relatedPlayer}</p>
                       )}
                     </div>
-                    <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-white font-bold">
+                    <div className="w-12 h-12 rounded-full bg-[var(--muted-bg)] flex items-center justify-center text-[var(--text-primary)] font-bold">
                       {event.minute}&apos;
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-slate-400 text-center py-8">No events recorded yet</p>
+              <p className="text-[var(--text-secondary)] text-center py-8">No events recorded yet</p>
             )}
           </div>
         )}
@@ -313,37 +314,37 @@ export default function MatchDetailPage() {
         {activeTab === 'lineup' && (
           <div className="grid grid-cols-2 gap-6">
             <div>
-              <h3 className="text-lg font-semibold text-white mb-4">{match.home_team}</h3>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">{match.home_team}</h3>
               {match.lineups.home.length > 0 ? (
                 <div className="space-y-2">
                   {match.lineups.home.slice(0, 11).map((player, idx) => (
-                    <div key={idx} className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
-                      <span className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs text-slate-300">
+                    <div key={idx} className="flex items-center gap-3 p-3 bg-[var(--card-bg)] border rounded-lg" style={{ borderColor: 'var(--border-color)' }}>
+                      <span className="w-6 h-6 rounded-full bg-[var(--muted-bg)] flex items-center justify-center text-xs text-[var(--text-secondary)]">
                         {idx + 1}
                       </span>
-                      <span className="text-white">{player}</span>
+                      <span className="text-[var(--text-primary)]">{player}</span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-slate-400">Lineup not available</p>
+                <p className="text-[var(--text-secondary)]">Lineup not available</p>
               )}
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-white mb-4">{match.away_team}</h3>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">{match.away_team}</h3>
               {match.lineups.away.length > 0 ? (
                 <div className="space-y-2">
                   {match.lineups.away.slice(0, 11).map((player, idx) => (
-                    <div key={idx} className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg">
-                      <span className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs text-slate-300">
+                    <div key={idx} className="flex items-center gap-3 p-3 bg-[var(--card-bg)] border rounded-lg" style={{ borderColor: 'var(--border-color)' }}>
+                      <span className="w-6 h-6 rounded-full bg-[var(--muted-bg)] flex items-center justify-center text-xs text-[var(--text-secondary)]">
                         {idx + 1}
                       </span>
-                      <span className="text-white">{player}</span>
+                      <span className="text-[var(--text-primary)]">{player}</span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-slate-400">Lineup not available</p>
+                <p className="text-[var(--text-secondary)]">Lineup not available</p>
               )}
             </div>
           </div>
@@ -351,7 +352,7 @@ export default function MatchDetailPage() {
 
         {activeTab === 'stats' && (
           <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Match Statistics</h3>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Match Statistics</h3>
             
             {[
               { label: 'Possession', values: match.stats.possession, suffix: '%' },
@@ -362,13 +363,13 @@ export default function MatchDetailPage() {
             ].map((stat) => (
               <div key={stat.label}>
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-white">{stat.values[0]}{stat.suffix || ''}</span>
-                  <span className="text-slate-400">{stat.label}</span>
-                  <span className="text-white">{stat.values[1]}{stat.suffix || ''}</span>
+                  <span className="text-[var(--text-primary)]">{stat.values[0]}{stat.suffix || ''}</span>
+                  <span className="text-[var(--text-secondary)]">{stat.label}</span>
+                  <span className="text-[var(--text-primary)]">{stat.values[1]}{stat.suffix || ''}</span>
                 </div>
-                <div className="flex h-2 bg-slate-700 rounded-full overflow-hidden">
+                <div className="flex h-2 bg-[var(--muted-bg)] rounded-full overflow-hidden">
                   <div
-                    className="bg-indigo-500"
+                    className="bg-[var(--accent-primary)]"
                     style={{ width: `${(stat.values[0] / (stat.values[0] + stat.values[1] || 1)) * 100}%` }}
                   />
                   <div
@@ -384,8 +385,8 @@ export default function MatchDetailPage() {
         {activeTab === 'h2h' && (
           <div className="text-center py-8">
             <span className="text-4xl mb-4 block">📊</span>
-            <p className="text-slate-400">Head-to-head data coming soon</p>
-            <p className="text-slate-500 text-sm mt-2">Historical match data between these teams</p>
+            <p className="text-[var(--text-secondary)]">Head-to-head data coming soon</p>
+            <p className="text-[var(--text-tertiary)] text-sm mt-2">Historical match data between these teams</p>
           </div>
         )}
       </div>
