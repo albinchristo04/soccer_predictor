@@ -71,15 +71,15 @@ export default function MatchCalendar({ leagueId, leagueName }: MatchCalendarPro
               status = 'completed';
             } else if (statusType === 'STATUS_IN_PROGRESS' || statusType === 'STATUS_HALFTIME' || statusType.includes('HALF')) {
               status = 'live';
-              minute = competition?.status?.displayClock ? parseInt(competition.status.displayClock) : undefined;
+              minute = competition?.status?.displayClock ? parseInt(competition.status.displayClock, 10) : undefined;
             }
             
             allMatches.push({
               id: event.id,
               home_team: homeTeam?.team?.displayName || homeTeam?.team?.shortDisplayName || '',
               away_team: awayTeam?.team?.displayName || awayTeam?.team?.shortDisplayName || '',
-              home_score: status !== 'upcoming' ? parseInt(homeTeam?.score || '0') : null,
-              away_score: status !== 'upcoming' ? parseInt(awayTeam?.score || '0') : null,
+              home_score: status !== 'upcoming' ? parseInt(homeTeam?.score || '0', 10) : null,
+              away_score: status !== 'upcoming' ? parseInt(awayTeam?.score || '0', 10) : null,
               time: event.date || '',
               status,
               minute,
@@ -94,7 +94,9 @@ export default function MatchCalendar({ leagueId, leagueName }: MatchCalendarPro
       // Group matches by date
       const grouped: Record<string, Match[]> = {};
       for (const match of allMatches) {
-        const matchDate = new Date(match.time).toISOString().split('T')[0];
+        // Cache the date string to avoid creating new Date objects repeatedly
+        const matchDate = match.time ? new Date(match.time).toISOString().split('T')[0] : '';
+        if (!matchDate) continue;
         if (!grouped[matchDate]) {
           grouped[matchDate] = [];
         }

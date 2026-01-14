@@ -12,19 +12,6 @@ const SIMULATION_LEAGUES = [
   { id: 53, name: 'Ligue 1', flag: '🇫🇷' },
 ];
 
-interface TeamStanding {
-  team_name: string;
-  team_id: number | null;
-  current_position: number;
-  current_points: number;
-  avg_final_position: number;
-  avg_final_points: number;
-  title_probability: number;
-  top_4_probability: number;
-  europa_probability: number;
-  relegation_probability: number;
-}
-
 export default function SeasonSimulator() {
   const [selectedLeague, setSelectedLeague] = useState<typeof SIMULATION_LEAGUES[0] | null>(null);
   const [loading, setLoading] = useState(false);
