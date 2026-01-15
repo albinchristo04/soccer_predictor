@@ -24,6 +24,7 @@ const ESPN_LEAGUES = [
   { id: 'usa.1', name: 'MLS' },
   { id: 'uefa.champions', name: 'UEFA Champions League' },
   { id: 'uefa.europa', name: 'UEFA Europa League' },
+  { id: 'fifa.world', name: 'FIFA World Cup 2026' },
 ]
 
 async function fetchESPNMatches(): Promise<Match[]> {

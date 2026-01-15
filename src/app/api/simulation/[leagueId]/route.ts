@@ -140,18 +140,22 @@ interface Standing {
   relegation_probability: number
 }
 
-// Simulation constants
-const TOTAL_MATCHES_PER_SEASON = 38
-const AVG_POINTS_PER_MATCH = 2.5
-const BASE_REMAINING_MATCHES = 20
-const TITLE_BASE_PROB = 0.3
-const TITLE_RANDOM_FACTOR = 0.15
-const TOP4_BASE_PROB = 0.14
-const TOP4_RANDOM_FACTOR = 0.08
-const EUROPA_BASE_PROB = 0.3
-const EUROPA_RANDOM_FACTOR = 0.15
-const RELEGATION_BASE_PROB = 0.22
-const RELEGATION_RANDOM_FACTOR = 0.08
+// League configuration - total matches per season for different league sizes
+const LEAGUE_MATCH_CONFIG: Record<number, number> = {
+  47: 38, // Premier League (20 teams)
+  87: 38, // La Liga (20 teams)
+  55: 38, // Serie A (20 teams)
+  54: 34, // Bundesliga (18 teams)
+  53: 34, // Ligue 1 (18 teams)
+}
+
+// Points per win
+const POINTS_PER_WIN = 3
+
+// Probability factors
+const TITLE_RANDOM_FACTOR = 0.1
+const TOP4_RANDOM_FACTOR = 0.05
+const RELEGATION_RANDOM_FACTOR = 0.05
 
 export async function GET(
   request: NextRequest,
@@ -172,17 +176,26 @@ export async function GET(
   // Helper function to generate simulation results from team data
   const generateSimulationResults = (teams: { name: string; points: number }[]) => {
     const totalTeams = teams.length
+    const totalMatchesPerSeason = LEAGUE_MATCH_CONFIG[leagueId] || 38
+    const maxPoints = totalMatchesPerSeason * POINTS_PER_WIN // e.g., 114 for 38 games
     
-    // First pass: calculate projected points for all teams
+    // Estimate matches played from leader's points (approximate 2 pts/match average)
+    const leaderPoints = teams[0]?.points || 0
+    const estimatedMatchesPlayed = Math.min(totalMatchesPerSeason, Math.round(leaderPoints / 2))
+    const remainingMatches = totalMatchesPerSeason - estimatedMatchesPlayed
+    
+    // Calculate projected points for all teams based on current performance
     const teamsWithProjections = teams.map((team, idx) => {
       const currentPosition = idx + 1
       const points = team.points
       
-      // Simple Monte Carlo simulation based on current standings
-      const remainingMatches = TOTAL_MATCHES_PER_SEASON - Math.round(points / AVG_POINTS_PER_MATCH)
-      const matchesPlayed = TOTAL_MATCHES_PER_SEASON - remainingMatches
-      const avgPointsPerGame = matchesPlayed > 0 ? points / matchesPlayed : 1.5
-      const projectedPoints = points + (remainingMatches * avgPointsPerGame)
+      // Calculate avg points per game based on estimated matches played
+      const avgPointsPerGame = estimatedMatchesPlayed > 0 ? points / estimatedMatchesPlayed : 1.5
+      
+      // Project final points: current points + expected from remaining matches
+      // Add slight variance based on position (leaders more likely to maintain, others have more uncertainty)
+      const positionFactor = 1 + (0.05 * (currentPosition - 1) / totalTeams) // Slight bonus for current leaders
+      const projectedPoints = Math.min(maxPoints, points + (remainingMatches * avgPointsPerGame * (1 / positionFactor)))
       
       return {
         name: team.name,
@@ -193,25 +206,52 @@ export async function GET(
     })
     
     // Sort by projected points to get predicted final positions
+    // This ensures the team with most expected points is #1
     const sortedByProjected = [...teamsWithProjections].sort((a, b) => b.projectedPoints - a.projectedPoints)
     
-    // Create standings with probabilities based on PROJECTED position (not current position)
+    // Create standings with probabilities based on PROJECTED position
     const standings: Standing[] = sortedByProjected.map((team, projectedIdx) => {
       const projectedPosition = projectedIdx + 1
       
       // Calculate probabilities based on projected position
-      const titleProb = projectedPosition <= 2 
-        ? Math.max(0, (3 - projectedPosition) * TITLE_BASE_PROB + Math.random() * TITLE_RANDOM_FACTOR) 
-        : projectedPosition <= 4 ? Math.random() * TOP4_RANDOM_FACTOR : 0
-      const top4Prob = projectedPosition <= 6 
-        ? Math.max(0, (7 - projectedPosition) * TOP4_BASE_PROB + Math.random() * TOP4_RANDOM_FACTOR) 
-        : Math.random() * 0.03
-      const europaProb = projectedPosition >= 5 && projectedPosition <= 8 
-        ? EUROPA_BASE_PROB + Math.random() * EUROPA_RANDOM_FACTOR 
-        : Math.random() * RELEGATION_RANDOM_FACTOR
-      const relegationProb = projectedPosition >= totalTeams - 4 
-        ? Math.max(0, (projectedPosition - totalTeams + 5) * RELEGATION_BASE_PROB + Math.random() * RELEGATION_RANDOM_FACTOR) 
-        : 0
+      // Position 1 gets highest title probability, decreases for others
+      let titleProb = 0
+      if (projectedPosition === 1) {
+        titleProb = 0.45 + Math.random() * TITLE_RANDOM_FACTOR
+      } else if (projectedPosition === 2) {
+        titleProb = 0.25 + Math.random() * TITLE_RANDOM_FACTOR
+      } else if (projectedPosition === 3) {
+        titleProb = 0.12 + Math.random() * TITLE_RANDOM_FACTOR
+      } else if (projectedPosition === 4) {
+        titleProb = 0.05 + Math.random() * TITLE_RANDOM_FACTOR
+      }
+      
+      // Top 4 probability
+      let top4Prob = 0
+      if (projectedPosition <= 4) {
+        top4Prob = 0.7 + (4 - projectedPosition) * 0.08 + Math.random() * TOP4_RANDOM_FACTOR
+      } else if (projectedPosition <= 6) {
+        top4Prob = 0.3 - (projectedPosition - 4) * 0.1 + Math.random() * TOP4_RANDOM_FACTOR
+      } else if (projectedPosition <= 8) {
+        top4Prob = 0.05 + Math.random() * 0.05
+      }
+      
+      // Europa probability (5th-7th typically)
+      let europaProb = 0
+      if (projectedPosition >= 5 && projectedPosition <= 7) {
+        europaProb = 0.4 + Math.random() * 0.1
+      } else if (projectedPosition === 4 || projectedPosition === 8) {
+        europaProb = 0.15 + Math.random() * 0.1
+      }
+      
+      // Relegation probability (bottom 3-4 teams)
+      const relegationZone = totalTeams <= 18 ? 3 : 3 // Bottom 3 usually
+      let relegationProb = 0
+      if (projectedPosition > totalTeams - relegationZone) {
+        relegationProb = 0.5 + (projectedPosition - (totalTeams - relegationZone)) * 0.15 + Math.random() * RELEGATION_RANDOM_FACTOR
+      } else if (projectedPosition > totalTeams - 5) {
+        relegationProb = 0.15 + Math.random() * RELEGATION_RANDOM_FACTOR
+      }
       
       return {
         team_name: team.name,
@@ -237,16 +277,11 @@ export async function GET(
     const sortedByRelegation = [...standings].sort((a, b) => b.relegation_probability - a.relegation_probability)
     const relegationCandidates = sortedByRelegation.slice(0, 3).map(t => t.team_name)
     
-    // Estimate remaining matches based on average points
-    const avgPoints = standings.reduce((sum, t) => sum + t.current_points, 0) / standings.length
-    const estimatedMatchesPlayed = Math.round(avgPoints / AVG_POINTS_PER_MATCH)
-    const estimatedRemainingMatches = Math.max(0, TOTAL_MATCHES_PER_SEASON - estimatedMatchesPlayed)
-    
     return {
       league_id: leagueId,
       league_name: leagueName,
       n_simulations: nSimulations,
-      remaining_matches: estimatedRemainingMatches,
+      remaining_matches: remainingMatches,
       most_likely_champion: mostLikelyChampion,
       champion_probability: championProbability,
       likely_top_4: likelyTop4,

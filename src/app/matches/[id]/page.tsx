@@ -65,7 +65,7 @@ interface MatchDetails {
 
 // Map league IDs for ESPN API
 const LEAGUE_ENDPOINTS = [
-  'eng.1', 'esp.1', 'ita.1', 'ger.1', 'fra.1', 'usa.1', 'uefa.champions', 'uefa.europa'
+  'eng.1', 'esp.1', 'ita.1', 'ger.1', 'fra.1', 'usa.1', 'uefa.champions', 'uefa.europa', 'fifa.world'
 ]
 
 export default function MatchDetailPage() {
@@ -507,7 +507,7 @@ export default function MatchDetailPage() {
                   </div>
                   
                   {match.lineups.home.length > 0 ? (
-                    <div className="relative z-10 h-full flex flex-col justify-between py-4">
+                    <div className="relative z-10 h-full flex flex-col justify-between py-4 min-h-[260px]">
                       {/* Group players by position type */}
                       {(() => {
                         const players = match.lineups.home.slice(0, 11)
@@ -519,34 +519,40 @@ export default function MatchDetailPage() {
                         const unpositioned = players.filter(p => !gk.includes(p) && !def.includes(p) && !mid.includes(p) && !fwd.includes(p))
                         
                         const renderRow = (rowPlayers: PlayerLineup[], color: string) => (
-                          <div className="flex justify-center gap-2 flex-wrap">
-                            {rowPlayers.map((p, i) => (
-                              <div key={i} className="text-center">
-                                <div className={`w-10 h-10 rounded-full ${color} flex items-center justify-center text-white font-bold text-sm shadow-lg`}>
-                                  {p.jersey || (i + 1)}
+                          <div className="flex flex-col items-center">
+                            <div className="flex justify-center gap-3 flex-wrap">
+                              {rowPlayers.map((p, i) => (
+                                <div key={i} className="text-center">
+                                  <div className={`w-10 h-10 rounded-full ${color} flex items-center justify-center text-white font-bold text-sm shadow-lg border-2 border-white/30`}>
+                                    {p.jersey || (i + 1)}
+                                  </div>
+                                  <p className="text-xs text-white mt-1 max-w-[60px] truncate drop-shadow font-medium">{p.name.split(' ').pop()}</p>
                                 </div>
-                                <p className="text-xs text-white mt-1 max-w-[60px] truncate drop-shadow">{p.name.split(' ').pop()}</p>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
                         )
                         
+                        // If we have positions, render in formation
+                        if (gk.length > 0 || def.length > 0 || mid.length > 0 || fwd.length > 0) {
+                          return (
+                            <div className="flex flex-col justify-between h-full gap-4">
+                              {fwd.length > 0 && renderRow(fwd, 'bg-red-600')}
+                              {mid.length > 0 && renderRow(mid, 'bg-blue-600')}
+                              {def.length > 0 && renderRow(def, 'bg-indigo-600')}
+                              {gk.length > 0 && renderRow(gk, 'bg-amber-600')}
+                            </div>
+                          )
+                        }
+                        
+                        // Fallback: display in default 4-3-3 layout
                         return (
-                          <>
-                            {fwd.length > 0 && renderRow(fwd, 'bg-red-600')}
-                            {mid.length > 0 && renderRow(mid, 'bg-blue-600')}
-                            {def.length > 0 && renderRow(def, 'bg-indigo-600')}
-                            {gk.length > 0 && renderRow(gk, 'bg-amber-600')}
-                            {unpositioned.length > 0 && players.length === unpositioned.length && (
-                              // If no positions, display all in rows
-                              <div className="space-y-4">
-                                {renderRow(unpositioned.slice(0, 1), 'bg-amber-600')}
-                                {renderRow(unpositioned.slice(1, 5), 'bg-indigo-600')}
-                                {renderRow(unpositioned.slice(5, 8), 'bg-blue-600')}
-                                {renderRow(unpositioned.slice(8, 11), 'bg-red-600')}
-                              </div>
-                            )}
-                          </>
+                          <div className="flex flex-col justify-between h-full gap-4">
+                            {renderRow(unpositioned.slice(8, 11), 'bg-red-600', 'FWD')}
+                            {renderRow(unpositioned.slice(5, 8), 'bg-blue-600', 'MID')}
+                            {renderRow(unpositioned.slice(1, 5), 'bg-indigo-600', 'DEF')}
+                            {renderRow(unpositioned.slice(0, 1), 'bg-amber-600', 'GK')}
+                          </div>
                         )
                       })()}
                     </div>
@@ -595,7 +601,7 @@ export default function MatchDetailPage() {
                   </div>
                   
                   {match.lineups.away.length > 0 ? (
-                    <div className="relative z-10 h-full flex flex-col justify-between py-4">
+                    <div className="relative z-10 h-full flex flex-col justify-between py-4 min-h-[260px]">
                       {(() => {
                         const players = match.lineups.away.slice(0, 11)
                         const gk = players.filter(p => p.position === 'GK' || p.position === 'G')
@@ -605,33 +611,40 @@ export default function MatchDetailPage() {
                         const unpositioned = players.filter(p => !gk.includes(p) && !def.includes(p) && !mid.includes(p) && !fwd.includes(p))
                         
                         const renderRow = (rowPlayers: PlayerLineup[], color: string) => (
-                          <div className="flex justify-center gap-2 flex-wrap">
-                            {rowPlayers.map((p, i) => (
-                              <div key={i} className="text-center">
-                                <div className={`w-10 h-10 rounded-full ${color} flex items-center justify-center text-white font-bold text-sm shadow-lg`}>
-                                  {p.jersey || (i + 1)}
+                          <div className="flex flex-col items-center">
+                            <div className="flex justify-center gap-3 flex-wrap">
+                              {rowPlayers.map((p, i) => (
+                                <div key={i} className="text-center">
+                                  <div className={`w-10 h-10 rounded-full ${color} flex items-center justify-center text-white font-bold text-sm shadow-lg border-2 border-white/30`}>
+                                    {p.jersey || (i + 1)}
+                                  </div>
+                                  <p className="text-xs text-white mt-1 max-w-[60px] truncate drop-shadow font-medium">{p.name.split(' ').pop()}</p>
                                 </div>
-                                <p className="text-xs text-white mt-1 max-w-[60px] truncate drop-shadow">{p.name.split(' ').pop()}</p>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
                         )
                         
+                        // If we have positions, render in formation
+                        if (gk.length > 0 || def.length > 0 || mid.length > 0 || fwd.length > 0) {
+                          return (
+                            <div className="flex flex-col justify-between h-full gap-4">
+                              {fwd.length > 0 && renderRow(fwd, 'bg-red-600')}
+                              {mid.length > 0 && renderRow(mid, 'bg-orange-600')}
+                              {def.length > 0 && renderRow(def, 'bg-yellow-600')}
+                              {gk.length > 0 && renderRow(gk, 'bg-amber-600')}
+                            </div>
+                          )
+                        }
+                        
+                        // Fallback: display in default 4-3-3 layout
                         return (
-                          <>
-                            {fwd.length > 0 && renderRow(fwd, 'bg-red-600')}
-                            {mid.length > 0 && renderRow(mid, 'bg-orange-600')}
-                            {def.length > 0 && renderRow(def, 'bg-yellow-600')}
-                            {gk.length > 0 && renderRow(gk, 'bg-amber-600')}
-                            {unpositioned.length > 0 && players.length === unpositioned.length && (
-                              <div className="space-y-4">
-                                {renderRow(unpositioned.slice(0, 1), 'bg-amber-600')}
-                                {renderRow(unpositioned.slice(1, 5), 'bg-yellow-600')}
-                                {renderRow(unpositioned.slice(5, 8), 'bg-orange-600')}
-                                {renderRow(unpositioned.slice(8, 11), 'bg-red-600')}
-                              </div>
-                            )}
-                          </>
+                          <div className="flex flex-col justify-between h-full gap-4">
+                            {renderRow(unpositioned.slice(8, 11), 'bg-red-600')}
+                            {renderRow(unpositioned.slice(5, 8), 'bg-orange-600')}
+                            {renderRow(unpositioned.slice(1, 5), 'bg-yellow-600')}
+                            {renderRow(unpositioned.slice(0, 1), 'bg-amber-600')}
+                          </div>
                         )
                       })()}
                     </div>

@@ -15,7 +15,7 @@ const LEAGUES = [
   { id: 'usa.1', name: 'MLS', country: 'USA', flagCode: 'US' },
   { id: 'uefa.champions', name: 'UEFA Champions League', country: 'Europe', flagCode: 'EU' },
   { id: 'uefa.europa', name: 'UEFA Europa League', country: 'Europe', flagCode: 'EU' },
-  { id: 'fifa.worldcup', name: 'FIFA World Cup 2026', country: 'USA/Mexico/Canada', flagCode: 'WORLD' },
+  { id: 'fifa.world', name: 'FIFA World Cup 2026', country: 'USA/Mexico/Canada', flagCode: 'WORLD' },
 ];
 
 interface Standing {

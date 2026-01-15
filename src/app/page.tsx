@@ -456,27 +456,47 @@ export default function Home() {
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {leagues.map((league) => (
-              <div 
-                key={league.name}
-                className="group flex items-center gap-3 p-4 rounded-2xl bg-[var(--card-bg)] border hover:border-[var(--accent-primary)]/50 transition-all duration-300 cursor-pointer"
-                style={{ borderColor: 'var(--border-color)' }}
-              >
-                {leagueFlagUrls[league.country] ? (
-                  <img 
-                    src={leagueFlagUrls[league.country]} 
-                    alt={league.country}
-                    className="w-6 h-auto rounded-sm shadow-sm"
-                  />
-                ) : (
-                  <span className="text-xs font-bold text-[var(--text-secondary)] bg-[var(--muted-bg)] px-2 py-1 rounded">{league.country}</span>
-                )}
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-primary)] group-hover:text-[var(--accent-primary)] transition-colors">{league.name}</p>
-                  <p className="text-xs text-[var(--text-tertiary)]">{league.matches} matches/season</p>
-                </div>
-              </div>
-            ))}
+            {leagues.map((league) => {
+              // Map league names to ESPN IDs for navigation
+              const leagueIdMap: Record<string, string> = {
+                'Premier League': 'eng.1',
+                'La Liga': 'esp.1',
+                'Serie A': 'ita.1',
+                'Bundesliga': 'ger.1',
+                'Ligue 1': 'fra.1',
+                'MLS': 'usa.1',
+                'UEFA Champions League': 'uefa.champions',
+                'UEFA Europa League': 'uefa.europa',
+                'FIFA World Cup': 'fifa.world',
+              }
+              const leagueId = leagueIdMap[league.name] || ''
+              
+              return (
+                <Link 
+                  key={league.name}
+                  href={leagueId ? `/matches?league=${leagueId}` : '/matches'}
+                  className="group flex items-center gap-3 p-4 rounded-2xl bg-[var(--card-bg)] border hover:border-[var(--accent-primary)]/50 hover:scale-[1.02] hover:shadow-lg transition-all duration-300"
+                  style={{ borderColor: 'var(--border-color)' }}
+                >
+                  {leagueFlagUrls[league.country] ? (
+                    <img 
+                      src={leagueFlagUrls[league.country]} 
+                      alt={league.country}
+                      className="w-6 h-auto rounded-sm shadow-sm"
+                    />
+                  ) : (
+                    <span className="text-xs font-bold text-[var(--text-secondary)] bg-[var(--muted-bg)] px-2 py-1 rounded">{league.country}</span>
+                  )}
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-[var(--text-primary)] group-hover:text-[var(--accent-primary)] transition-colors">{league.name}</p>
+                    <p className="text-xs text-[var(--text-tertiary)]">{league.matches} matches/season</p>
+                  </div>
+                  <svg className="w-4 h-4 text-[var(--text-tertiary)] group-hover:text-[var(--accent-primary)] group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              )
+            })}
           </div>
         </div>
       </section>
