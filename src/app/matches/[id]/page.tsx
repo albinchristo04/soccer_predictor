@@ -19,6 +19,7 @@ interface TeamStanding {
   drawn: number
   lost: number
   points: number
+  teamName?: string
 }
 
 interface PlayerLineup {
@@ -61,6 +62,7 @@ interface MatchDetails {
   }
   homeStanding?: TeamStanding
   awayStanding?: TeamStanding
+  fullStandings?: TeamStanding[]
 }
 
 // Map league IDs for ESPN API
@@ -224,9 +226,13 @@ export default function MatchDetailPage() {
                 const homeTeamName = matchDetails.home_team.toLowerCase()
                 const awayTeamName = matchDetails.away_team.toLowerCase()
                 
+                // Build full standings array
+                const fullStandings: TeamStanding[] = []
+                
                 for (let i = 0; i < entries.length; i++) {
                   const entry = entries[i]
-                  const teamName = (entry.team?.displayName || '').toLowerCase()
+                  const teamDisplayName = entry.team?.displayName || 'Unknown'
+                  const teamName = teamDisplayName.toLowerCase()
                   
                   const getStatVal = (name: string) => {
                     const stat = entry.stats?.find((s: any) => s.name === name)
@@ -240,7 +246,10 @@ export default function MatchDetailPage() {
                     drawn: getStatVal('ties'),
                     lost: getStatVal('losses'),
                     points: getStatVal('points'),
+                    teamName: teamDisplayName,
                   }
+                  
+                  fullStandings.push(standing)
                   
                   if (teamName.includes(homeTeamName) || homeTeamName.includes(teamName)) {
                     matchDetails.homeStanding = standing
@@ -249,6 +258,8 @@ export default function MatchDetailPage() {
                     matchDetails.awayStanding = standing
                   }
                 }
+                
+                matchDetails.fullStandings = fullStandings
               }
             } catch {
               // Standings not available, continue without them
@@ -784,76 +795,91 @@ export default function MatchDetailPage() {
               )
             })}
             
-            {/* League Standings Mini Section */}
+            {/* Full League Standings Table */}
             <div className="mt-8 pt-6 border-t" style={{ borderColor: 'var(--border-color)' }}>
               <div className="flex items-center justify-between mb-4">
-                <h4 className="text-md font-medium text-[var(--text-primary)]">League Position</h4>
-                {(!match.homeStanding && !match.awayStanding) && (
+                <h4 className="text-md font-medium text-[var(--text-primary)]">{match.league} Standings</h4>
+                {!match.fullStandings?.length && (
                   <span className="text-xs text-[var(--text-tertiary)]">Data unavailable</span>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-[var(--card-bg)] border rounded-xl p-4" style={{ borderColor: 'var(--border-color)' }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[var(--text-primary)] font-medium truncate mr-2">{match.home_team}</span>
-                    <span className={`text-2xl font-bold ${match.homeStanding ? 'text-blue-500' : 'text-[var(--text-tertiary)]'}`}>
-                      {match.homeStanding ? `#${match.homeStanding.position}` : '–'}
-                    </span>
+              
+              {match.fullStandings && match.fullStandings.length > 0 ? (
+                <div className="bg-[var(--card-bg)] border rounded-xl overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
+                  <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                    <table className="w-full">
+                      <thead className="sticky top-0 bg-[var(--muted-bg)]">
+                        <tr className="text-xs text-[var(--text-tertiary)] border-b" style={{ borderColor: 'var(--border-color)' }}>
+                          <th className="text-left py-2 px-3 font-medium">#</th>
+                          <th className="text-left py-2 px-3 font-medium">Team</th>
+                          <th className="text-center py-2 px-3 font-medium">P</th>
+                          <th className="text-center py-2 px-3 font-medium">W</th>
+                          <th className="text-center py-2 px-3 font-medium">D</th>
+                          <th className="text-center py-2 px-3 font-medium">L</th>
+                          <th className="text-center py-2 px-3 font-medium">Pts</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {match.fullStandings.map((team) => {
+                          const isHomeTeam = match.homeStanding?.position === team.position
+                          const isAwayTeam = match.awayStanding?.position === team.position
+                          const isHighlighted = isHomeTeam || isAwayTeam
+                          
+                          return (
+                            <tr
+                              key={team.position}
+                              className={`border-b text-sm transition-colors ${
+                                isHighlighted 
+                                  ? isHomeTeam 
+                                    ? 'bg-blue-500/20 border-l-4 border-l-blue-500' 
+                                    : 'bg-orange-500/20 border-l-4 border-l-orange-500'
+                                  : 'hover:bg-[var(--muted-bg)]'
+                              }`}
+                              style={{ borderColor: 'var(--border-color)' }}
+                            >
+                              <td className={`py-2 px-3 ${isHighlighted ? 'font-bold' : ''}`} style={{ color: 'var(--text-secondary)' }}>
+                                {team.position}
+                              </td>
+                              <td className={`py-2 px-3 ${isHighlighted ? 'font-bold' : 'font-medium'}`} style={{ color: isHighlighted ? (isHomeTeam ? '#3b82f6' : '#f97316') : 'var(--text-primary)' }}>
+                                {team.teamName}
+                                {isHighlighted && (
+                                  <span className="ml-2 text-xs">
+                                    {isHomeTeam ? '(H)' : '(A)'}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-center" style={{ color: 'var(--text-secondary)' }}>{team.played}</td>
+                              <td className="py-2 px-3 text-center text-green-500">{team.won}</td>
+                              <td className="py-2 px-3 text-center" style={{ color: 'var(--text-tertiary)' }}>{team.drawn}</td>
+                              <td className="py-2 px-3 text-center text-red-400">{team.lost}</td>
+                              <td className={`py-2 px-3 text-center font-bold ${isHighlighted ? (isHomeTeam ? 'text-blue-500' : 'text-orange-500') : ''}`} style={{ color: isHighlighted ? undefined : 'var(--text-primary)' }}>
+                                {team.points}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                  {match.homeStanding ? (
-                    <div className="grid grid-cols-4 gap-2 text-center text-xs mt-3">
-                      <div>
-                        <p className="text-[var(--text-tertiary)]">P</p>
-                        <p className="font-semibold text-[var(--text-primary)]">{match.homeStanding.played}</p>
-                      </div>
-                      <div>
-                        <p className="text-[var(--text-tertiary)]">W</p>
-                        <p className="font-semibold text-green-500">{match.homeStanding.won}</p>
-                      </div>
-                      <div>
-                        <p className="text-[var(--text-tertiary)]">D</p>
-                        <p className="font-semibold text-[var(--text-secondary)]">{match.homeStanding.drawn}</p>
-                      </div>
-                      <div>
-                        <p className="text-[var(--text-tertiary)]">Pts</p>
-                        <p className="font-semibold text-[var(--text-primary)]">{match.homeStanding.points}</p>
-                      </div>
+                  
+                  {/* Legend */}
+                  <div className="p-3 border-t flex gap-4 text-xs" style={{ borderColor: 'var(--border-color)', color: 'var(--text-tertiary)' }}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-blue-500/20 border-l-2 border-l-blue-500" />
+                      <span>{match.home_team}</span>
                     </div>
-                  ) : (
-                    <p className="text-xs text-[var(--text-tertiary)] text-center">Standings not available</p>
-                  )}
-                </div>
-                <div className="bg-[var(--card-bg)] border rounded-xl p-4" style={{ borderColor: 'var(--border-color)' }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[var(--text-primary)] font-medium truncate mr-2">{match.away_team}</span>
-                    <span className={`text-2xl font-bold ${match.awayStanding ? 'text-orange-500' : 'text-[var(--text-tertiary)]'}`}>
-                      {match.awayStanding ? `#${match.awayStanding.position}` : '–'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-orange-500/20 border-l-2 border-l-orange-500" />
+                      <span>{match.away_team}</span>
+                    </div>
                   </div>
-                  {match.awayStanding ? (
-                    <div className="grid grid-cols-4 gap-2 text-center text-xs mt-3">
-                      <div>
-                        <p className="text-[var(--text-tertiary)]">P</p>
-                        <p className="font-semibold text-[var(--text-primary)]">{match.awayStanding.played}</p>
-                      </div>
-                      <div>
-                        <p className="text-[var(--text-tertiary)]">W</p>
-                        <p className="font-semibold text-green-500">{match.awayStanding.won}</p>
-                      </div>
-                      <div>
-                        <p className="text-[var(--text-tertiary)]">D</p>
-                        <p className="font-semibold text-[var(--text-secondary)]">{match.awayStanding.drawn}</p>
-                      </div>
-                      <div>
-                        <p className="text-[var(--text-tertiary)]">Pts</p>
-                        <p className="font-semibold text-[var(--text-primary)]">{match.awayStanding.points}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-[var(--text-tertiary)] text-center">Standings not available</p>
-                  )}
                 </div>
-              </div>
+              ) : (
+                <div className="text-center py-8 bg-[var(--muted-bg)] rounded-xl">
+                  <span className="text-3xl mb-3 block">📊</span>
+                  <p className="text-[var(--text-secondary)]">League standings not available</p>
+                </div>
+              )}
             </div>
           </div>
         )}

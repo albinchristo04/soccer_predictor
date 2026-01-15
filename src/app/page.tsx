@@ -267,7 +267,9 @@ function TodaysMatchesWidget() {
                             <span className="text-lg font-bold text-[var(--text-secondary)]">{match.away_score}</span>
                           </div>
                         ) : (
-                          <span className="text-sm font-medium text-[var(--accent-primary)]">vs</span>
+                          <div className="flex flex-col items-center">
+                            <span className="text-sm font-semibold text-[var(--accent-primary)]">{formatMatchTime(match.time)}</span>
+                          </div>
                         )}
                       </div>
                       

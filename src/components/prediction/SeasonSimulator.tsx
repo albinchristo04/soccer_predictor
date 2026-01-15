@@ -195,8 +195,11 @@ export default function SeasonSimulator() {
 
           {/* Full Standings Table */}
           <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-3xl border border-[var(--border-color)] overflow-hidden">
-            <div className="p-4 border-b border-[var(--border-color)]">
+            <div className="p-4 border-b border-[var(--border-color)] flex items-center justify-between">
               <h3 className="font-semibold text-[var(--text-primary)]">Predicted Final Standings</h3>
+              <span className="text-sm text-[var(--text-secondary)]">
+                📊 {result.remaining_matches} games remaining
+              </span>
             </div>
 
             <div className="overflow-x-auto">
