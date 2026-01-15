@@ -207,7 +207,7 @@ function TodaysMatchesWidget() {
       {/* Matches by League */}
       <div className="max-h-[450px] overflow-y-auto">
         {leagueNames.length > 0 ? (
-          <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+          <div>
             {leagueNames.map((league) => (
               <div key={league} className="bg-[var(--card-bg)]">
                 {/* League Header */}
@@ -217,10 +217,10 @@ function TodaysMatchesWidget() {
                   <span className="text-xs text-[var(--text-tertiary)] ml-auto">{matchesByLeague[league].length} {matchesByLeague[league].length === 1 ? 'match' : 'matches'}</span>
                 </div>
                 
-                {/* Matches List */}
-                <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+                {/* Matches List - subtle spacing instead of borders */}
+                <div className="space-y-0.5 py-1 bg-[var(--muted-bg)]">
                   {matchesByLeague[league].map((match, idx) => (
-                    <div key={`${league}-${idx}`} className={`px-4 py-3 flex items-center ${match.status === 'live' ? 'bg-[var(--live-bg)]' : 'hover:bg-[var(--card-hover)]'} transition-colors`}>
+                    <div key={`${league}-${idx}`} className={`px-4 py-3 flex items-center ${match.status === 'live' ? 'bg-[var(--live-bg)]' : 'bg-[var(--card-bg)] hover:bg-[var(--card-hover)]'} transition-colors`}>
                       {/* Home Team */}
                       <div className="flex-1 text-right pr-3">
                         <span className="text-sm text-[var(--text-primary)] font-medium">{match.home_team}</span>
@@ -302,24 +302,24 @@ export default function Home() {
       color: 'from-indigo-500 to-purple-600'
     },
     {
-      href: '/predict?mode=head-to-head',
-      icon: '🎯',
-      title: 'Head-to-Head',
-      description: 'Compare teams within the same league for detailed predictions',
+      href: '/predict',
+      icon: '🤖',
+      title: 'AI Predictions',
+      description: 'Machine learning predictions for any matchup across all leagues',
       color: 'from-emerald-500 to-teal-600'
     },
     {
-      href: '/predict?mode=cross-league',
-      icon: '🌍',
-      title: 'Cross-League',
-      description: 'Analyze hypothetical matchups between teams from different leagues',
+      href: '/news',
+      icon: '📰',
+      title: 'Latest News',
+      description: 'Stay updated with the latest soccer news from around the world',
       color: 'from-amber-500 to-orange-600'
     },
     {
-      href: '/predict',
-      icon: '🤖',
-      title: 'AI Predictor',
-      description: 'Unified ML model trained on all leagues for maximum accuracy',
+      href: '/about',
+      icon: '📊',
+      title: 'About & Analytics',
+      description: 'Learn about the prediction model and explore accuracy metrics',
       color: 'from-rose-500 to-pink-600'
     }
   ]

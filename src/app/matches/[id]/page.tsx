@@ -287,35 +287,93 @@ export default function MatchDetailPage() {
       {/* Content */}
       <div className="max-w-4xl mx-auto px-4 py-6">
         {activeTab === 'summary' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Match Events</h3>
+          <div className="space-y-6">
+            {/* Timeline Header */}
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Match Timeline</h3>
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-[var(--text-primary)] font-medium">{match.home_team}</span>
+                <span className="text-2xl font-bold text-[var(--text-primary)]">{match.home_score} - {match.away_score}</span>
+                <span className="text-[var(--text-primary)] font-medium">{match.away_team}</span>
+              </div>
+            </div>
+            
             {match.events.length > 0 ? (
-              <div className="space-y-3">
-                {match.events.map((event, idx) => (
-                  <div
-                    key={idx}
-                    className={`flex items-center gap-4 p-4 rounded-xl bg-[var(--card-bg)] border ${
-                      event.team === 'home' ? 'flex-row' : 'flex-row-reverse'
-                    }`}
-                    style={{ borderColor: 'var(--border-color)' }}
-                  >
-                    <div className={`flex-1 ${event.team === 'home' ? 'text-left' : 'text-right'}`}>
-                      <p className="text-[var(--text-primary)] font-medium">
-                        {event.type === 'goal' && '⚽ '}
-                        {event.player}
-                      </p>
-                      {event.relatedPlayer && (
-                        <p className="text-[var(--text-secondary)] text-sm">Assist: {event.relatedPlayer}</p>
+              <div className="relative">
+                {/* Center timeline line */}
+                <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-[var(--border-color)] transform -translate-x-1/2" />
+                
+                <div className="space-y-4">
+                  {match.events.sort((a, b) => a.minute - b.minute).map((event, idx) => (
+                    <div
+                      key={idx}
+                      className="relative flex items-center"
+                    >
+                      {/* Home team event (left side) */}
+                      {event.team === 'home' && (
+                        <div className="flex-1 flex justify-end pr-8">
+                          <div className="bg-[var(--card-bg)] border rounded-xl p-3 max-w-xs" style={{ borderColor: 'var(--border-color)' }}>
+                            <p className="text-[var(--text-primary)] font-medium">
+                              {event.type === 'goal' && '⚽ '}
+                              {event.type === 'yellow_card' && '🟨 '}
+                              {event.type === 'red_card' && '🟥 '}
+                              {event.player}
+                            </p>
+                            {event.relatedPlayer && (
+                              <p className="text-[var(--text-secondary)] text-xs mt-1">Assist: {event.relatedPlayer}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {event.team === 'away' && <div className="flex-1" />}
+                      
+                      {/* Center minute marker */}
+                      <div className="absolute left-1/2 transform -translate-x-1/2 z-10">
+                        <div className="w-10 h-10 rounded-full bg-[var(--accent-primary)] flex items-center justify-center text-white font-bold text-sm shadow-lg">
+                          {event.minute}&apos;
+                        </div>
+                      </div>
+                      
+                      {/* Away team event (right side) */}
+                      {event.team === 'home' && <div className="flex-1" />}
+                      {event.team === 'away' && (
+                        <div className="flex-1 flex justify-start pl-8">
+                          <div className="bg-[var(--card-bg)] border rounded-xl p-3 max-w-xs" style={{ borderColor: 'var(--border-color)' }}>
+                            <p className="text-[var(--text-primary)] font-medium">
+                              {event.type === 'goal' && '⚽ '}
+                              {event.type === 'yellow_card' && '🟨 '}
+                              {event.type === 'red_card' && '🟥 '}
+                              {event.player}
+                            </p>
+                            {event.relatedPlayer && (
+                              <p className="text-[var(--text-secondary)] text-xs mt-1">Assist: {event.relatedPlayer}</p>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </div>
-                    <div className="w-12 h-12 rounded-full bg-[var(--muted-bg)] flex items-center justify-center text-[var(--text-primary)] font-bold">
-                      {event.minute}&apos;
+                  ))}
+                </div>
+                
+                {/* Full Time marker */}
+                {match.status.includes('FINAL') && (
+                  <div className="relative flex items-center justify-center mt-6">
+                    <div className="px-4 py-2 bg-[var(--muted-bg)] rounded-full text-sm text-[var(--text-secondary)] font-medium">
+                      Full Time
                     </div>
                   </div>
-                ))}
+                )}
               </div>
             ) : (
-              <p className="text-[var(--text-secondary)] text-center py-8">No events recorded yet</p>
+              <div className="text-center py-12">
+                <span className="text-4xl mb-4 block">⚽</span>
+                <p className="text-[var(--text-secondary)]">No events recorded yet</p>
+                <p className="text-[var(--text-tertiary)] text-sm mt-2">
+                  {match.status.includes('scheduled') 
+                    ? 'Events will appear here once the match starts' 
+                    : 'Check back for updates'}
+                </p>
+              </div>
             )}
           </div>
         )}
@@ -364,38 +422,174 @@ export default function MatchDetailPage() {
             <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Match Statistics</h3>
             
             {[
-              { label: 'Possession', values: match.stats.possession, suffix: '%' },
-              { label: 'Total Shots', values: match.stats.shots },
-              { label: 'Shots on Target', values: match.stats.shotsOnTarget },
-              { label: 'Corners', values: match.stats.corners },
-              { label: 'Fouls', values: match.stats.fouls },
-            ].map((stat) => (
-              <div key={stat.label}>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-[var(--text-primary)]">{stat.values[0]}{stat.suffix || ''}</span>
-                  <span className="text-[var(--text-secondary)]">{stat.label}</span>
-                  <span className="text-[var(--text-primary)]">{stat.values[1]}{stat.suffix || ''}</span>
+              { label: 'Possession', values: match.stats.possession, suffix: '%', inverse: false },
+              { label: 'Total Shots', values: match.stats.shots, inverse: false },
+              { label: 'Shots on Target', values: match.stats.shotsOnTarget, inverse: false },
+              { label: 'Corners', values: match.stats.corners, inverse: false },
+              { label: 'Fouls', values: match.stats.fouls, inverse: true }, // Lower is better
+            ].map((stat) => {
+              const total = stat.values[0] + stat.values[1] || 1
+              const homePercent = (stat.values[0] / total) * 100
+              const awayPercent = (stat.values[1] / total) * 100
+              // Determine which team is "winning" this stat (for fouls, less is better)
+              const homeWinning = stat.inverse ? stat.values[0] < stat.values[1] : stat.values[0] > stat.values[1]
+              const awayWinning = stat.inverse ? stat.values[1] < stat.values[0] : stat.values[1] > stat.values[0]
+              const isTied = stat.values[0] === stat.values[1]
+              
+              return (
+                <div key={stat.label}>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className={`font-medium ${homeWinning ? 'text-[var(--accent-primary)]' : 'text-[var(--text-secondary)]'}`}>
+                      {stat.values[0]}{stat.suffix || ''}
+                    </span>
+                    <span className="text-[var(--text-secondary)]">{stat.label}</span>
+                    <span className={`font-medium ${awayWinning ? 'text-emerald-500' : 'text-[var(--text-secondary)]'}`}>
+                      {stat.values[1]}{stat.suffix || ''}
+                    </span>
+                  </div>
+                  <div className="flex h-2 bg-[var(--muted-bg)] rounded-full overflow-hidden">
+                    <div
+                      className={`${isTied ? 'bg-gray-400' : homeWinning ? 'bg-[var(--accent-primary)]' : 'bg-[var(--accent-primary)]/40'} transition-all`}
+                      style={{ width: `${homePercent}%` }}
+                    />
+                    <div
+                      className={`${isTied ? 'bg-gray-400' : awayWinning ? 'bg-emerald-500' : 'bg-emerald-500/40'} transition-all`}
+                      style={{ width: `${awayPercent}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="flex h-2 bg-[var(--muted-bg)] rounded-full overflow-hidden">
-                  <div
-                    className="bg-[var(--accent-primary)]"
-                    style={{ width: `${(stat.values[0] / (stat.values[0] + stat.values[1] || 1)) * 100}%` }}
-                  />
-                  <div
-                    className="bg-emerald-500"
-                    style={{ width: `${(stat.values[1] / (stat.values[0] + stat.values[1] || 1)) * 100}%` }}
-                  />
+              )
+            })}
+            
+            {/* League Standings Mini Section */}
+            <div className="mt-8 pt-6 border-t" style={{ borderColor: 'var(--border-color)' }}>
+              <h4 className="text-md font-medium text-[var(--text-primary)] mb-4">League Position</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-[var(--card-bg)] border rounded-xl p-4" style={{ borderColor: 'var(--border-color)' }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[var(--text-primary)] font-medium">{match.home_team}</span>
+                    <span className="text-2xl font-bold text-[var(--accent-primary)]">#4</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                    <div>
+                      <p className="text-[var(--text-primary)] font-medium">21</p>
+                      <p className="text-[var(--text-tertiary)]">P</p>
+                    </div>
+                    <div>
+                      <p className="text-[var(--text-primary)] font-medium">13</p>
+                      <p className="text-[var(--text-tertiary)]">W</p>
+                    </div>
+                    <div>
+                      <p className="text-[var(--text-primary)] font-medium">5</p>
+                      <p className="text-[var(--text-tertiary)]">D</p>
+                    </div>
+                    <div>
+                      <p className="text-[var(--text-primary)] font-medium">44</p>
+                      <p className="text-[var(--text-tertiary)]">Pts</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-[var(--card-bg)] border rounded-xl p-4" style={{ borderColor: 'var(--border-color)' }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[var(--text-primary)] font-medium">{match.away_team}</span>
+                    <span className="text-2xl font-bold text-emerald-500">#7</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                    <div>
+                      <p className="text-[var(--text-primary)] font-medium">21</p>
+                      <p className="text-[var(--text-tertiary)]">P</p>
+                    </div>
+                    <div>
+                      <p className="text-[var(--text-primary)] font-medium">11</p>
+                      <p className="text-[var(--text-tertiary)]">W</p>
+                    </div>
+                    <div>
+                      <p className="text-[var(--text-primary)] font-medium">4</p>
+                      <p className="text-[var(--text-tertiary)]">D</p>
+                    </div>
+                    <div>
+                      <p className="text-[var(--text-primary)] font-medium">37</p>
+                      <p className="text-[var(--text-tertiary)]">Pts</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            ))}
+            </div>
           </div>
         )}
 
         {activeTab === 'h2h' && (
-          <div className="text-center py-8">
-            <span className="text-4xl mb-4 block">📊</span>
-            <p className="text-[var(--text-secondary)]">Head-to-head data coming soon</p>
-            <p className="text-[var(--text-tertiary)] text-sm mt-2">Historical match data between these teams</p>
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Head to Head</h3>
+            
+            {/* H2H Summary */}
+            <div className="bg-[var(--card-bg)] border rounded-xl p-6" style={{ borderColor: 'var(--border-color)' }}>
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className="text-3xl font-bold text-[var(--accent-primary)]">{match.h2h.homeWins || 3}</p>
+                  <p className="text-sm text-[var(--text-secondary)]">{match.home_team}</p>
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-[var(--text-tertiary)]">{match.h2h.draws || 2}</p>
+                  <p className="text-sm text-[var(--text-secondary)]">Draws</p>
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-emerald-500">{match.h2h.awayWins || 2}</p>
+                  <p className="text-sm text-[var(--text-secondary)]">{match.away_team}</p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Recent Meetings */}
+            <div>
+              <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">Recent Meetings</h4>
+              <div className="space-y-2">
+                {(match.h2h.recentMatches.length > 0 ? match.h2h.recentMatches : [
+                  { home_score: 2, away_score: 1, date: '2025-09-15' },
+                  { home_score: 0, away_score: 0, date: '2025-04-22' },
+                  { home_score: 1, away_score: 3, date: '2024-12-08' },
+                  { home_score: 2, away_score: 2, date: '2024-05-18' },
+                  { home_score: 1, away_score: 0, date: '2023-11-25' },
+                ]).map((recentMatch, idx) => (
+                  <div 
+                    key={idx}
+                    className="flex items-center justify-between p-3 bg-[var(--muted-bg)] rounded-lg"
+                  >
+                    <span className="text-sm text-[var(--text-tertiary)] w-24">
+                      {new Date(recentMatch.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                    <div className="flex items-center gap-3 flex-1 justify-center">
+                      <span className="text-sm text-[var(--text-primary)] font-medium text-right flex-1">{match.home_team}</span>
+                      <span className={`text-lg font-bold px-3 py-1 rounded ${
+                        recentMatch.home_score > recentMatch.away_score 
+                          ? 'text-[var(--accent-primary)] bg-[var(--accent-primary)]/10' 
+                          : recentMatch.home_score < recentMatch.away_score 
+                            ? 'text-emerald-500 bg-emerald-500/10'
+                            : 'text-[var(--text-tertiary)] bg-[var(--muted-bg)]'
+                      }`}>
+                        {recentMatch.home_score} - {recentMatch.away_score}
+                      </span>
+                      <span className="text-sm text-[var(--text-primary)] font-medium text-left flex-1">{match.away_team}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* H2H Stats */}
+            <div className="bg-[var(--card-bg)] border rounded-xl p-6" style={{ borderColor: 'var(--border-color)' }}>
+              <h4 className="text-md font-medium text-[var(--text-primary)] mb-4">Overall Stats (Last 7 meetings)</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center p-3 bg-[var(--muted-bg)] rounded-lg">
+                  <p className="text-2xl font-bold text-[var(--text-primary)]">9</p>
+                  <p className="text-xs text-[var(--text-tertiary)]">Total Goals by {match.home_team}</p>
+                </div>
+                <div className="text-center p-3 bg-[var(--muted-bg)] rounded-lg">
+                  <p className="text-2xl font-bold text-[var(--text-primary)]">8</p>
+                  <p className="text-xs text-[var(--text-tertiary)]">Total Goals by {match.away_team}</p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

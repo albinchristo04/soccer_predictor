@@ -44,13 +44,12 @@ export default function AboutPage() {
 
   const toggleSection = (index: number) => {
     setOpenSections(prev => {
-      const next = new Set(prev)
-      if (next.has(index)) {
-        next.delete(index)
-      } else {
-        next.add(index)
+      // If the section is already open, close it
+      if (prev.has(index)) {
+        return new Set()
       }
-      return next
+      // Otherwise, close all others and open this one (accordion behavior)
+      return new Set([index])
     })
   }
 
