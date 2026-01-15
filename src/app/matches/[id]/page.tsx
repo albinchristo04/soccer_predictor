@@ -21,6 +21,12 @@ interface TeamStanding {
   points: number
 }
 
+interface PlayerLineup {
+  name: string
+  position?: string
+  jersey?: number
+}
+
 interface MatchDetails {
   id: string
   home_team: string
@@ -35,8 +41,10 @@ interface MatchDetails {
   leagueId?: string
   events: MatchEvent[]
   lineups: {
-    home: string[]
-    away: string[]
+    home: PlayerLineup[]
+    away: PlayerLineup[]
+    homeFormation?: string
+    awayFormation?: string
   }
   stats: {
     possession: [number, number]
@@ -128,6 +136,20 @@ export default function MatchDetailPage() {
             const stat = teamStats.find((s: any) => s.name?.toLowerCase() === name.toLowerCase())
             return parseInt(stat?.displayValue) || 0
           }
+          
+          // Extract lineup with position information
+          const extractLineup = (roster: any[]): PlayerLineup[] => {
+            if (!roster) return []
+            return roster.map((p: any) => ({
+              name: p.athlete?.displayName || 'Unknown',
+              position: p.position?.abbreviation || p.athlete?.position?.abbreviation || undefined,
+              jersey: p.jersey ? parseInt(p.jersey, 10) : undefined,
+            }))
+          }
+          
+          // Get formation from ESPN data
+          const homeFormation = data.rosters?.[0]?.formation || data.boxscore?.teams?.[0]?.formation || undefined
+          const awayFormation = data.rosters?.[1]?.formation || data.boxscore?.teams?.[1]?.formation || undefined
 
           const matchDetails: MatchDetails = {
             id: matchId,
@@ -142,8 +164,10 @@ export default function MatchDetailPage() {
             league: data.header?.league?.name || '',
             events,
             lineups: {
-              home: data.rosters?.[0]?.roster?.map((p: any) => p.athlete?.displayName) || [],
-              away: data.rosters?.[1]?.roster?.map((p: any) => p.athlete?.displayName) || [],
+              home: extractLineup(data.rosters?.[0]?.roster),
+              away: extractLineup(data.rosters?.[1]?.roster),
+              homeFormation,
+              awayFormation,
             },
             stats: {
               possession: [getStatValue('possessionPct', 0), getStatValue('possessionPct', 1)],
@@ -460,40 +484,181 @@ export default function MatchDetailPage() {
         )}
 
         {activeTab === 'lineup' && (
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">{match.home_team}</h3>
-              {match.lineups.home.length > 0 ? (
-                <div className="space-y-2">
-                  {match.lineups.home.slice(0, 11).map((player, idx) => (
-                    <div key={idx} className="flex items-center gap-3 p-3 bg-[var(--card-bg)] border rounded-lg" style={{ borderColor: 'var(--border-color)' }}>
-                      <span className="w-6 h-6 rounded-full bg-[var(--muted-bg)] flex items-center justify-center text-xs text-[var(--text-secondary)]">
-                        {idx + 1}
-                      </span>
-                      <span className="text-[var(--text-primary)]">{player}</span>
-                    </div>
-                  ))}
+          <div className="space-y-6">
+            {/* Formation display */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Home Team Formation */}
+              <div className="bg-[var(--card-bg)] border rounded-2xl overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
+                <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-color)' }}>
+                  <h3 className="font-semibold text-[var(--text-primary)]">{match.home_team}</h3>
+                  {match.lineups.homeFormation && (
+                    <span className="text-sm font-mono px-3 py-1 rounded-full bg-blue-500/20 text-blue-500">
+                      {match.lineups.homeFormation}
+                    </span>
+                  )}
                 </div>
-              ) : (
-                <p className="text-[var(--text-secondary)]">Lineup not available</p>
-              )}
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">{match.away_team}</h3>
-              {match.lineups.away.length > 0 ? (
-                <div className="space-y-2">
-                  {match.lineups.away.slice(0, 11).map((player, idx) => (
-                    <div key={idx} className="flex items-center gap-3 p-3 bg-[var(--card-bg)] border rounded-lg" style={{ borderColor: 'var(--border-color)' }}>
-                      <span className="w-6 h-6 rounded-full bg-[var(--muted-bg)] flex items-center justify-center text-xs text-[var(--text-secondary)]">
-                        {idx + 1}
-                      </span>
-                      <span className="text-[var(--text-primary)]">{player}</span>
+                
+                {/* Pitch visualization */}
+                <div className="relative bg-gradient-to-b from-green-800 to-green-700 p-4 min-h-[280px]">
+                  {/* Pitch lines */}
+                  <div className="absolute inset-4 border-2 border-white/30 rounded-lg">
+                    <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-white/30" />
+                    <div className="absolute left-1/2 top-1/2 w-16 h-16 -ml-8 -mt-8 rounded-full border-2 border-white/30" />
+                  </div>
+                  
+                  {match.lineups.home.length > 0 ? (
+                    <div className="relative z-10 h-full flex flex-col justify-between py-4">
+                      {/* Group players by position type */}
+                      {(() => {
+                        const players = match.lineups.home.slice(0, 11)
+                        const gk = players.filter(p => p.position === 'GK' || p.position === 'G')
+                        const def = players.filter(p => ['CB', 'LB', 'RB', 'LWB', 'RWB', 'D', 'DF'].includes(p.position || ''))
+                        const mid = players.filter(p => ['CM', 'CDM', 'CAM', 'LM', 'RM', 'DM', 'AM', 'M', 'MF'].includes(p.position || ''))
+                        const fwd = players.filter(p => ['ST', 'LW', 'RW', 'CF', 'F', 'FW'].includes(p.position || ''))
+                        // Handle unpositioned players
+                        const unpositioned = players.filter(p => !gk.includes(p) && !def.includes(p) && !mid.includes(p) && !fwd.includes(p))
+                        
+                        const renderRow = (rowPlayers: PlayerLineup[], color: string) => (
+                          <div className="flex justify-center gap-2 flex-wrap">
+                            {rowPlayers.map((p, i) => (
+                              <div key={i} className="text-center">
+                                <div className={`w-10 h-10 rounded-full ${color} flex items-center justify-center text-white font-bold text-sm shadow-lg`}>
+                                  {p.jersey || (i + 1)}
+                                </div>
+                                <p className="text-xs text-white mt-1 max-w-[60px] truncate drop-shadow">{p.name.split(' ').pop()}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                        
+                        return (
+                          <>
+                            {fwd.length > 0 && renderRow(fwd, 'bg-red-600')}
+                            {mid.length > 0 && renderRow(mid, 'bg-blue-600')}
+                            {def.length > 0 && renderRow(def, 'bg-indigo-600')}
+                            {gk.length > 0 && renderRow(gk, 'bg-amber-600')}
+                            {unpositioned.length > 0 && players.length === unpositioned.length && (
+                              // If no positions, display all in rows
+                              <div className="space-y-4">
+                                {renderRow(unpositioned.slice(0, 1), 'bg-amber-600')}
+                                {renderRow(unpositioned.slice(1, 5), 'bg-indigo-600')}
+                                {renderRow(unpositioned.slice(5, 8), 'bg-blue-600')}
+                                {renderRow(unpositioned.slice(8, 11), 'bg-red-600')}
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()}
                     </div>
-                  ))}
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-white/70">
+                      <span>Lineup not available</span>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <p className="text-[var(--text-secondary)]">Lineup not available</p>
-              )}
+                
+                {/* Player list */}
+                <div className="p-4 max-h-[200px] overflow-y-auto">
+                  <div className="space-y-1">
+                    {match.lineups.home.slice(0, 11).map((player, idx) => (
+                      <div key={idx} className="flex items-center justify-between py-1 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center">{player.jersey || idx + 1}</span>
+                          <span className="text-[var(--text-primary)]">{player.name}</span>
+                        </div>
+                        {player.position && (
+                          <span className="text-xs text-[var(--text-tertiary)] bg-[var(--muted-bg)] px-2 py-0.5 rounded">{player.position}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Away Team Formation */}
+              <div className="bg-[var(--card-bg)] border rounded-2xl overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
+                <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-color)' }}>
+                  <h3 className="font-semibold text-[var(--text-primary)]">{match.away_team}</h3>
+                  {match.lineups.awayFormation && (
+                    <span className="text-sm font-mono px-3 py-1 rounded-full bg-orange-500/20 text-orange-500">
+                      {match.lineups.awayFormation}
+                    </span>
+                  )}
+                </div>
+                
+                {/* Pitch visualization */}
+                <div className="relative bg-gradient-to-b from-green-800 to-green-700 p-4 min-h-[280px]">
+                  {/* Pitch lines */}
+                  <div className="absolute inset-4 border-2 border-white/30 rounded-lg">
+                    <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-white/30" />
+                    <div className="absolute left-1/2 top-1/2 w-16 h-16 -ml-8 -mt-8 rounded-full border-2 border-white/30" />
+                  </div>
+                  
+                  {match.lineups.away.length > 0 ? (
+                    <div className="relative z-10 h-full flex flex-col justify-between py-4">
+                      {(() => {
+                        const players = match.lineups.away.slice(0, 11)
+                        const gk = players.filter(p => p.position === 'GK' || p.position === 'G')
+                        const def = players.filter(p => ['CB', 'LB', 'RB', 'LWB', 'RWB', 'D', 'DF'].includes(p.position || ''))
+                        const mid = players.filter(p => ['CM', 'CDM', 'CAM', 'LM', 'RM', 'DM', 'AM', 'M', 'MF'].includes(p.position || ''))
+                        const fwd = players.filter(p => ['ST', 'LW', 'RW', 'CF', 'F', 'FW'].includes(p.position || ''))
+                        const unpositioned = players.filter(p => !gk.includes(p) && !def.includes(p) && !mid.includes(p) && !fwd.includes(p))
+                        
+                        const renderRow = (rowPlayers: PlayerLineup[], color: string) => (
+                          <div className="flex justify-center gap-2 flex-wrap">
+                            {rowPlayers.map((p, i) => (
+                              <div key={i} className="text-center">
+                                <div className={`w-10 h-10 rounded-full ${color} flex items-center justify-center text-white font-bold text-sm shadow-lg`}>
+                                  {p.jersey || (i + 1)}
+                                </div>
+                                <p className="text-xs text-white mt-1 max-w-[60px] truncate drop-shadow">{p.name.split(' ').pop()}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                        
+                        return (
+                          <>
+                            {fwd.length > 0 && renderRow(fwd, 'bg-red-600')}
+                            {mid.length > 0 && renderRow(mid, 'bg-orange-600')}
+                            {def.length > 0 && renderRow(def, 'bg-yellow-600')}
+                            {gk.length > 0 && renderRow(gk, 'bg-amber-600')}
+                            {unpositioned.length > 0 && players.length === unpositioned.length && (
+                              <div className="space-y-4">
+                                {renderRow(unpositioned.slice(0, 1), 'bg-amber-600')}
+                                {renderRow(unpositioned.slice(1, 5), 'bg-yellow-600')}
+                                {renderRow(unpositioned.slice(5, 8), 'bg-orange-600')}
+                                {renderRow(unpositioned.slice(8, 11), 'bg-red-600')}
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-white/70">
+                      <span>Lineup not available</span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Player list */}
+                <div className="p-4 max-h-[200px] overflow-y-auto">
+                  <div className="space-y-1">
+                    {match.lineups.away.slice(0, 11).map((player, idx) => (
+                      <div key={idx} className="flex items-center justify-between py-1 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center">{player.jersey || idx + 1}</span>
+                          <span className="text-[var(--text-primary)]">{player.name}</span>
+                        </div>
+                        {player.position && (
+                          <span className="text-xs text-[var(--text-tertiary)] bg-[var(--muted-bg)] px-2 py-0.5 rounded">{player.position}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
