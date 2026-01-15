@@ -12,6 +12,15 @@ interface MatchEvent {
   relatedPlayer?: string
 }
 
+interface TeamStanding {
+  position: number
+  played: number
+  won: number
+  drawn: number
+  lost: number
+  points: number
+}
+
 interface MatchDetails {
   id: string
   home_team: string
@@ -23,6 +32,7 @@ interface MatchDetails {
   venue?: string
   date: string
   league: string
+  leagueId?: string
   events: MatchEvent[]
   lineups: {
     home: string[]
@@ -41,6 +51,8 @@ interface MatchDetails {
     awayWins: number
     recentMatches: { home_score: number; away_score: number; date: string }[]
   }
+  homeStanding?: TeamStanding
+  awayStanding?: TeamStanding
 }
 
 // Map league IDs for ESPN API
@@ -148,6 +160,78 @@ export default function MatchDetailPage() {
             }
           }
           
+          // Try to extract H2H data from ESPN response
+          const headToHead = data.headToHeadHistory || data.previousMeetings || data.headToHead
+          if (headToHead) {
+            // Count wins/draws from recent meetings
+            const recentGames = headToHead.events || headToHead.games || []
+            let homeWins = 0, awayWins = 0, draws = 0
+            const recentMatches: { home_score: number; away_score: number; date: string }[] = []
+            
+            for (const game of recentGames.slice(0, 10)) {
+              const homeScore = parseInt(game.homeTeam?.score || game.score?.home || '0', 10)
+              const awayScore = parseInt(game.awayTeam?.score || game.score?.away || '0', 10)
+              
+              if (homeScore > awayScore) homeWins++
+              else if (awayScore > homeScore) awayWins++
+              else draws++
+              
+              recentMatches.push({
+                home_score: homeScore,
+                away_score: awayScore,
+                date: game.date || game.gameDate || '',
+              })
+            }
+            
+            matchDetails.h2h = { homeWins, draws, awayWins, recentMatches }
+          }
+          
+          // Try to fetch league standings to get team positions
+          const leagueSlug = leagueId || data.header?.league?.slug || ''
+          if (leagueSlug) {
+            try {
+              const standingsRes = await fetch(
+                `https://site.api.espn.com/apis/v2/sports/soccer/${leagueSlug}/standings`
+              )
+              if (standingsRes.ok) {
+                const standingsData = await standingsRes.json()
+                const entries = standingsData.children?.[0]?.standings?.entries || []
+                
+                const homeTeamName = matchDetails.home_team.toLowerCase()
+                const awayTeamName = matchDetails.away_team.toLowerCase()
+                
+                for (let i = 0; i < entries.length; i++) {
+                  const entry = entries[i]
+                  const teamName = (entry.team?.displayName || '').toLowerCase()
+                  
+                  const getStatVal = (name: string) => {
+                    const stat = entry.stats?.find((s: any) => s.name === name)
+                    return parseInt(stat?.value || '0', 10)
+                  }
+                  
+                  const standing: TeamStanding = {
+                    position: i + 1,
+                    played: getStatVal('gamesPlayed'),
+                    won: getStatVal('wins'),
+                    drawn: getStatVal('ties'),
+                    lost: getStatVal('losses'),
+                    points: getStatVal('points'),
+                  }
+                  
+                  if (teamName.includes(homeTeamName) || homeTeamName.includes(teamName)) {
+                    matchDetails.homeStanding = standing
+                  }
+                  if (teamName.includes(awayTeamName) || awayTeamName.includes(teamName)) {
+                    matchDetails.awayStanding = standing
+                  }
+                }
+              }
+            } catch {
+              // Standings not available, continue without them
+            }
+          }
+          
+          matchDetails.leagueId = leagueSlug
           setMatch(matchDetails)
         }
       } catch (e) {
@@ -458,26 +542,74 @@ export default function MatchDetailPage() {
               )
             })}
             
-            {/* League Standings Mini Section - Placeholder data when actual standings unavailable */}
+            {/* League Standings Mini Section */}
             <div className="mt-8 pt-6 border-t" style={{ borderColor: 'var(--border-color)' }}>
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-md font-medium text-[var(--text-primary)]">League Position</h4>
-                <span className="text-xs text-[var(--text-tertiary)]">Sample data</span>
+                {(!match.homeStanding && !match.awayStanding) && (
+                  <span className="text-xs text-[var(--text-tertiary)]">Data unavailable</span>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-[var(--card-bg)] border rounded-xl p-4" style={{ borderColor: 'var(--border-color)' }}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[var(--text-primary)] font-medium">{match.home_team}</span>
-                    <span className="text-2xl font-bold text-[var(--text-tertiary)]">–</span>
+                    <span className="text-[var(--text-primary)] font-medium truncate mr-2">{match.home_team}</span>
+                    <span className={`text-2xl font-bold ${match.homeStanding ? 'text-blue-500' : 'text-[var(--text-tertiary)]'}`}>
+                      {match.homeStanding ? `#${match.homeStanding.position}` : '–'}
+                    </span>
                   </div>
-                  <p className="text-xs text-[var(--text-tertiary)] text-center">Standings data unavailable</p>
+                  {match.homeStanding ? (
+                    <div className="grid grid-cols-4 gap-2 text-center text-xs mt-3">
+                      <div>
+                        <p className="text-[var(--text-tertiary)]">P</p>
+                        <p className="font-semibold text-[var(--text-primary)]">{match.homeStanding.played}</p>
+                      </div>
+                      <div>
+                        <p className="text-[var(--text-tertiary)]">W</p>
+                        <p className="font-semibold text-green-500">{match.homeStanding.won}</p>
+                      </div>
+                      <div>
+                        <p className="text-[var(--text-tertiary)]">D</p>
+                        <p className="font-semibold text-[var(--text-secondary)]">{match.homeStanding.drawn}</p>
+                      </div>
+                      <div>
+                        <p className="text-[var(--text-tertiary)]">Pts</p>
+                        <p className="font-semibold text-[var(--text-primary)]">{match.homeStanding.points}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[var(--text-tertiary)] text-center">Standings not available</p>
+                  )}
                 </div>
                 <div className="bg-[var(--card-bg)] border rounded-xl p-4" style={{ borderColor: 'var(--border-color)' }}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[var(--text-primary)] font-medium">{match.away_team}</span>
-                    <span className="text-2xl font-bold text-[var(--text-tertiary)]">–</span>
+                    <span className="text-[var(--text-primary)] font-medium truncate mr-2">{match.away_team}</span>
+                    <span className={`text-2xl font-bold ${match.awayStanding ? 'text-orange-500' : 'text-[var(--text-tertiary)]'}`}>
+                      {match.awayStanding ? `#${match.awayStanding.position}` : '–'}
+                    </span>
                   </div>
-                  <p className="text-xs text-[var(--text-tertiary)] text-center">Standings data unavailable</p>
+                  {match.awayStanding ? (
+                    <div className="grid grid-cols-4 gap-2 text-center text-xs mt-3">
+                      <div>
+                        <p className="text-[var(--text-tertiary)]">P</p>
+                        <p className="font-semibold text-[var(--text-primary)]">{match.awayStanding.played}</p>
+                      </div>
+                      <div>
+                        <p className="text-[var(--text-tertiary)]">W</p>
+                        <p className="font-semibold text-green-500">{match.awayStanding.won}</p>
+                      </div>
+                      <div>
+                        <p className="text-[var(--text-tertiary)]">D</p>
+                        <p className="font-semibold text-[var(--text-secondary)]">{match.awayStanding.drawn}</p>
+                      </div>
+                      <div>
+                        <p className="text-[var(--text-tertiary)]">Pts</p>
+                        <p className="font-semibold text-[var(--text-primary)]">{match.awayStanding.points}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[var(--text-tertiary)] text-center">Standings not available</p>
+                  )}
                 </div>
               </div>
             </div>
