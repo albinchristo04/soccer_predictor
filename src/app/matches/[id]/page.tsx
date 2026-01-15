@@ -821,8 +821,12 @@ export default function MatchDetailPage() {
                       </thead>
                       <tbody>
                         {match.fullStandings.map((team) => {
-                          const isHomeTeam = match.homeStanding?.position === team.position
-                          const isAwayTeam = match.awayStanding?.position === team.position
+                          // Compare by team name for reliable identification
+                          const teamNameLower = (team.teamName || '').toLowerCase()
+                          const homeTeamLower = match.home_team.toLowerCase()
+                          const awayTeamLower = match.away_team.toLowerCase()
+                          const isHomeTeam = teamNameLower.includes(homeTeamLower) || homeTeamLower.includes(teamNameLower)
+                          const isAwayTeam = teamNameLower.includes(awayTeamLower) || awayTeamLower.includes(teamNameLower)
                           const isHighlighted = isHomeTeam || isAwayTeam
                           
                           return (
@@ -840,7 +844,7 @@ export default function MatchDetailPage() {
                               <td className={`py-2 px-3 ${isHighlighted ? 'font-bold' : ''}`} style={{ color: 'var(--text-secondary)' }}>
                                 {team.position}
                               </td>
-                              <td className={`py-2 px-3 ${isHighlighted ? 'font-bold' : 'font-medium'}`} style={{ color: isHighlighted ? (isHomeTeam ? '#3b82f6' : '#f97316') : 'var(--text-primary)' }}>
+                              <td className={`py-2 px-3 ${isHighlighted ? 'font-bold text-blue-500' : 'font-medium'} ${isAwayTeam ? 'text-orange-500' : ''}`} style={{ color: isHighlighted ? undefined : 'var(--text-primary)' }}>
                                 {team.teamName}
                                 {isHighlighted && (
                                   <span className="ml-2 text-xs">
@@ -852,7 +856,7 @@ export default function MatchDetailPage() {
                               <td className="py-2 px-3 text-center text-green-500">{team.won}</td>
                               <td className="py-2 px-3 text-center" style={{ color: 'var(--text-tertiary)' }}>{team.drawn}</td>
                               <td className="py-2 px-3 text-center text-red-400">{team.lost}</td>
-                              <td className={`py-2 px-3 text-center font-bold ${isHighlighted ? (isHomeTeam ? 'text-blue-500' : 'text-orange-500') : ''}`} style={{ color: isHighlighted ? undefined : 'var(--text-primary)' }}>
+                              <td className={`py-2 px-3 text-center font-bold ${isHomeTeam ? 'text-blue-500' : ''} ${isAwayTeam ? 'text-orange-500' : ''}`} style={{ color: isHighlighted ? undefined : 'var(--text-primary)' }}>
                                 {team.points}
                               </td>
                             </tr>
