@@ -548,10 +548,10 @@ export default function MatchDetailPage() {
                         // Fallback: display in default 4-3-3 layout
                         return (
                           <div className="flex flex-col justify-between h-full gap-4">
-                            {renderRow(unpositioned.slice(8, 11), 'bg-red-600', 'FWD')}
-                            {renderRow(unpositioned.slice(5, 8), 'bg-blue-600', 'MID')}
-                            {renderRow(unpositioned.slice(1, 5), 'bg-indigo-600', 'DEF')}
-                            {renderRow(unpositioned.slice(0, 1), 'bg-amber-600', 'GK')}
+                            {renderRow(unpositioned.slice(8, 11), 'bg-red-600')}
+                            {renderRow(unpositioned.slice(5, 8), 'bg-blue-600')}
+                            {renderRow(unpositioned.slice(1, 5), 'bg-indigo-600')}
+                            {renderRow(unpositioned.slice(0, 1), 'bg-amber-600')}
                           </div>
                         )
                       })()}

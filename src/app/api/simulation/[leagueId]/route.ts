@@ -193,9 +193,9 @@ export async function GET(
       const avgPointsPerGame = estimatedMatchesPlayed > 0 ? points / estimatedMatchesPlayed : 1.5
       
       // Project final points: current points + expected from remaining matches
-      // Add slight variance based on position (leaders more likely to maintain, others have more uncertainty)
-      const positionFactor = 1 + (0.05 * (currentPosition - 1) / totalTeams) // Slight bonus for current leaders
-      const projectedPoints = Math.min(maxPoints, points + (remainingMatches * avgPointsPerGame * (1 / positionFactor)))
+      // Leaders (lower positions) get slight boost as they're more likely to maintain form
+      const leaderBonus = 1 - (0.05 * (currentPosition - 1) / totalTeams)
+      const projectedPoints = Math.min(maxPoints, points + (remainingMatches * avgPointsPerGame * leaderBonus))
       
       return {
         name: team.name,
