@@ -171,10 +171,12 @@ export async function GET(
   
   // Helper function to generate simulation results from team data
   const generateSimulationResults = (teams: { name: string; points: number }[]) => {
-    const standings: Standing[] = teams.map((team, idx) => {
-      const position = idx + 1
+    const totalTeams = teams.length
+    
+    // First pass: calculate projected points for all teams
+    const teamsWithProjections = teams.map((team, idx) => {
+      const currentPosition = idx + 1
       const points = team.points
-      const totalTeams = teams.length
       
       // Simple Monte Carlo simulation based on current standings
       const remainingMatches = TOTAL_MATCHES_PER_SEASON - Math.round(points / AVG_POINTS_PER_MATCH)
@@ -182,27 +184,42 @@ export async function GET(
       const avgPointsPerGame = matchesPlayed > 0 ? points / matchesPlayed : 1.5
       const projectedPoints = points + (remainingMatches * avgPointsPerGame)
       
-      // Calculate probabilities based on position
-      const titleProb = position <= 2 
-        ? Math.max(0, (3 - position) * TITLE_BASE_PROB + Math.random() * TITLE_RANDOM_FACTOR) 
-        : position <= 4 ? Math.random() * TOP4_RANDOM_FACTOR : 0
-      const top4Prob = position <= 6 
-        ? Math.max(0, (7 - position) * TOP4_BASE_PROB + Math.random() * TOP4_RANDOM_FACTOR) 
+      return {
+        name: team.name,
+        currentPosition,
+        currentPoints: points,
+        projectedPoints: Math.round(projectedPoints),
+      }
+    })
+    
+    // Sort by projected points to get predicted final positions
+    const sortedByProjected = [...teamsWithProjections].sort((a, b) => b.projectedPoints - a.projectedPoints)
+    
+    // Create standings with probabilities based on PROJECTED position (not current position)
+    const standings: Standing[] = sortedByProjected.map((team, projectedIdx) => {
+      const projectedPosition = projectedIdx + 1
+      
+      // Calculate probabilities based on projected position
+      const titleProb = projectedPosition <= 2 
+        ? Math.max(0, (3 - projectedPosition) * TITLE_BASE_PROB + Math.random() * TITLE_RANDOM_FACTOR) 
+        : projectedPosition <= 4 ? Math.random() * TOP4_RANDOM_FACTOR : 0
+      const top4Prob = projectedPosition <= 6 
+        ? Math.max(0, (7 - projectedPosition) * TOP4_BASE_PROB + Math.random() * TOP4_RANDOM_FACTOR) 
         : Math.random() * 0.03
-      const europaProb = position >= 5 && position <= 8 
+      const europaProb = projectedPosition >= 5 && projectedPosition <= 8 
         ? EUROPA_BASE_PROB + Math.random() * EUROPA_RANDOM_FACTOR 
         : Math.random() * RELEGATION_RANDOM_FACTOR
-      const relegationProb = position >= totalTeams - 4 
-        ? Math.max(0, (position - totalTeams + 5) * RELEGATION_BASE_PROB + Math.random() * RELEGATION_RANDOM_FACTOR) 
+      const relegationProb = projectedPosition >= totalTeams - 4 
+        ? Math.max(0, (projectedPosition - totalTeams + 5) * RELEGATION_BASE_PROB + Math.random() * RELEGATION_RANDOM_FACTOR) 
         : 0
       
       return {
         team_name: team.name,
         team_id: null,
-        current_position: position,
-        current_points: points,
-        avg_final_position: position + (Math.random() * 1.5 - 0.75),
-        avg_final_points: Math.round(projectedPoints),
+        current_position: team.currentPosition,
+        current_points: team.currentPoints,
+        avg_final_position: projectedPosition + (Math.random() * 0.5 - 0.25),
+        avg_final_points: team.projectedPoints,
         title_probability: Math.min(1, titleProb),
         top_4_probability: Math.min(1, top4Prob),
         europa_probability: Math.min(1, europaProb),
@@ -210,9 +227,9 @@ export async function GET(
       }
     })
     
-    const sortedByTitle = [...standings].sort((a, b) => b.title_probability - a.title_probability)
-    const mostLikelyChampion = sortedByTitle[0]?.team_name || 'Unknown'
-    const championProbability = sortedByTitle[0]?.title_probability || 0
+    // The team with highest expected points is the most likely champion (first in sorted list)
+    const mostLikelyChampion = standings[0]?.team_name || 'Unknown'
+    const championProbability = standings[0]?.title_probability || 0
     
     const sortedByTop4 = [...standings].sort((a, b) => b.top_4_probability - a.top_4_probability)
     const likelyTop4 = sortedByTop4.slice(0, 4).map(t => t.team_name)

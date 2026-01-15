@@ -200,6 +200,7 @@ export default function MatchDetailPage() {
   }
 
   const isLive = match.status.includes('IN_PROGRESS') || match.status.includes('HALF')
+  const isScheduled = match.status.toLowerCase().includes('scheduled') || match.status.toLowerCase().includes('pre')
 
   // Navigate back to the league page
   const handleBack = () => {
@@ -243,10 +244,13 @@ export default function MatchDetailPage() {
                   </div>
                 )}
                 <div className="text-4xl md:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                  {match.home_score} - {match.away_score}
+                  {isScheduled ? 'vs' : `${match.home_score} - ${match.away_score}`}
                 </div>
-                {!isLive && match.status.includes('FINAL') && (
+                {!isLive && !isScheduled && match.status.includes('FINAL') && (
                   <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>Full Time</p>
+                )}
+                {isScheduled && (
+                  <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>Upcoming</p>
                 )}
               </div>
               
