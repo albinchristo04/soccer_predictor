@@ -562,7 +562,8 @@ export default function MatchDetailPage() {
                         }
                         
                         // Use formation numbers to distribute players
-                        let playerIndex = 0
+                        // Start from player 1 (after GK which is at index 0)
+                        let playerIndex = 1
                         const rows: { players: PlayerLineup[]; color: string }[] = []
                         
                         // Reverse formation for display (FWD at top)
@@ -570,12 +571,12 @@ export default function MatchDetailPage() {
                         const colors = ['bg-red-600', 'bg-blue-600', 'bg-indigo-600']
                         
                         reversedFormation.forEach((count, idx) => {
-                          const rowPlayers = players.slice(playerIndex + 1, playerIndex + 1 + count)
+                          const rowPlayers = players.slice(playerIndex, playerIndex + count)
                           rows.push({ players: rowPlayers, color: colors[idx] || 'bg-blue-600' })
                           playerIndex += count
                         })
                         
-                        // Add goalkeeper
+                        // Add goalkeeper (player at index 0)
                         rows.push({ players: players.slice(0, 1), color: 'bg-amber-600' })
                         
                         return (
@@ -685,18 +686,19 @@ export default function MatchDetailPage() {
                           )
                         }
                         
-                        // Use formation numbers
-                        let playerIndex = 0
+                        // Start from player 1 (after GK which is at index 0)
+                        let playerIndex = 1
                         const rows: { players: PlayerLineup[]; color: string }[] = []
                         const reversedFormation = [...formationNumbers].reverse()
                         const colors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-600']
                         
                         reversedFormation.forEach((count, idx) => {
-                          const rowPlayers = players.slice(playerIndex + 1, playerIndex + 1 + count)
+                          const rowPlayers = players.slice(playerIndex, playerIndex + count)
                           rows.push({ players: rowPlayers, color: colors[idx] || 'bg-orange-500' })
                           playerIndex += count
                         })
                         
+                        // Add goalkeeper (player at index 0)
                         rows.push({ players: players.slice(0, 1), color: 'bg-amber-600' })
                         
                         return (

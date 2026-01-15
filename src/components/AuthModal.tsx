@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Google OAuth Client ID - should be set in environment variables for production
@@ -22,6 +22,21 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
   const [googleLoaded, setGoogleLoaded] = useState(false);
   
   const { login, register, loginWithGoogle } = useAuth();
+
+  // Handle Google sign-in callback - defined before useEffect that uses it
+  const handleGoogleCallback = useCallback(async (response: { credential: string }) => {
+    setError('');
+    setIsLoading(true);
+    
+    try {
+      await loginWithGoogle(response.credential);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google sign-in failed');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [loginWithGoogle, onClose]);
 
   // Load Google Sign-In script
   useEffect(() => {
@@ -70,23 +85,9 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
     } catch (e) {
       console.error('Failed to initialize Google Sign-In:', e);
     }
-  }, [googleLoaded, isOpen]);
+  }, [googleLoaded, isOpen, handleGoogleCallback]);
 
   if (!isOpen) return null;
-
-  const handleGoogleCallback = async (response: { credential: string }) => {
-    setError('');
-    setIsLoading(true);
-    
-    try {
-      await loginWithGoogle(response.credential);
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google sign-in failed');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
