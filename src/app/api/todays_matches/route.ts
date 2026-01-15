@@ -94,6 +94,20 @@ async function fetchFotMobMatches(): Promise<Match[]> {
   const matches: Match[] = []
   const today = new Date().toISOString().split('T')[0].replace(/-/g, '')
   
+  // Map FotMob league names to ESPN league IDs
+  const FOTMOB_LEAGUE_MAPPING: Record<string, string> = {
+    'Premier League': 'eng.1',
+    'La Liga': 'esp.1',
+    'Serie A': 'ita.1',
+    'Bundesliga': 'ger.1',
+    'Ligue 1': 'fra.1',
+    'MLS': 'usa.1',
+    'Champions League': 'uefa.champions',
+    'UEFA Champions League': 'uefa.champions',
+    'Europa League': 'uefa.europa',
+    'UEFA Europa League': 'uefa.europa',
+  }
+  
   try {
     const response = await fetch(`https://www.fotmob.com/api/matches?date=${today}`, {
       headers: {
@@ -114,6 +128,7 @@ async function fetchFotMobMatches(): Promise<Match[]> {
     if (data.leagues && Array.isArray(data.leagues)) {
       for (const league of data.leagues) {
         const leagueName = league.name || 'Unknown'
+        const leagueId = FOTMOB_LEAGUE_MAPPING[leagueName] || ''
         
         for (const match of league.matches || []) {
           const isFinished = match.status?.finished === true
@@ -135,7 +150,7 @@ async function fetchFotMobMatches(): Promise<Match[]> {
             time: match.status?.utcTime || '',
             status,
             league: leagueName,
-            leagueId: '',
+            leagueId: leagueId,
             match_id: match.id,
           })
         }
