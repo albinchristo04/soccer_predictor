@@ -30,11 +30,11 @@ const AccordionItem = ({ title, children, isOpen, onToggle, icon }: AccordionIte
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+      {isOpen && (
         <div className="py-4 px-4 text-[var(--text-secondary)] text-sm leading-relaxed">
           {children}
         </div>
-      </div>
+      )}
     </div>
   )
 }
