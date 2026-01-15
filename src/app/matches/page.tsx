@@ -31,6 +31,11 @@ interface Standing {
   points: number;
 }
 
+interface GroupStanding {
+  groupName: string;
+  teams: Standing[];
+}
+
 export default function MatchesPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -40,8 +45,14 @@ export default function MatchesPage() {
   const initialLeague = leagueParam ? LEAGUES.find(l => l.id === leagueParam) : null;
   const [selectedLeague, setSelectedLeague] = useState<typeof LEAGUES[0] | null>(initialLeague);
   const [standings, setStandings] = useState<Standing[]>([]);
+  const [groupStandings, setGroupStandings] = useState<GroupStanding[]>([]);
   const [loadingStandings, setLoadingStandings] = useState(false);
   const [activeTab, setActiveTab] = useState<'fixtures' | 'standings'>('fixtures');
+
+  // Check if the league uses groups (World Cup, Champions League, Europa League)
+  const isGroupStage = selectedLeague?.id === 'fifa.world' || 
+                       selectedLeague?.id === 'uefa.champions' || 
+                       selectedLeague?.id === 'uefa.europa';
 
   // Update URL when league changes
   const handleSelectLeague = (league: typeof LEAGUES[0]) => {
@@ -64,21 +75,52 @@ export default function MatchesPage() {
         const res = await fetch(`https://site.api.espn.com/apis/v2/sports/soccer/${selectedLeague.id}/standings`);
         if (res.ok) {
           const data = await res.json();
-          const entries = data.children?.[0]?.standings?.entries || [];
-          const standingsList: Standing[] = entries.map((entry: any) => ({
-            position: entry.stats?.find((s: any) => s.name === 'rank')?.value || 0,
-            team: entry.team?.displayName || '',
-            played: entry.stats?.find((s: any) => s.name === 'gamesPlayed')?.value || 0,
-            won: entry.stats?.find((s: any) => s.name === 'wins')?.value || 0,
-            drawn: entry.stats?.find((s: any) => s.name === 'ties')?.value || 0,
-            lost: entry.stats?.find((s: any) => s.name === 'losses')?.value || 0,
-            goalsFor: entry.stats?.find((s: any) => s.name === 'pointsFor')?.value || 0,
-            goalsAgainst: entry.stats?.find((s: any) => s.name === 'pointsAgainst')?.value || 0,
-            goalDifference: entry.stats?.find((s: any) => s.name === 'pointDifferential')?.value || 0,
-            points: entry.stats?.find((s: any) => s.name === 'points')?.value || 0,
-          }));
-          standingsList.sort((a, b) => a.position - b.position);
-          setStandings(standingsList);
+          
+          // Check if this is a group-based competition (World Cup, UCL, UEL)
+          const children = data.children || [];
+          
+          if (children.length > 1 || (children.length === 1 && children[0].name?.toLowerCase().includes('group'))) {
+            // Multiple groups - extract all of them
+            const groups: GroupStanding[] = [];
+            for (const child of children) {
+              const groupName = child.name || child.abbreviation || 'Group';
+              const entries = child.standings?.entries || [];
+              const teams: Standing[] = entries.map((entry: any, idx: number) => ({
+                position: entry.stats?.find((s: any) => s.name === 'rank')?.value || idx + 1,
+                team: entry.team?.displayName || '',
+                played: entry.stats?.find((s: any) => s.name === 'gamesPlayed')?.value || 0,
+                won: entry.stats?.find((s: any) => s.name === 'wins')?.value || 0,
+                drawn: entry.stats?.find((s: any) => s.name === 'ties')?.value || 0,
+                lost: entry.stats?.find((s: any) => s.name === 'losses')?.value || 0,
+                goalsFor: entry.stats?.find((s: any) => s.name === 'pointsFor')?.value || 0,
+                goalsAgainst: entry.stats?.find((s: any) => s.name === 'pointsAgainst')?.value || 0,
+                goalDifference: entry.stats?.find((s: any) => s.name === 'pointDifferential')?.value || 0,
+                points: entry.stats?.find((s: any) => s.name === 'points')?.value || 0,
+              }));
+              teams.sort((a, b) => a.position - b.position);
+              groups.push({ groupName, teams });
+            }
+            setGroupStandings(groups);
+            setStandings([]);
+          } else {
+            // Single table (regular league)
+            const entries = children[0]?.standings?.entries || [];
+            const standingsList: Standing[] = entries.map((entry: any) => ({
+              position: entry.stats?.find((s: any) => s.name === 'rank')?.value || 0,
+              team: entry.team?.displayName || '',
+              played: entry.stats?.find((s: any) => s.name === 'gamesPlayed')?.value || 0,
+              won: entry.stats?.find((s: any) => s.name === 'wins')?.value || 0,
+              drawn: entry.stats?.find((s: any) => s.name === 'ties')?.value || 0,
+              lost: entry.stats?.find((s: any) => s.name === 'losses')?.value || 0,
+              goalsFor: entry.stats?.find((s: any) => s.name === 'pointsFor')?.value || 0,
+              goalsAgainst: entry.stats?.find((s: any) => s.name === 'pointsAgainst')?.value || 0,
+              goalDifference: entry.stats?.find((s: any) => s.name === 'pointDifferential')?.value || 0,
+              points: entry.stats?.find((s: any) => s.name === 'points')?.value || 0,
+            }));
+            standingsList.sort((a, b) => a.position - b.position);
+            setStandings(standingsList);
+            setGroupStandings([]);
+          }
         }
       } catch (e) {
         console.error('Error fetching standings:', e);
@@ -200,6 +242,53 @@ export default function MatchesPage() {
             {loadingStandings ? (
               <div className="flex justify-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500" />
+              </div>
+            ) : groupStandings.length > 0 ? (
+              // Group-based standings (World Cup, UCL, UEL)
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {groupStandings.map((group) => (
+                  <div key={group.groupName} className="bg-[var(--card-bg)] rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border-color)' }}>
+                    <div className="px-4 py-3 bg-[var(--muted-bg)] border-b" style={{ borderColor: 'var(--border-color)' }}>
+                      <h3 className="font-bold text-[var(--text-primary)]">{group.groupName}</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-[var(--text-tertiary)] border-b" style={{ borderColor: 'var(--border-color)' }}>
+                            <th className="text-left py-2 px-3">#</th>
+                            <th className="text-left py-2 px-3">Team</th>
+                            <th className="text-center py-2 px-1">P</th>
+                            <th className="text-center py-2 px-1">W</th>
+                            <th className="text-center py-2 px-1">D</th>
+                            <th className="text-center py-2 px-1">L</th>
+                            <th className="text-center py-2 px-1">GD</th>
+                            <th className="text-center py-2 px-2 font-bold">Pts</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {group.teams.map((team, idx) => (
+                            <tr
+                              key={team.team}
+                              className={`border-b transition-colors hover:bg-[var(--card-hover)] ${
+                                idx < 2 ? 'border-l-2 border-l-green-500' : ''
+                              }`}
+                              style={{ borderColor: 'var(--border-color)' }}
+                            >
+                              <td className="py-2 px-3 text-[var(--text-tertiary)]">{idx + 1}</td>
+                              <td className="py-2 px-3 text-[var(--text-primary)] font-medium truncate max-w-[120px]">{team.team}</td>
+                              <td className="py-2 px-1 text-center text-[var(--text-secondary)]">{team.played}</td>
+                              <td className="py-2 px-1 text-center text-[var(--text-secondary)]">{team.won}</td>
+                              <td className="py-2 px-1 text-center text-[var(--text-secondary)]">{team.drawn}</td>
+                              <td className="py-2 px-1 text-center text-[var(--text-secondary)]">{team.lost}</td>
+                              <td className="py-2 px-1 text-center text-[var(--text-secondary)]">{team.goalDifference > 0 ? '+' : ''}{team.goalDifference}</td>
+                              <td className="py-2 px-2 text-center text-[var(--text-primary)] font-bold">{team.points}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : standings.length > 0 ? (
               <div className="overflow-x-auto">

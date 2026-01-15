@@ -129,19 +129,30 @@ function formatMatchTime(timeStr?: string): string {
   }
 }
 
-// League flags mapping - using simple emojis for cross-platform compatibility
-const leagueFlags: Record<string, string> = {
-  'Premier League': '🏴',
-  'La Liga': '🇪🇸',
-  'LaLiga': '🇪🇸',
-  'Serie A': '🇮🇹',
-  'Bundesliga': '🇩🇪',
-  'Ligue 1': '🇫🇷',
-  'Champions League': '🏆',
-  'Europa League': '🏆',
-  'FA Cup': '🏴',
-  'Copa del Rey': '🇪🇸',
-  'MLS': '🇺🇸',
+// League flags mapping - using flagcdn.com for consistency
+const leagueFlagCodes: Record<string, string> = {
+  'Premier League': 'ENG',
+  'La Liga': 'ES',
+  'LaLiga': 'ES',
+  'Serie A': 'IT',
+  'Bundesliga': 'DE',
+  'Ligue 1': 'FR',
+  'Champions League': 'EU',
+  'UEFA Champions League': 'EU',
+  'Europa League': 'EU',
+  'UEFA Europa League': 'EU',
+  'FA Cup': 'ENG',
+  'Copa del Rey': 'ES',
+  'MLS': 'US',
+  'FIFA World Cup': 'WORLD',
+  'FIFA World Cup 2026': 'WORLD',
+}
+
+// Helper to get flag image URL
+function getLeagueFlagUrl(league: string): string | null {
+  const code = leagueFlagCodes[league]
+  if (!code) return null
+  return leagueFlagUrls[code] || null
 }
 
 function TodaysMatchesWidget() {
@@ -214,7 +225,15 @@ function TodaysMatchesWidget() {
               <div key={league} className="bg-[var(--card-bg)]">
                 {/* League Header */}
                 <div className="px-4 py-3 bg-[var(--muted-bg)] flex items-center gap-2 sticky top-0 z-10 border-b" style={{ borderColor: 'var(--border-color)' }}>
-                  <span className="text-lg">{leagueFlags[league] || '⚽'}</span>
+                  {getLeagueFlagUrl(league) ? (
+                    <img 
+                      src={getLeagueFlagUrl(league)!} 
+                      alt={league}
+                      className="w-5 h-auto rounded"
+                    />
+                  ) : (
+                    <span className="text-lg">⚽</span>
+                  )}
                   <span className="font-semibold text-[var(--text-primary)] text-sm">{league}</span>
                   <span className="text-xs text-[var(--text-tertiary)] ml-auto">{matchesByLeague[league].length} {matchesByLeague[league].length === 1 ? 'match' : 'matches'}</span>
                 </div>
