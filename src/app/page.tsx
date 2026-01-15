@@ -16,6 +16,7 @@ type LiveMatch = {
 }
 
 type TodayMatch = {
+  id?: string
   home_team: string
   away_team: string
   home_score?: number
@@ -23,6 +24,7 @@ type TodayMatch = {
   time?: string
   status: string
   league: string
+  leagueId?: string
 }
 
 function LiveScoresTicker() {
@@ -220,7 +222,11 @@ function TodaysMatchesWidget() {
                 {/* Matches List - subtle spacing instead of borders */}
                 <div className="space-y-0.5 py-1 bg-[var(--muted-bg)]">
                   {matchesByLeague[league].map((match, idx) => (
-                    <div key={`${league}-${idx}`} className={`px-4 py-3 flex items-center ${match.status === 'live' ? 'bg-[var(--live-bg)]' : 'bg-[var(--card-bg)] hover:bg-[var(--card-hover)]'} transition-colors`}>
+                    <Link 
+                      key={`${league}-${idx}`} 
+                      href={match.id ? `/matches/${match.id}${match.leagueId ? `?league=${match.leagueId}` : ''}` : '/matches'}
+                      className={`px-4 py-3 flex items-center cursor-pointer ${match.status === 'live' ? 'bg-[var(--live-bg)]' : 'bg-[var(--card-bg)] hover:bg-[var(--card-hover)]'} transition-colors`}
+                    >
                       {/* Home Team */}
                       <div className="flex-1 text-right pr-3">
                         <span className="text-sm text-[var(--text-primary)] font-medium">{match.home_team}</span>
@@ -242,7 +248,7 @@ function TodaysMatchesWidget() {
                             <span className="text-lg font-bold text-[var(--text-secondary)]">{match.away_score}</span>
                           </div>
                         ) : (
-                          <span className="text-sm font-medium text-[var(--accent-primary)]">{formatMatchTime(match.time)}</span>
+                          <span className="text-sm font-medium text-[var(--accent-primary)]">vs</span>
                         )}
                       </div>
                       
@@ -250,7 +256,7 @@ function TodaysMatchesWidget() {
                       <div className="flex-1 text-left pl-3">
                         <span className="text-sm text-[var(--text-primary)] font-medium">{match.away_team}</span>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               </div>

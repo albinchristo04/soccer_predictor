@@ -289,14 +289,7 @@ export default function MatchDetailPage() {
         {activeTab === 'summary' && (
           <div className="space-y-6">
             {/* Timeline Header */}
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Match Timeline</h3>
-              <div className="flex items-center gap-4 text-sm">
-                <span className="text-[var(--text-primary)] font-medium">{match.home_team}</span>
-                <span className="text-2xl font-bold text-[var(--text-primary)]">{match.home_score} - {match.away_score}</span>
-                <span className="text-[var(--text-primary)] font-medium">{match.away_team}</span>
-              </div>
-            </div>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">Match Timeline</h3>
             
             {match.events.length > 0 ? (
               <div className="relative">
@@ -439,21 +432,21 @@ export default function MatchDetailPage() {
               return (
                 <div key={stat.label}>
                   <div className="flex justify-between text-sm mb-2">
-                    <span className={`font-medium ${homeWinning ? 'text-[var(--accent-primary)]' : 'text-[var(--text-secondary)]'}`}>
+                    <span className={`font-medium ${homeWinning ? 'text-blue-500' : 'text-[var(--text-secondary)]'}`}>
                       {stat.values[0]}{stat.suffix || ''}
                     </span>
                     <span className="text-[var(--text-secondary)]">{stat.label}</span>
-                    <span className={`font-medium ${awayWinning ? 'text-emerald-500' : 'text-[var(--text-secondary)]'}`}>
+                    <span className={`font-medium ${awayWinning ? 'text-orange-500' : 'text-[var(--text-secondary)]'}`}>
                       {stat.values[1]}{stat.suffix || ''}
                     </span>
                   </div>
-                  <div className="flex h-2 bg-[var(--muted-bg)] rounded-full overflow-hidden">
+                  <div className="flex h-3 bg-[var(--muted-bg)] rounded-full overflow-hidden">
                     <div
-                      className={`${isTied ? 'bg-gray-400' : homeWinning ? 'bg-[var(--accent-primary)]' : 'bg-[var(--accent-primary)]/40'} transition-all`}
+                      className={`${isTied ? 'bg-gray-400' : homeWinning ? 'bg-blue-500' : 'bg-blue-500/30'} transition-all`}
                       style={{ width: `${homePercent}%` }}
                     />
                     <div
-                      className={`${isTied ? 'bg-gray-400' : awayWinning ? 'bg-emerald-500' : 'bg-emerald-500/40'} transition-all`}
+                      className={`${isTied ? 'bg-gray-400' : awayWinning ? 'bg-orange-500' : 'bg-orange-500/30'} transition-all`}
                       style={{ width: `${awayPercent}%` }}
                     />
                   </div>

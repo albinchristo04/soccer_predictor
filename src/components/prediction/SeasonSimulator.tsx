@@ -2,14 +2,15 @@
 
 import React, { useState } from 'react';
 import { leaguesApi, LeagueSimulationResult } from '@/lib/api';
+import { leagueFlagUrls } from '@/data/leagues';
 
-// League options for simulation
+// League options for simulation with flag codes
 const SIMULATION_LEAGUES = [
-  { id: 47, name: 'Premier League', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
-  { id: 87, name: 'La Liga', flag: '🇪🇸' },
-  { id: 55, name: 'Serie A', flag: '🇮🇹' },
-  { id: 54, name: 'Bundesliga', flag: '🇩🇪' },
-  { id: 53, name: 'Ligue 1', flag: '🇫🇷' },
+  { id: 47, name: 'Premier League', flagCode: 'ENG' },
+  { id: 87, name: 'La Liga', flagCode: 'ES' },
+  { id: 55, name: 'Serie A', flagCode: 'IT' },
+  { id: 54, name: 'Bundesliga', flagCode: 'DE' },
+  { id: 53, name: 'Ligue 1', flagCode: 'FR' },
 ];
 
 export default function SeasonSimulator() {
@@ -64,7 +65,15 @@ export default function SeasonSimulator() {
                   : 'bg-[var(--background-secondary)] border-[var(--border-color)] hover:border-indigo-500/30'
               }`}
             >
-              <span className="text-2xl block mb-2">{league.flag}</span>
+              {leagueFlagUrls[league.flagCode] ? (
+                <img 
+                  src={leagueFlagUrls[league.flagCode]} 
+                  alt={league.name}
+                  className="w-8 h-auto mx-auto mb-2"
+                />
+              ) : (
+                <span className="text-2xl block mb-2">🏆</span>
+              )}
               <span className="text-sm font-medium text-[var(--text-primary)]">{league.name}</span>
             </button>
           ))}
@@ -205,7 +214,7 @@ export default function SeasonSimulator() {
                 </thead>
                 <tbody>
                   {result.standings
-                    .sort((a, b) => a.avg_final_position - b.avg_final_position)
+                    .sort((a, b) => b.avg_final_points - a.avg_final_points)
                     .map((team, idx) => (
                       <tr
                         key={team.team_name}

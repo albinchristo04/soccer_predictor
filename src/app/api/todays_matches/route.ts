@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 interface Match {
+  id: string
   home_team: string
   away_team: string
   home_score: number | null
@@ -8,6 +9,7 @@ interface Match {
   time: string
   status: string
   league: string
+  leagueId: string
   match_id: string | number
   venue?: string
 }
@@ -20,8 +22,8 @@ const ESPN_LEAGUES = [
   { id: 'ger.1', name: 'Bundesliga' },
   { id: 'fra.1', name: 'Ligue 1' },
   { id: 'usa.1', name: 'MLS' },
-  { id: 'uefa.champions', name: 'Champions League' },
-  { id: 'uefa.europa', name: 'Europa League' },
+  { id: 'uefa.champions', name: 'UEFA Champions League' },
+  { id: 'uefa.europa', name: 'UEFA Europa League' },
 ]
 
 async function fetchESPNMatches(): Promise<Match[]> {
@@ -67,6 +69,7 @@ async function fetchESPNMatches(): Promise<Match[]> {
         }
         
         allMatches.push({
+          id: String(event.id),
           home_team: homeTeam.team?.displayName || homeTeam.team?.name || '',
           away_team: awayTeam.team?.displayName || awayTeam.team?.name || '',
           home_score: status !== 'upcoming' ? parseInt(homeTeam.score || '0') : null,
@@ -74,6 +77,7 @@ async function fetchESPNMatches(): Promise<Match[]> {
           time: event.date || '',
           status,
           league: league.name,
+          leagueId: league.id,
           match_id: event.id,
           venue: competition.venue?.fullName,
         })
@@ -123,6 +127,7 @@ async function fetchFotMobMatches(): Promise<Match[]> {
           }
           
           matches.push({
+            id: String(match.id),
             home_team: match.home?.name || match.home?.shortName || '',
             away_team: match.away?.name || match.away?.shortName || '',
             home_score: match.home?.score ?? null,
@@ -130,6 +135,7 @@ async function fetchFotMobMatches(): Promise<Match[]> {
             time: match.status?.utcTime || '',
             status,
             league: leagueName,
+            leagueId: '',
             match_id: match.id,
           })
         }

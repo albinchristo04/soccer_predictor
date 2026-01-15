@@ -28,8 +28,8 @@ export const leagues = [
   { name: 'Serie A', country: 'IT', matches: '380+' },
   { name: 'Bundesliga', country: 'DE', matches: '306+' },
   { name: 'Ligue 1', country: 'FR', matches: '380+' },
-  { name: 'Champions League', country: 'EU', matches: '125+' },
-  { name: 'Europa League', country: 'EU', matches: '200+' },
+  { name: 'UEFA Champions League', country: 'EU', matches: '125+' },
+  { name: 'UEFA Europa League', country: 'EU', matches: '200+' },
   { name: 'MLS', country: 'US', matches: '500+' },
   { name: 'FIFA World Cup', country: 'WORLD', matches: '64' }
 ];
