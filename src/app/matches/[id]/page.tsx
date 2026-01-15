@@ -499,44 +499,60 @@ export default function MatchDetailPage() {
                 </div>
                 
                 {/* Pitch visualization */}
-                <div className="relative bg-gradient-to-b from-green-800 to-green-700 p-4 min-h-[280px]">
+                <div className="relative bg-gradient-to-b from-green-800 to-green-700 p-4 min-h-[320px]">
                   {/* Pitch lines */}
                   <div className="absolute inset-4 border-2 border-white/30 rounded-lg">
                     <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-white/30" />
                     <div className="absolute left-1/2 top-1/2 w-16 h-16 -ml-8 -mt-8 rounded-full border-2 border-white/30" />
+                    {/* Goal area */}
+                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-24 h-8 border-2 border-white/30 border-b-0" />
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-8 border-2 border-white/30 border-t-0" />
                   </div>
                   
                   {match.lineups.home.length > 0 ? (
-                    <div className="relative z-10 h-full flex flex-col justify-between py-4 min-h-[260px]">
-                      {/* Group players by position type */}
+                    <div className="relative z-10 h-full flex flex-col justify-between py-4 min-h-[300px]">
                       {(() => {
                         const players = match.lineups.home.slice(0, 11)
+                        const formation = match.lineups.homeFormation
+                        
+                        // Parse formation (e.g., "4-3-3" or "4-4-2")
+                        const parseFormation = (formationStr: string | undefined): number[] => {
+                          if (!formationStr) return [4, 3, 3] // Default 4-3-3
+                          const parts = formationStr.split('-').map(n => parseInt(n, 10)).filter(n => !isNaN(n))
+                          if (parts.length >= 2) return parts
+                          return [4, 3, 3]
+                        }
+                        
+                        const formationNumbers = parseFormation(formation)
+                        
+                        // Try to group by position first
                         const gk = players.filter(p => p.position === 'GK' || p.position === 'G')
                         const def = players.filter(p => ['CB', 'LB', 'RB', 'LWB', 'RWB', 'D', 'DF'].includes(p.position || ''))
                         const mid = players.filter(p => ['CM', 'CDM', 'CAM', 'LM', 'RM', 'DM', 'AM', 'M', 'MF'].includes(p.position || ''))
                         const fwd = players.filter(p => ['ST', 'LW', 'RW', 'CF', 'F', 'FW'].includes(p.position || ''))
-                        // Handle unpositioned players
-                        const unpositioned = players.filter(p => !gk.includes(p) && !def.includes(p) && !mid.includes(p) && !fwd.includes(p))
                         
-                        const renderRow = (rowPlayers: PlayerLineup[], color: string) => (
-                          <div className="flex flex-col items-center">
-                            <div className="flex justify-center gap-3 flex-wrap">
-                              {rowPlayers.map((p, i) => (
-                                <div key={i} className="text-center">
-                                  <div className={`w-10 h-10 rounded-full ${color} flex items-center justify-center text-white font-bold text-sm shadow-lg border-2 border-white/30`}>
-                                    {p.jersey || (i + 1)}
-                                  </div>
-                                  <p className="text-xs text-white mt-1 max-w-[60px] truncate drop-shadow font-medium">{p.name.split(' ').pop()}</p>
-                                </div>
-                              ))}
+                        const hasPositions = gk.length > 0 || def.length > 0 || mid.length > 0 || fwd.length > 0
+                        
+                        // Render player node
+                        const renderPlayer = (p: PlayerLineup, i: number, color: string) => (
+                          <div key={i} className="text-center flex flex-col items-center">
+                            <div className={`w-11 h-11 rounded-full ${color} flex items-center justify-center text-white font-bold text-sm shadow-lg border-2 border-white/50`}>
+                              {p.jersey || (i + 1)}
                             </div>
+                            <p className="text-xs text-white mt-1 max-w-[70px] truncate drop-shadow-lg font-semibold">{p.name.split(' ').pop()}</p>
                           </div>
                         )
                         
-                        // If we have positions, render in formation
-                        if (gk.length > 0 || def.length > 0 || mid.length > 0 || fwd.length > 0) {
+                        const renderRow = (rowPlayers: PlayerLineup[], color: string, startIndex: number = 0) => (
+                          <div className="flex justify-center gap-4 flex-wrap">
+                            {rowPlayers.map((p, i) => renderPlayer(p, startIndex + i, color))}
+                          </div>
+                        )
+                        
+                        if (hasPositions) {
+                          // Use actual positions
                           return (
-                            <div className="flex flex-col justify-between h-full gap-4">
+                            <div className="flex flex-col justify-between h-full gap-6">
                               {fwd.length > 0 && renderRow(fwd, 'bg-red-600')}
                               {mid.length > 0 && renderRow(mid, 'bg-blue-600')}
                               {def.length > 0 && renderRow(def, 'bg-indigo-600')}
@@ -545,19 +561,36 @@ export default function MatchDetailPage() {
                           )
                         }
                         
-                        // Fallback: display in default 4-3-3 layout
+                        // Use formation numbers to distribute players
+                        let playerIndex = 0
+                        const rows: { players: PlayerLineup[]; color: string }[] = []
+                        
+                        // Reverse formation for display (FWD at top)
+                        const reversedFormation = [...formationNumbers].reverse()
+                        const colors = ['bg-red-600', 'bg-blue-600', 'bg-indigo-600']
+                        
+                        reversedFormation.forEach((count, idx) => {
+                          const rowPlayers = players.slice(playerIndex + 1, playerIndex + 1 + count)
+                          rows.push({ players: rowPlayers, color: colors[idx] || 'bg-blue-600' })
+                          playerIndex += count
+                        })
+                        
+                        // Add goalkeeper
+                        rows.push({ players: players.slice(0, 1), color: 'bg-amber-600' })
+                        
                         return (
-                          <div className="flex flex-col justify-between h-full gap-4">
-                            {renderRow(unpositioned.slice(8, 11), 'bg-red-600')}
-                            {renderRow(unpositioned.slice(5, 8), 'bg-blue-600')}
-                            {renderRow(unpositioned.slice(1, 5), 'bg-indigo-600')}
-                            {renderRow(unpositioned.slice(0, 1), 'bg-amber-600')}
+                          <div className="flex flex-col justify-between h-full gap-6">
+                            {rows.map((row, idx) => (
+                              <div key={idx} className="flex justify-center gap-4 flex-wrap">
+                                {row.players.map((p, i) => renderPlayer(p, i, row.color))}
+                              </div>
+                            ))}
                           </div>
                         )
                       })()}
                     </div>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-white/70">
+                    <div className="flex items-center justify-center h-full text-white/70 min-h-[300px]">
                       <span>Lineup not available</span>
                     </div>
                   )}
@@ -593,63 +626,92 @@ export default function MatchDetailPage() {
                 </div>
                 
                 {/* Pitch visualization */}
-                <div className="relative bg-gradient-to-b from-green-800 to-green-700 p-4 min-h-[280px]">
+                <div className="relative bg-gradient-to-b from-green-800 to-green-700 p-4 min-h-[320px]">
                   {/* Pitch lines */}
                   <div className="absolute inset-4 border-2 border-white/30 rounded-lg">
                     <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-white/30" />
                     <div className="absolute left-1/2 top-1/2 w-16 h-16 -ml-8 -mt-8 rounded-full border-2 border-white/30" />
+                    {/* Goal area */}
+                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-24 h-8 border-2 border-white/30 border-b-0" />
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-8 border-2 border-white/30 border-t-0" />
                   </div>
                   
                   {match.lineups.away.length > 0 ? (
-                    <div className="relative z-10 h-full flex flex-col justify-between py-4 min-h-[260px]">
+                    <div className="relative z-10 h-full flex flex-col justify-between py-4 min-h-[300px]">
                       {(() => {
                         const players = match.lineups.away.slice(0, 11)
+                        const formation = match.lineups.awayFormation
+                        
+                        // Parse formation
+                        const parseFormation = (formationStr: string | undefined): number[] => {
+                          if (!formationStr) return [4, 3, 3]
+                          const parts = formationStr.split('-').map(n => parseInt(n, 10)).filter(n => !isNaN(n))
+                          if (parts.length >= 2) return parts
+                          return [4, 3, 3]
+                        }
+                        
+                        const formationNumbers = parseFormation(formation)
+                        
                         const gk = players.filter(p => p.position === 'GK' || p.position === 'G')
                         const def = players.filter(p => ['CB', 'LB', 'RB', 'LWB', 'RWB', 'D', 'DF'].includes(p.position || ''))
                         const mid = players.filter(p => ['CM', 'CDM', 'CAM', 'LM', 'RM', 'DM', 'AM', 'M', 'MF'].includes(p.position || ''))
                         const fwd = players.filter(p => ['ST', 'LW', 'RW', 'CF', 'F', 'FW'].includes(p.position || ''))
-                        const unpositioned = players.filter(p => !gk.includes(p) && !def.includes(p) && !mid.includes(p) && !fwd.includes(p))
                         
-                        const renderRow = (rowPlayers: PlayerLineup[], color: string) => (
-                          <div className="flex flex-col items-center">
-                            <div className="flex justify-center gap-3 flex-wrap">
-                              {rowPlayers.map((p, i) => (
-                                <div key={i} className="text-center">
-                                  <div className={`w-10 h-10 rounded-full ${color} flex items-center justify-center text-white font-bold text-sm shadow-lg border-2 border-white/30`}>
-                                    {p.jersey || (i + 1)}
-                                  </div>
-                                  <p className="text-xs text-white mt-1 max-w-[60px] truncate drop-shadow font-medium">{p.name.split(' ').pop()}</p>
-                                </div>
-                              ))}
+                        const hasPositions = gk.length > 0 || def.length > 0 || mid.length > 0 || fwd.length > 0
+                        
+                        const renderPlayer = (p: PlayerLineup, i: number, color: string) => (
+                          <div key={i} className="text-center flex flex-col items-center">
+                            <div className={`w-11 h-11 rounded-full ${color} flex items-center justify-center text-white font-bold text-sm shadow-lg border-2 border-white/50`}>
+                              {p.jersey || (i + 1)}
                             </div>
+                            <p className="text-xs text-white mt-1 max-w-[70px] truncate drop-shadow-lg font-semibold">{p.name.split(' ').pop()}</p>
                           </div>
                         )
                         
-                        // If we have positions, render in formation
-                        if (gk.length > 0 || def.length > 0 || mid.length > 0 || fwd.length > 0) {
+                        const renderRow = (rowPlayers: PlayerLineup[], color: string) => (
+                          <div className="flex justify-center gap-4 flex-wrap">
+                            {rowPlayers.map((p, i) => renderPlayer(p, i, color))}
+                          </div>
+                        )
+                        
+                        if (hasPositions) {
                           return (
-                            <div className="flex flex-col justify-between h-full gap-4">
-                              {fwd.length > 0 && renderRow(fwd, 'bg-red-600')}
-                              {mid.length > 0 && renderRow(mid, 'bg-orange-600')}
+                            <div className="flex flex-col justify-between h-full gap-6">
+                              {fwd.length > 0 && renderRow(fwd, 'bg-red-500')}
+                              {mid.length > 0 && renderRow(mid, 'bg-orange-500')}
                               {def.length > 0 && renderRow(def, 'bg-yellow-600')}
                               {gk.length > 0 && renderRow(gk, 'bg-amber-600')}
                             </div>
                           )
                         }
                         
-                        // Fallback: display in default 4-3-3 layout
+                        // Use formation numbers
+                        let playerIndex = 0
+                        const rows: { players: PlayerLineup[]; color: string }[] = []
+                        const reversedFormation = [...formationNumbers].reverse()
+                        const colors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-600']
+                        
+                        reversedFormation.forEach((count, idx) => {
+                          const rowPlayers = players.slice(playerIndex + 1, playerIndex + 1 + count)
+                          rows.push({ players: rowPlayers, color: colors[idx] || 'bg-orange-500' })
+                          playerIndex += count
+                        })
+                        
+                        rows.push({ players: players.slice(0, 1), color: 'bg-amber-600' })
+                        
                         return (
-                          <div className="flex flex-col justify-between h-full gap-4">
-                            {renderRow(unpositioned.slice(8, 11), 'bg-red-600')}
-                            {renderRow(unpositioned.slice(5, 8), 'bg-orange-600')}
-                            {renderRow(unpositioned.slice(1, 5), 'bg-yellow-600')}
-                            {renderRow(unpositioned.slice(0, 1), 'bg-amber-600')}
+                          <div className="flex flex-col justify-between h-full gap-6">
+                            {rows.map((row, idx) => (
+                              <div key={idx} className="flex justify-center gap-4 flex-wrap">
+                                {row.players.map((p, i) => renderPlayer(p, i, row.color))}
+                              </div>
+                            ))}
                           </div>
                         )
                       })()}
                     </div>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-white/70">
+                    <div className="flex items-center justify-center h-full text-white/70 min-h-[300px]">
                       <span>Lineup not available</span>
                     </div>
                   )}
