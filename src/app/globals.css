@@ -110,6 +110,21 @@ body {
   box-shadow: 0 4px 20px var(--shadow-color);
 }
 
+/* Interactive Card - Pop-out effect */
+.fm-card-pop {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+
+.fm-card-pop:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 8px 30px var(--shadow-lg);
+  transform: translateY(-4px) scale(1.02);
+}
+
 /* Match Card - Fotmob Style */
 .match-card {
   background-color: var(--match-card-bg);

@@ -201,39 +201,48 @@ export default function MatchDetailPage() {
 
   const isLive = match.status.includes('IN_PROGRESS') || match.status.includes('HALF')
 
+  // Navigate back to the league page
+  const handleBack = () => {
+    if (leagueId) {
+      router.push(`/matches?league=${leagueId}`)
+    } else {
+      router.back()
+    }
+  }
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--background)' }}>
       {/* Header */}
       <div style={{ backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)' }}>
         <div className="max-w-4xl mx-auto px-4 py-4">
           <button
-            onClick={() => router.back()}
+            onClick={handleBack}
             className="flex items-center gap-2 hover:opacity-80 mb-4 transition-colors"
             style={{ color: 'var(--text-secondary)' }}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back
+            Back to {match.league || 'matches'}
           </button>
           
-          {/* Match Header */}
+          {/* Match Header - Centered */}
           <div className="text-center">
-            <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>{match.league}</p>
+            <p className="text-sm font-medium mb-4 text-center" style={{ color: 'var(--text-secondary)' }}>{match.league}</p>
             
-            <div className="flex items-center justify-center gap-8">
-              <div className="text-center">
-                <p className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>{match.home_team}</p>
+            <div className="flex items-center justify-center gap-4 md:gap-8">
+              <div className="flex-1 text-right">
+                <p className="text-lg md:text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{match.home_team}</p>
               </div>
               
-              <div className="text-center px-6">
+              <div className="text-center px-4 md:px-8">
                 {isLive && (
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                     <span className="text-red-400 text-sm font-bold">{match.minute}&apos;</span>
                   </div>
                 )}
-                <div className="text-4xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                <div className="text-4xl md:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
                   {match.home_score} - {match.away_score}
                 </div>
                 {!isLive && match.status.includes('FINAL') && (
@@ -241,14 +250,14 @@ export default function MatchDetailPage() {
                 )}
               </div>
               
-              <div className="text-center">
-                <p className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>{match.away_team}</p>
+              <div className="flex-1 text-left">
+                <p className="text-lg md:text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{match.away_team}</p>
               </div>
             </div>
             
-            <p className="text-sm mt-4" style={{ color: 'var(--text-tertiary)' }}>{formatDate(match.date)}</p>
+            <p className="text-sm mt-4 text-center" style={{ color: 'var(--text-tertiary)' }}>{formatDate(match.date)}</p>
             {match.venue && (
-              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{match.venue}</p>
+              <p className="text-sm text-center" style={{ color: 'var(--text-tertiary)' }}>📍 {match.venue}</p>
             )}
           </div>
         </div>
@@ -257,7 +266,7 @@ export default function MatchDetailPage() {
       {/* Tabs */}
       <div className="bg-[var(--background-secondary)] border-b sticky top-16 z-10" style={{ borderColor: 'var(--border-color)' }}>
         <div className="max-w-4xl mx-auto px-4">
-          <div className="flex gap-4 overflow-x-auto">
+          <div className="flex gap-4 overflow-x-auto justify-center">
             {['summary', 'lineup', 'stats', 'h2h'].map((tab) => (
               <button
                 key={tab}

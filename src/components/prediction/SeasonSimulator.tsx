@@ -27,7 +27,12 @@ export default function SeasonSimulator() {
     setResult(null);
 
     try {
-      const data = await leaguesApi.getSimulation(selectedLeague.id, nSimulations);
+      // Use local API route instead of external backend
+      const response = await fetch(`/api/simulation/${selectedLeague.id}?n_simulations=${nSimulations}`);
+      if (!response.ok) {
+        throw new Error('Failed to run simulation');
+      }
+      const data = await response.json();
       setResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to run simulation');

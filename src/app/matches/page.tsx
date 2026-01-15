@@ -1,18 +1,20 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import MatchCalendar from '@/components/match/MatchCalendar';
+import { leagueFlagUrls } from '@/data/leagues';
 
-// League configuration with ESPN IDs
+// League configuration with ESPN IDs and flag codes
 const LEAGUES = [
-  { id: 'eng.1', name: 'Premier League', country: 'England', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
-  { id: 'esp.1', name: 'La Liga', country: 'Spain', flag: '🇪🇸' },
-  { id: 'ita.1', name: 'Serie A', country: 'Italy', flag: '🇮🇹' },
-  { id: 'ger.1', name: 'Bundesliga', country: 'Germany', flag: '🇩🇪' },
-  { id: 'fra.1', name: 'Ligue 1', country: 'France', flag: '🇫🇷' },
-  { id: 'usa.1', name: 'MLS', country: 'USA', flag: '🇺🇸' },
-  { id: 'uefa.champions', name: 'Champions League', country: 'Europe', flag: '🏆' },
-  { id: 'uefa.europa', name: 'Europa League', country: 'Europe', flag: '🏆' },
+  { id: 'eng.1', name: 'Premier League', country: 'England', flagCode: 'ENG' },
+  { id: 'esp.1', name: 'La Liga', country: 'Spain', flagCode: 'ES' },
+  { id: 'ita.1', name: 'Serie A', country: 'Italy', flagCode: 'IT' },
+  { id: 'ger.1', name: 'Bundesliga', country: 'Germany', flagCode: 'DE' },
+  { id: 'fra.1', name: 'Ligue 1', country: 'France', flagCode: 'FR' },
+  { id: 'usa.1', name: 'MLS', country: 'USA', flagCode: 'US' },
+  { id: 'uefa.champions', name: 'Champions League', country: 'Europe', flagCode: 'EU' },
+  { id: 'uefa.europa', name: 'Europa League', country: 'Europe', flagCode: 'EU' },
 ];
 
 interface Standing {
@@ -29,10 +31,27 @@ interface Standing {
 }
 
 export default function MatchesPage() {
-  const [selectedLeague, setSelectedLeague] = useState<typeof LEAGUES[0] | null>(null);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const leagueParam = searchParams.get('league');
+  
+  // Initialize selected league from URL if available
+  const initialLeague = leagueParam ? LEAGUES.find(l => l.id === leagueParam) : null;
+  const [selectedLeague, setSelectedLeague] = useState<typeof LEAGUES[0] | null>(initialLeague);
   const [standings, setStandings] = useState<Standing[]>([]);
   const [loadingStandings, setLoadingStandings] = useState(false);
   const [activeTab, setActiveTab] = useState<'fixtures' | 'standings'>('fixtures');
+
+  // Update URL when league changes
+  const handleSelectLeague = (league: typeof LEAGUES[0]) => {
+    setSelectedLeague(league);
+    router.push(`/matches?league=${league.id}`);
+  };
+
+  const handleBackToLeagues = () => {
+    setSelectedLeague(null);
+    router.push('/matches');
+  };
 
   // Fetch standings when league is selected
   useEffect(() => {
@@ -82,12 +101,20 @@ export default function MatchesPage() {
             {LEAGUES.map((league) => (
               <button
                 key={league.id}
-                onClick={() => setSelectedLeague(league)}
-                className="group flex items-center gap-4 p-5 rounded-2xl border transition-all text-left fm-card"
+                onClick={() => handleSelectLeague(league)}
+                className="group flex items-center gap-4 p-5 rounded-2xl border transition-all text-left fm-card hover:scale-[1.02] hover:shadow-lg"
               >
-                <span className="text-3xl">{league.flag}</span>
+                {leagueFlagUrls[league.flagCode] ? (
+                  <img 
+                    src={leagueFlagUrls[league.flagCode]} 
+                    alt={league.country}
+                    className="w-8 h-auto rounded shadow-sm"
+                  />
+                ) : (
+                  <span className="text-3xl">🏆</span>
+                )}
                 <div>
-                  <p className="text-lg font-semibold group-hover:text-indigo-300 transition-colors" style={{ color: 'var(--text-primary)' }}>
+                  <p className="text-lg font-semibold group-hover:text-indigo-400 transition-colors" style={{ color: 'var(--text-primary)' }}>
                     {league.name}
                   </p>
                   <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{league.country}</p>
@@ -110,7 +137,7 @@ export default function MatchesPage() {
       <div style={{ backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)' }}>
         <div className="max-w-6xl mx-auto px-4 py-6">
           <button
-            onClick={() => setSelectedLeague(null)}
+            onClick={handleBackToLeagues}
             className="flex items-center gap-2 hover:opacity-80 mb-4 transition-colors"
             style={{ color: 'var(--text-secondary)' }}
           >
@@ -121,7 +148,15 @@ export default function MatchesPage() {
           </button>
           
           <div className="flex items-center gap-4">
-            <span className="text-4xl">{selectedLeague.flag}</span>
+            {leagueFlagUrls[selectedLeague.flagCode] ? (
+              <img 
+                src={leagueFlagUrls[selectedLeague.flagCode]} 
+                alt={selectedLeague.country}
+                className="w-10 h-auto rounded shadow-sm"
+              />
+            ) : (
+              <span className="text-4xl">🏆</span>
+            )}
             <div>
               <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{selectedLeague.name}</h1>
               <p style={{ color: 'var(--text-secondary)' }}>{selectedLeague.country}</p>

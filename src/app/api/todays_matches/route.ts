@@ -27,16 +27,15 @@ const ESPN_LEAGUES = [
 async function fetchESPNMatches(): Promise<Match[]> {
   const allMatches: Match[] = []
   
-  // Get today's date boundaries for filtering
-  const MS_PER_DAY = 24 * 60 * 60 * 1000
+  // Get today's date in YYYYMMDD format for ESPN API
   const today = new Date()
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
-  const todayEnd = todayStart + MS_PER_DAY // End of today
+  const todayStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
   
   for (const league of ESPN_LEAGUES) {
     try {
+      // Use dates parameter to explicitly request today's matches
       const response = await fetch(
-        `https://site.api.espn.com/apis/site/v2/sports/soccer/${league.id}/scoreboard`,
+        `https://site.api.espn.com/apis/site/v2/sports/soccer/${league.id}/scoreboard?dates=${todayStr}`,
         {
           headers: {
             'Accept': 'application/json',
@@ -53,12 +52,6 @@ async function fetchESPNMatches(): Promise<Match[]> {
       for (const event of data.events || []) {
         const competition = event.competitions?.[0]
         if (!competition) continue
-        
-        // Filter to only today's matches
-        const matchDate = new Date(event.date).getTime()
-        if (matchDate < todayStart || matchDate >= todayEnd) {
-          continue // Skip matches not from today
-        }
         
         const homeTeam = competition.competitors?.find((c: any) => c.homeAway === 'home')
         const awayTeam = competition.competitors?.find((c: any) => c.homeAway === 'away')
