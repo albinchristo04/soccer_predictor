@@ -140,6 +140,19 @@ interface Standing {
   relegation_probability: number
 }
 
+// Simulation constants
+const TOTAL_MATCHES_PER_SEASON = 38
+const AVG_POINTS_PER_MATCH = 2.5
+const BASE_REMAINING_MATCHES = 20
+const TITLE_BASE_PROB = 0.3
+const TITLE_RANDOM_FACTOR = 0.15
+const TOP4_BASE_PROB = 0.14
+const TOP4_RANDOM_FACTOR = 0.08
+const EUROPA_BASE_PROB = 0.3
+const EUROPA_RANDOM_FACTOR = 0.15
+const RELEGATION_BASE_PROB = 0.22
+const RELEGATION_RANDOM_FACTOR = 0.08
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ leagueId: string }> }
@@ -164,15 +177,24 @@ export async function GET(
       const totalTeams = teams.length
       
       // Simple Monte Carlo simulation based on current standings
-      const remainingMatches = 38 - Math.round(points / 2.5)
-      const avgPointsPerGame = points / (38 - remainingMatches) || 1.5
+      const remainingMatches = TOTAL_MATCHES_PER_SEASON - Math.round(points / AVG_POINTS_PER_MATCH)
+      const matchesPlayed = TOTAL_MATCHES_PER_SEASON - remainingMatches
+      const avgPointsPerGame = matchesPlayed > 0 ? points / matchesPlayed : 1.5
       const projectedPoints = points + (remainingMatches * avgPointsPerGame)
       
       // Calculate probabilities based on position
-      const titleProb = position <= 2 ? Math.max(0, (3 - position) * 0.3 + Math.random() * 0.15) : position <= 4 ? Math.random() * 0.08 : 0
-      const top4Prob = position <= 6 ? Math.max(0, (7 - position) * 0.14 + Math.random() * 0.08) : Math.random() * 0.03
-      const europaProb = position >= 5 && position <= 8 ? 0.3 + Math.random() * 0.15 : Math.random() * 0.08
-      const relegationProb = position >= totalTeams - 4 ? Math.max(0, (position - totalTeams + 5) * 0.22 + Math.random() * 0.08) : 0
+      const titleProb = position <= 2 
+        ? Math.max(0, (3 - position) * TITLE_BASE_PROB + Math.random() * TITLE_RANDOM_FACTOR) 
+        : position <= 4 ? Math.random() * TOP4_RANDOM_FACTOR : 0
+      const top4Prob = position <= 6 
+        ? Math.max(0, (7 - position) * TOP4_BASE_PROB + Math.random() * TOP4_RANDOM_FACTOR) 
+        : Math.random() * 0.03
+      const europaProb = position >= 5 && position <= 8 
+        ? EUROPA_BASE_PROB + Math.random() * EUROPA_RANDOM_FACTOR 
+        : Math.random() * RELEGATION_RANDOM_FACTOR
+      const relegationProb = position >= totalTeams - 4 
+        ? Math.max(0, (position - totalTeams + 5) * RELEGATION_BASE_PROB + Math.random() * RELEGATION_RANDOM_FACTOR) 
+        : 0
       
       return {
         team_name: team.name,
@@ -198,11 +220,16 @@ export async function GET(
     const sortedByRelegation = [...standings].sort((a, b) => b.relegation_probability - a.relegation_probability)
     const relegationCandidates = sortedByRelegation.slice(0, 3).map(t => t.team_name)
     
+    // Estimate remaining matches based on average points
+    const avgPoints = standings.reduce((sum, t) => sum + t.current_points, 0) / standings.length
+    const estimatedMatchesPlayed = Math.round(avgPoints / AVG_POINTS_PER_MATCH)
+    const estimatedRemainingMatches = Math.max(0, TOTAL_MATCHES_PER_SEASON - estimatedMatchesPlayed)
+    
     return {
       league_id: leagueId,
       league_name: leagueName,
       n_simulations: nSimulations,
-      remaining_matches: Math.max(0, 20 - Math.round(Math.random() * 3)),
+      remaining_matches: estimatedRemainingMatches,
       most_likely_champion: mostLikelyChampion,
       champion_probability: championProbability,
       likely_top_4: likelyTop4,
