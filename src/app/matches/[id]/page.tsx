@@ -74,11 +74,6 @@ interface MatchDetails {
   nextResumeTime?: Date
 }
 
-// Map league IDs for ESPN API
-const LEAGUE_ENDPOINTS = [
-  'eng.1', 'esp.1', 'ita.1', 'ger.1', 'fra.1', 'usa.1', 'uefa.champions', 'uefa.europa', 'fifa.world'
-]
-
 export default function MatchDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -128,413 +123,120 @@ export default function MatchDetailPage() {
   useEffect(() => {
     const fetchMatchDetails = async () => {
       try {
-        // Try fetching from different league endpoints until we find the match
-        let matchData = null
-        let dataSource: 'espn' | 'fotmob' = 'espn'
+        // Use our server-side API proxy to fetch match details
+        // This avoids CORS issues and handles fallbacks between ESPN and FotMob
+        const url = `/api/match/${matchId}${leagueId ? `?league=${leagueId}` : ''}`
+        const res = await fetch(url)
         
-        // If league ID is provided, try that first
-        if (leagueId) {
-          const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueId}/summary?event=${matchId}`)
-          if (res.ok) {
-            matchData = await res.json()
-          }
+        if (!res.ok) {
+          console.error('Match not found:', res.status)
+          setMatch(null)
+          setLoading(false)
+          return
         }
         
-        // If no data yet, try each league endpoint
-        if (!matchData || !matchData.header) {
-          for (const league of LEAGUE_ENDPOINTS) {
-            try {
-              const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/summary?event=${matchId}`)
-              if (res.ok) {
-                const data = await res.json()
-                if (data.header?.competitions?.[0]) {
-                  matchData = data
-                  break
-                }
-              }
-            } catch {
-              continue
-            }
-          }
+        const data = await res.json()
+        
+        // Map the API response to MatchDetails format
+        const matchDetails: MatchDetails = {
+          id: data.id,
+          home_team: data.home_team,
+          away_team: data.away_team,
+          home_score: data.home_score,
+          away_score: data.away_score,
+          status: data.status === 'finished' ? 'STATUS_FINAL' : 
+                  data.status === 'live' ? 'STATUS_IN_PROGRESS' : 'STATUS_SCHEDULED',
+          minute: data.minute,
+          venue: data.venue,
+          date: data.date,
+          league: data.league,
+          leagueId: data.leagueId,
+          referee: data.referee,
+          events: (data.events || []).map((e: { type: string; minute: number; addedTime?: number; player: string; team: string; relatedPlayer?: string }) => ({
+            type: e.type as MatchEvent['type'],
+            minute: e.minute,
+            addedTime: e.addedTime,
+            player: e.player,
+            team: e.team as 'home' | 'away',
+            relatedPlayer: e.relatedPlayer,
+          })),
+          lineups: {
+            home: data.lineups?.home || [],
+            away: data.lineups?.away || [],
+            homeFormation: data.lineups?.homeFormation,
+            awayFormation: data.lineups?.awayFormation,
+          },
+          stats: data.stats || {
+            possession: [50, 50],
+            shots: [0, 0],
+            shotsOnTarget: [0, 0],
+            corners: [0, 0],
+            fouls: [0, 0],
+          },
+          h2h: {
+            homeWins: 0,
+            draws: 0,
+            awayWins: 0,
+            recentMatches: [],
+          },
         }
         
-        // If still no data, try FotMob API (for matches sourced from FotMob)
-        if (!matchData || !matchData.header) {
+        // Try to fetch standings for team positions
+        if (data.leagueId) {
           try {
-            const fotmobRes = await fetch(`https://www.fotmob.com/api/matchDetails?matchId=${matchId}`, {
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'application/json',
-              },
-            })
-            if (fotmobRes.ok) {
-              const fotmobData = await fotmobRes.json()
-              if (fotmobData.general) {
-                matchData = fotmobData
-                dataSource = 'fotmob'
-              }
-            }
-          } catch (e) {
-            console.error('FotMob fallback failed:', e)
-          }
-        }
-        
-        // Process ESPN data
-        if (matchData && matchData.header && dataSource === 'espn') {
-          const data = matchData
-          const competition = data.header?.competitions?.[0]
-          const homeTeam = competition?.competitors?.find((c: any) => c.homeAway === 'home')
-          const awayTeam = competition?.competitors?.find((c: any) => c.homeAway === 'away')
-          
-          // Extract referee from multiple possible locations
-          let refereeName: string | null = null
-          
-          // Try gameInfo.officials first (most common)
-          const officials = data.gameInfo?.officials || data.officials || []
-          if (officials.length > 0) {
-            const mainReferee = officials.find((o: any) => 
-              o.position?.name?.toLowerCase() === 'referee' || 
-              o.position?.displayName?.toLowerCase() === 'referee' ||
-              o.order === 1
-            ) || officials[0]
-            refereeName = mainReferee?.fullName || mainReferee?.displayName || mainReferee?.athlete?.displayName || null
-          }
-          
-          // Try from competition status details
-          if (!refereeName && competition?.status?.detail) {
-            const detail = competition.status.detail
-            const refMatch = detail.match(/Referee:\s*([^,\n]+)/i)
-            if (refMatch) {
-              refereeName = refMatch[1].trim()
-            }
-          }
-          
-          // Try from boxscore or content
-          if (!refereeName) {
-            const boxscoreOfficials = data.boxscore?.officials || data.content?.gameInfo?.officials || []
-            if (boxscoreOfficials.length > 0) {
-              const mainRef = boxscoreOfficials.find((o: any) => o.position?.toLowerCase().includes('referee')) || boxscoreOfficials[0]
-              refereeName = mainRef?.displayName || mainRef?.name || null
-            }
-          }
-          
-          // Extract all events including cards, substitutions
-          const events: MatchEvent[] = []
-          
-          // Scoring plays (goals)
-          const scoringPlays = data.scoringPlays || []
-          for (const play of scoringPlays) {
-            const isOwnGoal = play.text?.toLowerCase().includes('own goal')
-            events.push({
-              type: isOwnGoal ? 'own_goal' : 'goal',
-              minute: parseInt(play.clock?.displayValue) || 0,
-              player: play.scoringPlay?.scorer?.athlete?.displayName || play.text?.trim() || 'Unknown',
-              team: play.homeAway === 'home' ? 'home' : 'away',
-              relatedPlayer: play.scoringPlay?.assists?.[0]?.athlete?.displayName,
-            })
-          }
-          
-          // Extract match facts events (cards, subs)
-          const matchFactEvents = data.content?.matchFacts?.events?.events || data.keyEvents || []
-          for (const evt of matchFactEvents) {
-            const evtType = evt.type?.toLowerCase() || evt.eventType?.toLowerCase() || ''
-            let type: MatchEvent['type'] = 'goal'
-            
-            if (evtType.includes('yellow')) type = 'yellow_card'
-            else if (evtType.includes('red') || evtType.includes('second yellow')) type = 'red_card'
-            else if (evtType.includes('sub')) type = 'substitution'
-            else if (evtType.includes('var')) type = 'var'
-            else continue  // Skip unknown types to avoid duplicating goals
-            
-            events.push({
-              type,
-              minute: evt.minute || evt.time?.minute || parseInt(evt.clock?.displayValue) || 0,
-              addedTime: evt.addedTime || evt.time?.injuryTime,
-              player: evt.player?.name || evt.athlete?.displayName || evt.text || 'Unknown',
-              team: evt.isHome || evt.homeAway === 'home' ? 'home' : 'away',
-              relatedPlayer: evt.relatedPlayer?.name || evt.playerOff?.name,
-            })
-          }
-          
-          // Extract stats helper function
-          const getStatValue = (name: string, teamIndex: number) => {
-            const teamStats = data.boxscore?.teams?.[teamIndex]?.statistics || []
-            const stat = teamStats.find((s: any) => s.name?.toLowerCase() === name.toLowerCase())
-            return parseInt(stat?.displayValue) || 0
-          }
-          
-          // Extract lineup with position information
-          const extractLineup = (roster: any[]): PlayerLineup[] => {
-            if (!roster) return []
-            return roster.map((p: any) => ({
-              name: p.athlete?.displayName || 'Unknown',
-              position: p.position?.abbreviation || p.athlete?.position?.abbreviation || undefined,
-              jersey: p.jersey ? parseInt(p.jersey, 10) : undefined,
-            }))
-          }
-          
-          // Get formation from ESPN data
-          const homeFormation = data.rosters?.[0]?.formation || data.boxscore?.teams?.[0]?.formation || undefined
-          const awayFormation = data.rosters?.[1]?.formation || data.boxscore?.teams?.[1]?.formation || undefined
-
-          const matchDetails: MatchDetails = {
-            id: matchId,
-            home_team: homeTeam?.team?.displayName || 'Home Team',
-            away_team: awayTeam?.team?.displayName || 'Away Team',
-            home_score: parseInt(homeTeam?.score) || 0,
-            away_score: parseInt(awayTeam?.score) || 0,
-            status: competition?.status?.type?.name || 'scheduled',
-            minute: parseInt(competition?.status?.displayClock) || undefined,
-            venue: data.gameInfo?.venue?.fullName,
-            date: data.header?.competitions?.[0]?.date || '',
-            league: data.header?.league?.name || '',
-            referee: refereeName,
-            events,
-            lineups: {
-              home: extractLineup(data.rosters?.[0]?.roster),
-              away: extractLineup(data.rosters?.[1]?.roster),
-              homeFormation,
-              awayFormation,
-            },
-            stats: {
-              possession: [getStatValue('possessionPct', 0), getStatValue('possessionPct', 1)],
-              shots: [getStatValue('totalShots', 0), getStatValue('totalShots', 1)],
-              shotsOnTarget: [getStatValue('shotsOnTarget', 0), getStatValue('shotsOnTarget', 1)],
-              corners: [getStatValue('wonCorners', 0), getStatValue('wonCorners', 1)],
-              fouls: [getStatValue('foulsCommitted', 0), getStatValue('foulsCommitted', 1)],
-            },
-            h2h: {
-              homeWins: 0,
-              draws: 0,
-              awayWins: 0,
-              recentMatches: [],
-            }
-          }
-          
-          // Try to extract H2H data from ESPN response
-          const headToHead = data.headToHeadHistory || data.previousMeetings || data.headToHead
-          if (headToHead) {
-            // Count wins/draws from recent meetings
-            const recentGames = headToHead.events || headToHead.games || []
-            let homeWins = 0, awayWins = 0, draws = 0
-            const recentMatches: { home_score: number; away_score: number; date: string }[] = []
-            
-            for (const game of recentGames.slice(0, 10)) {
-              const homeScore = parseInt(game.homeTeam?.score || game.score?.home || '0', 10)
-              const awayScore = parseInt(game.awayTeam?.score || game.score?.away || '0', 10)
+            const standingsRes = await fetch(
+              `https://site.api.espn.com/apis/v2/sports/soccer/${data.leagueId}/standings`
+            )
+            if (standingsRes.ok) {
+              const standingsData = await standingsRes.json()
+              const entries = standingsData.children?.[0]?.standings?.entries || []
               
-              if (homeScore > awayScore) homeWins++
-              else if (awayScore > homeScore) awayWins++
-              else draws++
+              const homeTeamName = matchDetails.home_team.toLowerCase()
+              const awayTeamName = matchDetails.away_team.toLowerCase()
               
-              recentMatches.push({
-                home_score: homeScore,
-                away_score: awayScore,
-                date: game.date || game.gameDate || '',
-              })
-            }
-            
-            matchDetails.h2h = { homeWins, draws, awayWins, recentMatches }
-          }
-          
-          // Try to fetch league standings to get team positions
-          const leagueSlug = leagueId || data.header?.league?.slug || ''
-          if (leagueSlug) {
-            try {
-              const standingsRes = await fetch(
-                `https://site.api.espn.com/apis/v2/sports/soccer/${leagueSlug}/standings`
-              )
-              if (standingsRes.ok) {
-                const standingsData = await standingsRes.json()
-                const entries = standingsData.children?.[0]?.standings?.entries || []
+              const fullStandings: TeamStanding[] = []
+              
+              for (let i = 0; i < entries.length; i++) {
+                const entry = entries[i]
+                const teamDisplayName = entry.team?.displayName || 'Unknown'
+                const teamName = teamDisplayName.toLowerCase()
                 
-                const homeTeamName = matchDetails.home_team.toLowerCase()
-                const awayTeamName = matchDetails.away_team.toLowerCase()
-                
-                // Build full standings array
-                const fullStandings: TeamStanding[] = []
-                
-                for (let i = 0; i < entries.length; i++) {
-                  const entry = entries[i]
-                  const teamDisplayName = entry.team?.displayName || 'Unknown'
-                  const teamName = teamDisplayName.toLowerCase()
-                  
-                  const getStatVal = (name: string) => {
-                    const stat = entry.stats?.find((s: any) => s.name === name)
-                    return parseInt(stat?.value || '0', 10)
-                  }
-                  
-                  const standing: TeamStanding = {
-                    position: i + 1,
-                    played: getStatVal('gamesPlayed'),
-                    won: getStatVal('wins'),
-                    drawn: getStatVal('ties'),
-                    lost: getStatVal('losses'),
-                    points: getStatVal('points'),
-                    teamName: teamDisplayName,
-                  }
-                  
-                  fullStandings.push(standing)
-                  
-                  if (teamName.includes(homeTeamName) || homeTeamName.includes(teamName)) {
-                    matchDetails.homeStanding = standing
-                  }
-                  if (teamName.includes(awayTeamName) || awayTeamName.includes(teamName)) {
-                    matchDetails.awayStanding = standing
-                  }
+                const getStatVal = (name: string) => {
+                  const stat = entry.stats?.find((s: { name: string }) => s.name === name)
+                  return parseInt(stat?.value || '0', 10)
                 }
                 
-                matchDetails.fullStandings = fullStandings
+                const standing: TeamStanding = {
+                  position: i + 1,
+                  played: getStatVal('gamesPlayed'),
+                  won: getStatVal('wins'),
+                  drawn: getStatVal('ties'),
+                  lost: getStatVal('losses'),
+                  points: getStatVal('points'),
+                  teamName: teamDisplayName,
+                }
+                
+                fullStandings.push(standing)
+                
+                if (teamName.includes(homeTeamName) || homeTeamName.includes(teamName)) {
+                  matchDetails.homeStanding = standing
+                }
+                if (teamName.includes(awayTeamName) || awayTeamName.includes(teamName)) {
+                  matchDetails.awayStanding = standing
+                }
               }
-            } catch {
-              // Standings not available, continue without them
+              
+              matchDetails.fullStandings = fullStandings
             }
+          } catch {
+            // Standings not available, continue without them
           }
-          
-          matchDetails.leagueId = leagueSlug
-          setMatch(matchDetails)
         }
         
-        // Process FotMob data
-        if (matchData && matchData.general && dataSource === 'fotmob') {
-          const general = matchData.general
-          const content = matchData.content
-          const header = matchData.header
-          
-          // Extract status
-          let status = 'scheduled'
-          const started = general.started
-          const finished = general.finished
-          if (finished) {
-            status = 'STATUS_FINAL'
-          } else if (started) {
-            status = general.matchTimeUTC ? 'STATUS_IN_PROGRESS' : 'STATUS_HALFTIME'
-          }
-          
-          // Extract events from FotMob
-          const events: MatchEvent[] = []
-          const matchEvents = content?.matchFacts?.events?.events || []
-          for (const evt of matchEvents) {
-            const evtType = evt.type?.toLowerCase() || ''
-            let type: MatchEvent['type'] = 'goal'
-            
-            if (evtType === 'goal' || evtType === 'scoring') {
-              type = evt.ownGoal ? 'own_goal' : 'goal'
-            } else if (evtType === 'yellowcard' || evtType.includes('yellow')) {
-              type = 'yellow_card'
-            } else if (evtType === 'redcard' || evtType.includes('red')) {
-              type = 'red_card'
-            } else if (evtType === 'substitution' || evtType.includes('sub')) {
-              type = 'substitution'
-            } else if (evtType.includes('var')) {
-              type = 'var'
-            } else {
-              continue
-            }
-            
-            events.push({
-              type,
-              minute: evt.time || evt.minute || 0,
-              addedTime: evt.addedTime,
-              player: evt.nameStr || evt.player?.name || 'Unknown',
-              team: evt.isHome ? 'home' : 'away',
-              relatedPlayer: evt.assistStr || evt.assist?.name,
-            })
-          }
-          
-          // Extract stats from FotMob
-          const statsObj = content?.stats?.Ede?.stats?.[0]?.stats || []
-          const getStatPair = (title: string): [number, number] => {
-            const stat = statsObj.find((s: any) => s.title?.toLowerCase() === title.toLowerCase())
-            if (!stat) return [0, 0]
-            return [
-              parseInt(stat.stats?.[0]) || 0,
-              parseInt(stat.stats?.[1]) || 0,
-            ]
-          }
-          
-          // Extract lineups from FotMob
-          const extractFotmobLineup = (lineup: any): PlayerLineup[] => {
-            if (!lineup?.players) return []
-            const players: PlayerLineup[] = []
-            for (const row of lineup.players) {
-              for (const p of row || []) {
-                players.push({
-                  name: p.name?.fullName || p.name?.shortName || 'Unknown',
-                  position: p.positionStringShort || p.position,
-                  jersey: p.shirt,
-                })
-              }
-            }
-            return players
-          }
-          
-          const homeLineup = extractFotmobLineup(content?.lineup?.homeTeam)
-          const awayLineup = extractFotmobLineup(content?.lineup?.awayTeam)
-          
-          // Extract referee from FotMob
-          const refereeData = content?.matchFacts?.infoBox?.Referee
-          const refereeName = refereeData?.text || null
-          
-          const matchDetails: MatchDetails = {
-            id: matchId,
-            home_team: general.homeTeam?.name || 'Home Team',
-            away_team: general.awayTeam?.name || 'Away Team',
-            home_score: general.homeTeam?.score ?? 0,
-            away_score: general.awayTeam?.score ?? 0,
-            status,
-            minute: general.matchTimeUTCDate ? Math.floor((Date.now() - new Date(general.matchTimeUTCDate).getTime()) / 60000) : undefined,
-            venue: content?.matchFacts?.infoBox?.Stadium?.text || general.venue?.name,
-            date: general.matchTimeUTC || '',
-            league: general.leagueName || general.parentLeagueName || '',
-            referee: refereeName,
-            events,
-            lineups: {
-              home: homeLineup,
-              away: awayLineup,
-              homeFormation: content?.lineup?.homeTeam?.formation,
-              awayFormation: content?.lineup?.awayTeam?.formation,
-            },
-            stats: {
-              possession: getStatPair('Ball possession'),
-              shots: getStatPair('Total shots'),
-              shotsOnTarget: getStatPair('Shots on target'),
-              corners: getStatPair('Corners'),
-              fouls: getStatPair('Fouls'),
-            },
-            h2h: {
-              homeWins: 0,
-              draws: 0,
-              awayWins: 0,
-              recentMatches: [],
-            },
-          }
-          
-          // Extract H2H from FotMob
-          const h2hData = content?.h2h?.matches || []
-          let homeWins = 0, awayWins = 0, draws = 0
-          const recentMatches: { home_score: number; away_score: number; date: string }[] = []
-          
-          for (const game of h2hData.slice(0, 10)) {
-            const homeScore = game.homeTeam?.score ?? 0
-            const awayScore = game.awayTeam?.score ?? 0
-            
-            if (homeScore > awayScore) homeWins++
-            else if (awayScore > homeScore) awayWins++
-            else draws++
-            
-            recentMatches.push({
-              home_score: homeScore,
-              away_score: awayScore,
-              date: game.matchDate || '',
-            })
-          }
-          
-          matchDetails.h2h = { homeWins, draws, awayWins, recentMatches }
-          setMatch(matchDetails)
-        }
+        setMatch(matchDetails)
       } catch (e) {
         console.error('Error fetching match details:', e)
+        setMatch(null)
       } finally {
         setLoading(false)
       }
