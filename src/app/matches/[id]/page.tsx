@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import FormationDisplay, { PitchBackground, SubstitutesBench } from '@/components/lineup/FormationDisplay'
@@ -89,6 +89,40 @@ export default function MatchDetailPage() {
   const [match, setMatch] = useState<MatchDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'summary' | 'lineup' | 'stats' | 'h2h'>('summary')
+  const [halftimeCountdown, setHalftimeCountdown] = useState<string>('')
+
+  // Derived state for live status - compute before hooks that depend on it
+  const isLive = match?.status?.includes('IN_PROGRESS') || match?.status?.includes('HALF') || match?.status?.includes('LIVE') || false
+  const isHalftime = match?.status?.toLowerCase().includes('half') && !match?.status?.toLowerCase().includes('first') && !match?.status?.toLowerCase().includes('second') || false
+
+  // Halftime countdown effect - must be before early returns
+  useEffect(() => {
+    if (!isHalftime) {
+      setHalftimeCountdown('')
+      return
+    }
+    
+    const estimatedResumeTime = new Date()
+    estimatedResumeTime.setMinutes(estimatedResumeTime.getMinutes() + 10)
+    
+    const updateCountdown = () => {
+      const now = new Date()
+      const diff = estimatedResumeTime.getTime() - now.getTime()
+      
+      if (diff <= 0) {
+        setHalftimeCountdown('Resuming soon...')
+        return
+      }
+      
+      const minutes = Math.floor(diff / 60000)
+      const seconds = Math.floor((diff % 60000) / 1000)
+      setHalftimeCountdown(`${minutes}:${seconds.toString().padStart(2, '0')}`)
+    }
+    
+    updateCountdown()
+    const interval = setInterval(updateCountdown, 1000)
+    return () => clearInterval(interval)
+  }, [isHalftime])
 
   useEffect(() => {
     const fetchMatchDetails = async () => {
@@ -358,43 +392,9 @@ export default function MatchDetailPage() {
     )
   }
 
-  const isLive = match.status.includes('IN_PROGRESS') || match.status.includes('HALF') || match.status.includes('LIVE')
-  const isHalftime = match.status.toLowerCase().includes('half') && !match.status.toLowerCase().includes('first') && !match.status.toLowerCase().includes('second')
+  // Additional derived state (isLive and isHalftime already computed above before hooks)
   const isScheduled = match.status.toLowerCase().includes('scheduled') || match.status.toLowerCase().includes('pre')
   const isFinished = match.status.includes('FINAL') || match.status.toLowerCase().includes('finished') || match.status.toLowerCase().includes('ft')
-
-  // Halftime countdown state
-  const [halftimeCountdown, setHalftimeCountdown] = useState<string>('')
-  
-  // Update halftime countdown
-  useEffect(() => {
-    if (!isHalftime) {
-      setHalftimeCountdown('')
-      return
-    }
-    
-    // Estimate halftime end (15 minutes from halftime start, usually around minute 45)
-    const estimatedResumeTime = new Date()
-    estimatedResumeTime.setMinutes(estimatedResumeTime.getMinutes() + 10) // Rough estimate
-    
-    const updateCountdown = () => {
-      const now = new Date()
-      const diff = estimatedResumeTime.getTime() - now.getTime()
-      
-      if (diff <= 0) {
-        setHalftimeCountdown('Resuming soon...')
-        return
-      }
-      
-      const minutes = Math.floor(diff / 60000)
-      const seconds = Math.floor((diff % 60000) / 1000)
-      setHalftimeCountdown(`${minutes}:${seconds.toString().padStart(2, '0')}`)
-    }
-    
-    updateCountdown()
-    const interval = setInterval(updateCountdown, 1000)
-    return () => clearInterval(interval)
-  }, [isHalftime])
 
   // Navigate back to the league page
   const handleBack = () => {
