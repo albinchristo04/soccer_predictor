@@ -172,12 +172,12 @@ async function fetchFromESPN(matchId: string, leagueId?: string): Promise<MatchD
           home: homeLineup.map((p: { athlete?: { displayName?: string }; position?: { abbreviation?: string }; jersey?: string }) => ({
             name: p.athlete?.displayName || 'Unknown',
             position: p.position?.abbreviation,
-            jersey: parseInt(p.jersey || '0'),
+            jersey: p.jersey ? parseInt(p.jersey) : undefined,
           })),
           away: awayLineup.map((p: { athlete?: { displayName?: string }; position?: { abbreviation?: string }; jersey?: string }) => ({
             name: p.athlete?.displayName || 'Unknown',
             position: p.position?.abbreviation,
-            jersey: parseInt(p.jersey || '0'),
+            jersey: p.jersey ? parseInt(p.jersey) : undefined,
           })),
           homeFormation: data.rosters?.find((r: { homeAway: string }) => r.homeAway === 'home')?.formation,
           awayFormation: data.rosters?.find((r: { homeAway: string }) => r.homeAway === 'away')?.formation,
@@ -232,7 +232,7 @@ async function fetchFromFotMob(matchId: string): Promise<MatchDetailsResponse | 
       let type = 'goal'
       
       if (evtType === 'goal' || evtType === 'penaltygoal') {
-        type = evtType === 'penaltygoal' ? 'goal' : 'goal'
+        type = 'goal'
       } else if (evtType === 'owngoal') {
         type = 'own_goal'
       } else if (evtType === 'yellowcard') {
@@ -295,7 +295,9 @@ async function fetchFromFotMob(matchId: string): Promise<MatchDetailsResponse | 
       home_score: header.teams?.[0]?.score ?? null,
       away_score: header.teams?.[1]?.score ?? null,
       status,
-      minute: general.matchTimeUTCDate ? undefined : general.matchTime,
+      // FotMob provides matchTime as current minute when match is live
+      // If matchTimeUTCDate exists, the match hasn't started yet (scheduled)
+      minute: general.started && !general.finished ? general.matchTime : undefined,
       venue: general.venue?.name,
       date: general.matchTimeUTCDate || '',
       league: general.leagueName || '',
