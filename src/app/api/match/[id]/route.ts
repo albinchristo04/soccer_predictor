@@ -409,12 +409,23 @@ async function fetchH2H(homeTeam: string, awayTeam: string, leagueId?: string): 
   }
 }
 
+// Expected goals coefficients based on historical match outcome analysis
+// Higher values when winning team dominates, lower when losing
+const XG_COEFFICIENTS = {
+  WIN_XG: 2.2,      // Expected goals when team wins
+  DRAW_XG: 1.1,     // Expected goals in a draw
+  LOSE_XG: 0.8,     // Expected goals when team loses
+  AWAY_WIN_XG: 2.0, // Away team expected goals when winning
+  AWAY_DRAW_XG: 1.0,// Away team expected goals in draw
+  AWAY_LOSE_XG: 0.7 // Away team expected goals when losing
+}
+
 // Generate prediction using a simple ELO-based model
-function generatePrediction(homeTeam: string, awayTeam: string, leagueId?: string): PredictionData {
+function generatePrediction(homeTeam: string, awayTeam: string, _leagueId?: string): PredictionData {
   // Simple ELO-based prediction model
   // In production, this would call a proper ML backend
   
-  // Base probabilities with home advantage
+  // Base probabilities with home advantage (sum = 1.0)
   let homeWin = 0.42
   let draw = 0.28
   let awayWin = 0.30
@@ -438,9 +449,21 @@ function generatePrediction(homeTeam: string, awayTeam: string, leagueId?: strin
     awayWin = 0.30
   }
   
-  // Calculate expected goals based on probabilities
-  const homeXG = homeWin * 2.2 + draw * 1.1 + awayWin * 0.8
-  const awayXG = awayWin * 2.0 + draw * 1.0 + homeWin * 0.7
+  // Normalize probabilities to ensure they sum to 1.0
+  const total = homeWin + draw + awayWin
+  homeWin = homeWin / total
+  draw = draw / total
+  awayWin = awayWin / total
+  
+  // Calculate expected goals based on probabilities and coefficients
+  const homeXG = homeWin * XG_COEFFICIENTS.WIN_XG + draw * XG_COEFFICIENTS.DRAW_XG + awayWin * XG_COEFFICIENTS.LOSE_XG
+  const awayXG = awayWin * XG_COEFFICIENTS.AWAY_WIN_XG + draw * XG_COEFFICIENTS.AWAY_DRAW_XG + homeWin * XG_COEFFICIENTS.AWAY_LOSE_XG
+  
+  // Calculate confidence: ranges from 0 (all equal at 33%) to ~44 for 55% certainty
+  // Formula: (max_prob - baseline) * scale, where baseline=0.33 (equal odds), scale=200
+  // Clamped to 0-100 range
+  const maxProb = Math.max(homeWin, draw, awayWin)
+  const confidence = Math.min(100, Math.max(0, Math.round((maxProb - 0.33) * 200)))
   
   return {
     home_win: Math.round(homeWin * 100) / 100,
@@ -450,7 +473,7 @@ function generatePrediction(homeTeam: string, awayTeam: string, leagueId?: strin
       home: Math.round(homeXG),
       away: Math.round(awayXG)
     },
-    confidence: Math.round((Math.max(homeWin, draw, awayWin) - 0.33) * 200) // 0-100 scale
+    confidence
   }
 }
 

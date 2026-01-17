@@ -331,6 +331,32 @@ export default function MatchDetailPage() {
   const isScheduled = match.status.toLowerCase().includes('scheduled') || match.status.toLowerCase().includes('pre')
   const isFinished = match.status.includes('FINAL') || match.status.toLowerCase().includes('finished') || match.status.toLowerCase().includes('ft')
 
+  // Helper function to evaluate prediction accuracy
+  const getPredictionAccuracy = (): { type: 'exact' | 'close' | 'miss'; message: string } => {
+    if (!match.prediction || match.home_score === null || match.away_score === null) {
+      return { type: 'miss', message: '' }
+    }
+    
+    const predictedHome = match.prediction.predicted_score.home
+    const predictedAway = match.prediction.predicted_score.away
+    const actualHome = match.home_score
+    const actualAway = match.away_score
+    
+    // Exact score match
+    if (predictedHome === actualHome && predictedAway === actualAway) {
+      return { type: 'exact', message: '✅ Exact prediction!' }
+    }
+    
+    // Close prediction: goal difference within 1
+    const predictedDiff = predictedHome - predictedAway
+    const actualDiff = actualHome - actualAway
+    if (Math.abs(predictedDiff - actualDiff) <= 1) {
+      return { type: 'close', message: '⚡ Close prediction' }
+    }
+    
+    return { type: 'miss', message: `Actual: ${actualHome} - ${actualAway}` }
+  }
+
   // Navigate back to the league page
   const handleBack = () => {
     if (leagueId) {
@@ -457,21 +483,22 @@ export default function MatchDetailPage() {
                 </div>
                 
                 {/* Comparison with actual result for finished matches */}
-                {isFinished && match.home_score !== null && match.away_score !== null && (
-                  <div className="mt-3 pt-3 border-t border-indigo-500/20">
-                    <div className="flex items-center justify-center gap-2 text-xs">
-                      {match.prediction.predicted_score.home === match.home_score && 
-                       match.prediction.predicted_score.away === match.away_score ? (
-                        <span className="text-green-500 font-semibold">✅ Exact prediction!</span>
-                      ) : (Math.abs((match.prediction.predicted_score.home - match.prediction.predicted_score.away) - 
-                                   (match.home_score - match.away_score)) <= 1) ? (
-                        <span className="text-amber-500 font-semibold">⚡ Close prediction</span>
-                      ) : (
-                        <span className="text-[var(--text-tertiary)]">Actual: {match.home_score} - {match.away_score}</span>
-                      )}
+                {isFinished && match.home_score !== null && match.away_score !== null && (() => {
+                  const accuracy = getPredictionAccuracy()
+                  return (
+                    <div className="mt-3 pt-3 border-t border-indigo-500/20">
+                      <div className="flex items-center justify-center gap-2 text-xs">
+                        <span className={`font-semibold ${
+                          accuracy.type === 'exact' ? 'text-green-500' : 
+                          accuracy.type === 'close' ? 'text-amber-500' : 
+                          'text-[var(--text-tertiary)]'
+                        }`}>
+                          {accuracy.message}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
               </div>
             )}
           </div>
