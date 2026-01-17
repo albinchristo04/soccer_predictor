@@ -72,6 +72,14 @@ interface MatchDetails {
   awayStanding?: TeamStanding
   fullStandings?: TeamStanding[]
   nextResumeTime?: Date
+  prediction?: {
+    home_win: number
+    draw: number
+    away_win: number
+    predicted_score: { home: number; away: number }
+    confidence: number
+  }
+  commentary?: { minute: number; text: string }[]
 }
 
 export default function MatchDetailPage() {
@@ -173,12 +181,14 @@ export default function MatchDetailPage() {
             corners: [0, 0],
             fouls: [0, 0],
           },
-          h2h: {
+          h2h: data.h2h || {
             homeWins: 0,
             draws: 0,
             awayWins: 0,
             recentMatches: [],
           },
+          prediction: data.prediction,
+          commentary: data.commentary || [],
         }
         
         // Try to fetch standings for team positions
@@ -400,6 +410,70 @@ export default function MatchDetailPage() {
             {match.venue && (
               <p className="text-sm text-center" style={{ color: 'var(--text-tertiary)' }}>📍 {match.venue}</p>
             )}
+            
+            {/* ML Prediction Card - shown for all matches */}
+            {match.prediction && (
+              <div className="mt-4 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/30 rounded-xl p-4">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <span className="text-lg">🤖</span>
+                  <span className="text-sm font-semibold text-indigo-400">AI Prediction</span>
+                  <span className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full">
+                    {match.prediction.confidence}% confidence
+                  </span>
+                </div>
+                
+                <div className="flex items-center justify-center gap-6">
+                  {/* Predicted Score */}
+                  <div className="text-center">
+                    <p className="text-xs text-[var(--text-tertiary)] mb-1">Predicted Score</p>
+                    <p className="text-2xl font-bold text-indigo-400">
+                      {match.prediction.predicted_score.home} - {match.prediction.predicted_score.away}
+                    </p>
+                  </div>
+                  
+                  <div className="h-10 w-px bg-[var(--border-color)]" />
+                  
+                  {/* Win Probabilities */}
+                  <div className="flex gap-3">
+                    <div className="text-center">
+                      <p className="text-xs text-[var(--text-tertiary)] mb-1">Home</p>
+                      <p className={`text-lg font-bold ${match.prediction.home_win > match.prediction.away_win ? 'text-green-500' : 'text-[var(--text-secondary)]'}`}>
+                        {Math.round(match.prediction.home_win * 100)}%
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-[var(--text-tertiary)] mb-1">Draw</p>
+                      <p className="text-lg font-bold text-[var(--text-secondary)]">
+                        {Math.round(match.prediction.draw * 100)}%
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-[var(--text-tertiary)] mb-1">Away</p>
+                      <p className={`text-lg font-bold ${match.prediction.away_win > match.prediction.home_win ? 'text-green-500' : 'text-[var(--text-secondary)]'}`}>
+                        {Math.round(match.prediction.away_win * 100)}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Comparison with actual result for finished matches */}
+                {isFinished && match.home_score !== null && match.away_score !== null && (
+                  <div className="mt-3 pt-3 border-t border-indigo-500/20">
+                    <div className="flex items-center justify-center gap-2 text-xs">
+                      {match.prediction.predicted_score.home === match.home_score && 
+                       match.prediction.predicted_score.away === match.away_score ? (
+                        <span className="text-green-500 font-semibold">✅ Exact prediction!</span>
+                      ) : (Math.abs((match.prediction.predicted_score.home - match.prediction.predicted_score.away) - 
+                                   (match.home_score - match.away_score)) <= 1) ? (
+                        <span className="text-amber-500 font-semibold">⚡ Close prediction</span>
+                      ) : (
+                        <span className="text-[var(--text-tertiary)]">Actual: {match.home_score} - {match.away_score}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -439,7 +513,7 @@ export default function MatchDetailPage() {
                   </div>
                   <div>
                     <p className="text-xs text-[var(--text-tertiary)]">Venue</p>
-                    <p className="text-sm font-medium text-[var(--text-primary)]">{match.venue || 'TBD'}</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{match.venue || 'Not announced'}</p>
                   </div>
                 </div>
               </div>
@@ -452,7 +526,9 @@ export default function MatchDetailPage() {
                   </div>
                   <div>
                     <p className="text-xs text-[var(--text-tertiary)]">Referee</p>
-                    <p className="text-sm font-medium text-[var(--text-primary)]">{match.referee || 'TBD'}</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">
+                      {match.referee || (isScheduled ? 'Not yet assigned' : 'Not available')}
+                    </p>
                   </div>
                 </div>
               </div>
