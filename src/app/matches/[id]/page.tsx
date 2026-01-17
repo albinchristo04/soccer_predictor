@@ -827,6 +827,37 @@ export default function MatchDetailPage() {
                 </p>
               </div>
             )}
+            
+            {/* Commentary Section - FotMob-style */}
+            {match.commentary && match.commentary.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">📝 Match Commentary</h3>
+                <div className="bg-[var(--card-bg)] border rounded-2xl overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
+                  <div className="max-h-[400px] overflow-y-auto">
+                    {match.commentary
+                      .sort((a, b) => b.minute - a.minute)
+                      .map((item, idx) => (
+                        <div 
+                          key={idx} 
+                          className="p-4 border-b last:border-b-0 hover:bg-[var(--muted-bg)] transition-colors"
+                          style={{ borderColor: 'var(--border-color)' }}
+                        >
+                          <div className="flex gap-4">
+                            <div className="flex-shrink-0">
+                              <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] font-bold text-sm">
+                                {item.minute}&apos;
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-[var(--text-primary)]">{item.text}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
