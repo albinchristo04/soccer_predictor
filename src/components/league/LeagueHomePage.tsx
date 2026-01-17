@@ -125,20 +125,43 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
     const fetchLeagueData = async () => {
       setLoading(true)
       try {
-        // Fetch data from multiple endpoints in parallel
-        const [standingsRes, scorersRes, matchesRes, newsRes, simulationRes] = await Promise.allSettled([
-          fetch(`/api/v1/leagues/${leagueId}/standings`),
-          fetch(`/api/v1/leagues/${leagueId}/top-scorers`),
-          fetch(`/api/v1/leagues/${leagueId}/matches`),
-          fetch(`/api/v1/leagues/${leagueId}/news`),
-          fetch(`/api/v1/leagues/${leagueId}/simulation?n_simulations=1000`),
+        // Convert ESPN-style league ID to internal format
+        const leagueParam = leagueId.includes('.') 
+          ? leagueId.split('.')[0] === 'eng' ? 'premier_league'
+            : leagueId.split('.')[0] === 'esp' ? 'la_liga'
+            : leagueId.split('.')[0] === 'ger' ? 'bundesliga'
+            : leagueId.split('.')[0] === 'ita' ? 'serie_a'
+            : leagueId.split('.')[0] === 'fra' ? 'ligue_1'
+            : leagueId.split('.')[0] === 'usa' ? 'mls'
+            : leagueId
+          : leagueId
+        
+        // Fetch data from existing endpoints in parallel
+        const [standingsRes, fixturesRes, newsRes] = await Promise.allSettled([
+          fetch(`/api/standings?league=${leagueParam}`),
+          fetch(`/api/upcoming_matches?league=${leagueParam}&limit=10`),
+          fetch(`/api/news?league=${leagueParam}`),
+        ])
+        
+        // Also fetch from ESPN for real-time data
+        const espnLeagueId = leagueId.includes('.') ? leagueId : 
+          leagueParam === 'premier_league' ? 'eng.1' :
+          leagueParam === 'la_liga' ? 'esp.1' :
+          leagueParam === 'bundesliga' ? 'ger.1' :
+          leagueParam === 'serie_a' ? 'ita.1' :
+          leagueParam === 'ligue_1' ? 'fra.1' :
+          leagueParam === 'mls' ? 'usa.1' : leagueId
+
+        const espnResults = await Promise.allSettled([
+          fetch(`https://site.api.espn.com/apis/v2/sports/soccer/${espnLeagueId}/standings`),
+          fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnLeagueId}/scoreboard`),
         ])
 
         const leagueData: LeagueHomeData = {
-          leagueId: parseInt(leagueId),
+          leagueId: parseInt(leagueId) || 0,
           leagueName,
           country,
-          season: '2025-26',
+          season: '2024-25',
           standings: [],
           topScorers: [],
           upcomingMatches: [],
@@ -146,94 +169,106 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
           news: [],
         }
 
-        // Process standings
+        // Process local standings or ESPN standings
         if (standingsRes.status === 'fulfilled' && standingsRes.value.ok) {
           const standingsJson = await standingsRes.value.json()
           leagueData.standings = (standingsJson.standings || []).map((s: any, idx: number) => ({
-            position: s.idx || idx + 1,
-            teamName: s.name || s.team_name || 'Unknown',
+            position: s.position || idx + 1,
+            teamName: s.team || s.name || s.team_name || 'Unknown',
             teamId: s.id,
             played: s.played || 0,
-            won: s.wins || 0,
-            drawn: s.draws || 0,
-            lost: s.losses || 0,
-            goalsFor: s.scoresStr?.split('-')[0] || 0,
-            goalsAgainst: s.scoresStr?.split('-')[1] || 0,
-            goalDiff: s.goalConDiff || 0,
-            points: s.pts || 0,
+            won: s.won || s.wins || 0,
+            drawn: s.drawn || s.draws || 0,
+            lost: s.lost || s.losses || 0,
+            goalsFor: s.goalsFor || 0,
+            goalsAgainst: s.goalsAgainst || 0,
+            goalDiff: s.goalDifference || s.goalConDiff || 0,
+            points: s.points || s.pts || 0,
+            form: s.form || [],
           }))
         }
-
-        // Process top scorers
-        if (scorersRes.status === 'fulfilled' && scorersRes.value.ok) {
-          const scorersJson = await scorersRes.value.json()
-          leagueData.topScorers = (scorersJson.top_scorers || []).slice(0, 10).map((s: any, idx: number) => ({
-            rank: idx + 1,
-            name: s.name || 'Unknown',
-            team: s.team || 'Unknown',
-            goals: s.goals || 0,
-            assists: s.assists || 0,
-            matches: s.matches || 0,
-          }))
+        
+        // If no local standings, try ESPN
+        if (leagueData.standings.length === 0 && espnResults[0].status === 'fulfilled') {
+          const espnStandings = espnResults[0] as PromiseFulfilledResult<Response>
+          if (espnStandings.value.ok) {
+            const espnData = await espnStandings.value.json()
+            const entries = espnData.children?.[0]?.standings?.entries || []
+            leagueData.standings = entries.map((entry: any, idx: number) => {
+              const getStatVal = (name: string) => {
+                const stat = entry.stats?.find((s: any) => s.name === name)
+                return parseInt(stat?.value || '0', 10)
+              }
+              return {
+                position: idx + 1,
+                teamName: entry.team?.displayName || 'Unknown',
+                teamId: entry.team?.id,
+                played: getStatVal('gamesPlayed'),
+                won: getStatVal('wins'),
+                drawn: getStatVal('ties'),
+                lost: getStatVal('losses'),
+                goalsFor: getStatVal('pointsFor'),
+                goalsAgainst: getStatVal('pointsAgainst'),
+                goalDiff: getStatVal('pointDifferential'),
+                points: getStatVal('points'),
+                form: [],
+              }
+            })
+          }
         }
 
-        // Process matches
-        if (matchesRes.status === 'fulfilled' && matchesRes.value.ok) {
-          const matchesJson = await matchesRes.value.json()
-          const allMatches = matchesJson.matches || []
-          const now = new Date()
-          
-          // Separate into upcoming and recent
-          for (const match of allMatches) {
-            const matchDate = new Date(match.utcTime || match.date || '')
-            const isPlayed = match.status === 'played' || match.status === 'finished'
+        // Process upcoming matches from ESPN
+        if (espnResults[1].status === 'fulfilled') {
+          const espnMatches = espnResults[1] as PromiseFulfilledResult<Response>
+          if (espnMatches.value.ok) {
+            const matchesData = await espnMatches.value.json()
+            const events = matchesData.events || []
+            const now = new Date()
             
-            if (isPlayed) {
-              leagueData.recentResults.push({
-                id: String(match.id || match.match_id || ''),
-                homeTeam: match.home?.name || match.home_team || 'Home',
-                awayTeam: match.away?.name || match.away_team || 'Away',
-                homeScore: match.home?.score ?? match.home_goals ?? 0,
-                awayScore: match.away?.score ?? match.away_goals ?? 0,
-                date: matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-              })
-            } else if (matchDate > now) {
-              leagueData.upcomingMatches.push({
-                id: String(match.id || match.match_id || ''),
-                homeTeam: match.home?.name || match.home_team || 'Home',
-                awayTeam: match.away?.name || match.away_team || 'Away',
-                date: matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                time: matchDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-                venue: match.venue?.name,
-              })
+            for (const event of events) {
+              const competition = event.competitions?.[0]
+              if (!competition) continue
+              
+              const homeTeam = competition.competitors?.find((c: any) => c.homeAway === 'home')
+              const awayTeam = competition.competitors?.find((c: any) => c.homeAway === 'away')
+              const matchDate = new Date(event.date)
+              const statusType = competition.status?.type?.name || ''
+              
+              const isFinished = statusType.includes('FINAL') || statusType.includes('FULL_TIME')
+              
+              if (isFinished) {
+                leagueData.recentResults.push({
+                  id: String(event.id),
+                  homeTeam: homeTeam?.team?.displayName || 'Home',
+                  awayTeam: awayTeam?.team?.displayName || 'Away',
+                  homeScore: parseInt(homeTeam?.score || '0'),
+                  awayScore: parseInt(awayTeam?.score || '0'),
+                  date: matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                })
+              } else if (matchDate >= now) {
+                leagueData.upcomingMatches.push({
+                  id: String(event.id),
+                  homeTeam: homeTeam?.team?.displayName || 'Home',
+                  awayTeam: awayTeam?.team?.displayName || 'Away',
+                  date: matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                  time: matchDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+                  venue: competition.venue?.fullName,
+                })
+              }
             }
           }
-          
-          // Limit and sort
-          leagueData.recentResults = leagueData.recentResults.slice(0, 10)
-          leagueData.upcomingMatches = leagueData.upcomingMatches.slice(0, 10)
         }
 
         // Process news
         if (newsRes.status === 'fulfilled' && newsRes.value.ok) {
           const newsJson = await newsRes.value.json()
-          leagueData.news = (newsJson.news || []).slice(0, 5).map((n: any) => ({
+          leagueData.news = (newsJson.articles || newsJson.news || []).slice(0, 5).map((n: any) => ({
             headline: n.headline || n.title || '',
             description: n.description || n.summary || '',
             link: n.links?.web?.href || n.url || '',
-            image: n.images?.[0]?.url || '',
+            image: n.images?.[0]?.url || n.image || '',
             published: n.published || '',
           }))
-        }
-
-        // Process simulation
-        if (simulationRes.status === 'fulfilled' && simulationRes.value.ok) {
-          const simJson = await simulationRes.value.json()
-          leagueData.simulation = {
-            mostLikelyChampion: simJson.most_likely_champion || 'Unknown',
-            championProbability: simJson.champion_probability || 0,
-            topFourTeams: simJson.likely_top_4 || [],
-          }
         }
 
         setData(leagueData)

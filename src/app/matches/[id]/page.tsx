@@ -129,6 +129,7 @@ export default function MatchDetailPage() {
       try {
         // Try fetching from different league endpoints until we find the match
         let matchData = null
+        let dataSource: 'espn' | 'fotmob' = 'espn'
         
         // If league ID is provided, try that first
         if (leagueId) {
@@ -156,16 +157,65 @@ export default function MatchDetailPage() {
           }
         }
         
-        if (matchData && matchData.header) {
+        // If still no data, try FotMob API (for matches sourced from FotMob)
+        if (!matchData || !matchData.header) {
+          try {
+            const fotmobRes = await fetch(`https://www.fotmob.com/api/matchDetails?matchId=${matchId}`, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'application/json',
+              },
+            })
+            if (fotmobRes.ok) {
+              const fotmobData = await fotmobRes.json()
+              if (fotmobData.general) {
+                matchData = fotmobData
+                dataSource = 'fotmob'
+              }
+            }
+          } catch (e) {
+            console.error('FotMob fallback failed:', e)
+          }
+        }
+        
+        // Process ESPN data
+        if (matchData && matchData.header && dataSource === 'espn') {
           const data = matchData
           const competition = data.header?.competitions?.[0]
           const homeTeam = competition?.competitors?.find((c: any) => c.homeAway === 'home')
           const awayTeam = competition?.competitors?.find((c: any) => c.homeAway === 'away')
           
-          // Extract referee from game info
-          const officials = data.gameInfo?.officials || []
-          const mainReferee = officials.find((o: any) => o.position?.name?.toLowerCase() === 'referee') || officials[0]
-          const refereeName = mainReferee?.fullName || mainReferee?.displayName || null
+          // Extract referee from multiple possible locations
+          let refereeName: string | null = null
+          
+          // Try gameInfo.officials first (most common)
+          const officials = data.gameInfo?.officials || data.officials || []
+          if (officials.length > 0) {
+            const mainReferee = officials.find((o: any) => 
+              o.position?.name?.toLowerCase() === 'referee' || 
+              o.position?.displayName?.toLowerCase() === 'referee' ||
+              o.order === 1
+            ) || officials[0]
+            refereeName = mainReferee?.fullName || mainReferee?.displayName || mainReferee?.athlete?.displayName || null
+          }
+          
+          // Try from competition status details
+          if (!refereeName && competition?.status?.detail) {
+            const detail = competition.status.detail
+            const refMatch = detail.match(/Referee:\s*([^,\n]+)/i)
+            if (refMatch) {
+              refereeName = refMatch[1].trim()
+            }
+          }
+          
+          // Try from boxscore or content
+          if (!refereeName) {
+            const boxscoreOfficials = data.boxscore?.officials || data.content?.gameInfo?.officials || []
+            if (boxscoreOfficials.length > 0) {
+              const mainRef = boxscoreOfficials.find((o: any) => o.position?.toLowerCase().includes('referee')) || boxscoreOfficials[0]
+              refereeName = mainRef?.displayName || mainRef?.name || null
+            }
+          }
           
           // Extract all events including cards, substitutions
           const events: MatchEvent[] = []
@@ -341,6 +391,145 @@ export default function MatchDetailPage() {
           }
           
           matchDetails.leagueId = leagueSlug
+          setMatch(matchDetails)
+        }
+        
+        // Process FotMob data
+        if (matchData && matchData.general && dataSource === 'fotmob') {
+          const general = matchData.general
+          const content = matchData.content
+          const header = matchData.header
+          
+          // Extract status
+          let status = 'scheduled'
+          const started = general.started
+          const finished = general.finished
+          if (finished) {
+            status = 'STATUS_FINAL'
+          } else if (started) {
+            status = general.matchTimeUTC ? 'STATUS_IN_PROGRESS' : 'STATUS_HALFTIME'
+          }
+          
+          // Extract events from FotMob
+          const events: MatchEvent[] = []
+          const matchEvents = content?.matchFacts?.events?.events || []
+          for (const evt of matchEvents) {
+            const evtType = evt.type?.toLowerCase() || ''
+            let type: MatchEvent['type'] = 'goal'
+            
+            if (evtType === 'goal' || evtType === 'scoring') {
+              type = evt.ownGoal ? 'own_goal' : 'goal'
+            } else if (evtType === 'yellowcard' || evtType.includes('yellow')) {
+              type = 'yellow_card'
+            } else if (evtType === 'redcard' || evtType.includes('red')) {
+              type = 'red_card'
+            } else if (evtType === 'substitution' || evtType.includes('sub')) {
+              type = 'substitution'
+            } else if (evtType.includes('var')) {
+              type = 'var'
+            } else {
+              continue
+            }
+            
+            events.push({
+              type,
+              minute: evt.time || evt.minute || 0,
+              addedTime: evt.addedTime,
+              player: evt.nameStr || evt.player?.name || 'Unknown',
+              team: evt.isHome ? 'home' : 'away',
+              relatedPlayer: evt.assistStr || evt.assist?.name,
+            })
+          }
+          
+          // Extract stats from FotMob
+          const statsObj = content?.stats?.Ede?.stats?.[0]?.stats || []
+          const getStatPair = (title: string): [number, number] => {
+            const stat = statsObj.find((s: any) => s.title?.toLowerCase() === title.toLowerCase())
+            if (!stat) return [0, 0]
+            return [
+              parseInt(stat.stats?.[0]) || 0,
+              parseInt(stat.stats?.[1]) || 0,
+            ]
+          }
+          
+          // Extract lineups from FotMob
+          const extractFotmobLineup = (lineup: any): PlayerLineup[] => {
+            if (!lineup?.players) return []
+            const players: PlayerLineup[] = []
+            for (const row of lineup.players) {
+              for (const p of row || []) {
+                players.push({
+                  name: p.name?.fullName || p.name?.shortName || 'Unknown',
+                  position: p.positionStringShort || p.position,
+                  jersey: p.shirt,
+                })
+              }
+            }
+            return players
+          }
+          
+          const homeLineup = extractFotmobLineup(content?.lineup?.homeTeam)
+          const awayLineup = extractFotmobLineup(content?.lineup?.awayTeam)
+          
+          // Extract referee from FotMob
+          const refereeData = content?.matchFacts?.infoBox?.Referee
+          const refereeName = refereeData?.text || null
+          
+          const matchDetails: MatchDetails = {
+            id: matchId,
+            home_team: general.homeTeam?.name || 'Home Team',
+            away_team: general.awayTeam?.name || 'Away Team',
+            home_score: general.homeTeam?.score ?? 0,
+            away_score: general.awayTeam?.score ?? 0,
+            status,
+            minute: general.matchTimeUTCDate ? Math.floor((Date.now() - new Date(general.matchTimeUTCDate).getTime()) / 60000) : undefined,
+            venue: content?.matchFacts?.infoBox?.Stadium?.text || general.venue?.name,
+            date: general.matchTimeUTC || '',
+            league: general.leagueName || general.parentLeagueName || '',
+            referee: refereeName,
+            events,
+            lineups: {
+              home: homeLineup,
+              away: awayLineup,
+              homeFormation: content?.lineup?.homeTeam?.formation,
+              awayFormation: content?.lineup?.awayTeam?.formation,
+            },
+            stats: {
+              possession: getStatPair('Ball possession'),
+              shots: getStatPair('Total shots'),
+              shotsOnTarget: getStatPair('Shots on target'),
+              corners: getStatPair('Corners'),
+              fouls: getStatPair('Fouls'),
+            },
+            h2h: {
+              homeWins: 0,
+              draws: 0,
+              awayWins: 0,
+              recentMatches: [],
+            },
+          }
+          
+          // Extract H2H from FotMob
+          const h2hData = content?.h2h?.matches || []
+          let homeWins = 0, awayWins = 0, draws = 0
+          const recentMatches: { home_score: number; away_score: number; date: string }[] = []
+          
+          for (const game of h2hData.slice(0, 10)) {
+            const homeScore = game.homeTeam?.score ?? 0
+            const awayScore = game.awayTeam?.score ?? 0
+            
+            if (homeScore > awayScore) homeWins++
+            else if (awayScore > homeScore) awayWins++
+            else draws++
+            
+            recentMatches.push({
+              home_score: homeScore,
+              away_score: awayScore,
+              date: game.matchDate || '',
+            })
+          }
+          
+          matchDetails.h2h = { homeWins, draws, awayWins, recentMatches }
           setMatch(matchDetails)
         }
       } catch (e) {

@@ -25,6 +25,7 @@ type TodayMatch = {
   status: string
   league: string
   leagueId?: string
+  minute?: number | string
 }
 
 function LiveScoresTicker() {
@@ -252,13 +253,18 @@ function TodaysMatchesWidget() {
                       </div>
                       
                       {/* Score or Time */}
-                      <div className="w-24 flex-shrink-0 text-center">
+                      <div className="w-28 flex-shrink-0 text-center">
                         {match.status === 'live' ? (
-                          <div className="flex items-center justify-center gap-1">
-                            <span className="text-lg font-bold text-[var(--text-primary)]">{match.home_score}</span>
-                            <span className="text-[var(--text-tertiary)]">-</span>
-                            <span className="text-lg font-bold text-[var(--text-primary)]">{match.away_score}</span>
-                            <span className="ml-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                          <div className="flex flex-col items-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <span className="text-lg font-bold text-[var(--text-primary)]">{match.home_score}</span>
+                              <span className="text-[var(--text-tertiary)]">-</span>
+                              <span className="text-lg font-bold text-[var(--text-primary)]">{match.away_score}</span>
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                              <span className="text-xs font-semibold text-red-500">{match.minute ? `${match.minute}'` : 'LIVE'}</span>
+                            </div>
                           </div>
                         ) : match.status === 'finished' ? (
                           <div className="flex items-center justify-center gap-1">

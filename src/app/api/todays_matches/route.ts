@@ -12,6 +12,7 @@ interface Match {
   leagueId: string
   match_id: string | number
   venue?: string
+  minute?: number | string
 }
 
 // ESPN league IDs for major leagues
@@ -63,10 +64,21 @@ async function fetchESPNMatches(): Promise<Match[]> {
         
         const statusType = competition.status?.type?.name || 'STATUS_SCHEDULED'
         let status = 'upcoming'
+        let minute: number | string | undefined = undefined
+        
         if (statusType === 'STATUS_FINAL' || statusType === 'STATUS_FULL_TIME') {
           status = 'completed'
         } else if (statusType === 'STATUS_IN_PROGRESS' || statusType === 'STATUS_HALFTIME' || statusType === 'STATUS_FIRST_HALF' || statusType === 'STATUS_SECOND_HALF') {
           status = 'live'
+          // Extract minute from clock or status
+          const displayClock = competition.status?.displayClock
+          if (displayClock) {
+            minute = parseInt(displayClock.split(':')[0]) || displayClock
+          }
+          // For halftime, show "HT"
+          if (statusType === 'STATUS_HALFTIME') {
+            minute = 'HT'
+          }
         }
         
         allMatches.push({
@@ -81,6 +93,7 @@ async function fetchESPNMatches(): Promise<Match[]> {
           leagueId: league.id,
           match_id: event.id,
           venue: competition.venue?.fullName,
+          minute,
         })
       }
     } catch (error) {
@@ -136,10 +149,17 @@ async function fetchFotMobMatches(): Promise<Match[]> {
           const isStarted = match.status?.started === true
           
           let status = 'upcoming'
+          let minute: number | string | undefined = undefined
+          
           if (isFinished) {
             status = 'completed'
           } else if (isStarted) {
             status = 'live'
+            // Extract minute from FotMob status
+            minute = match.status?.liveTime?.short || match.status?.reason?.short
+            if (!minute && match.status?.reason?.short === 'HT') {
+              minute = 'HT'
+            }
           }
           
           matches.push({
@@ -153,6 +173,7 @@ async function fetchFotMobMatches(): Promise<Match[]> {
             league: leagueName,
             leagueId: leagueId,
             match_id: match.id,
+            minute,
           })
         }
       }
