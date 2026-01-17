@@ -1,17 +1,28 @@
 import LeagueHomePage from '@/components/league/LeagueHomePage'
 import TournamentHomePage from '@/components/tournament/TournamentHomePage'
 
-// League configuration for known leagues
+// League configuration for known leagues (FotMob-style IDs and names)
 const LEAGUE_CONFIG: Record<string, { name: string; country: string; isTournament?: boolean; tournamentId?: 'champions_league' | 'europa_league' | 'world_cup' }> = {
+  // ESPN-style IDs
   'eng.1': { name: 'Premier League', country: 'England' },
   'esp.1': { name: 'La Liga', country: 'Spain' },
   'ger.1': { name: 'Bundesliga', country: 'Germany' },
   'ita.1': { name: 'Serie A', country: 'Italy' },
   'fra.1': { name: 'Ligue 1', country: 'France' },
   'usa.1': { name: 'MLS', country: 'USA' },
+  'ned.1': { name: 'Eredivisie', country: 'Netherlands' },
+  'por.1': { name: 'Primeira Liga', country: 'Portugal' },
+  'sco.1': { name: 'Scottish Premiership', country: 'Scotland' },
+  'bel.1': { name: 'Belgian Pro League', country: 'Belgium' },
+  'tur.1': { name: 'Süper Lig', country: 'Turkey' },
+  'bra.1': { name: 'Brasileirão', country: 'Brazil' },
+  'arg.1': { name: 'Liga Profesional', country: 'Argentina' },
+  'mex.1': { name: 'Liga MX', country: 'Mexico' },
   'uefa.champions': { name: 'UEFA Champions League', country: 'Europe', isTournament: true, tournamentId: 'champions_league' },
   'uefa.europa': { name: 'UEFA Europa League', country: 'Europe', isTournament: true, tournamentId: 'europa_league' },
+  'uefa.europa.conf': { name: 'Conference League', country: 'Europe' },
   'fifa.world': { name: 'FIFA World Cup', country: 'International', isTournament: true, tournamentId: 'world_cup' },
+  // Snake_case IDs
   'premier_league': { name: 'Premier League', country: 'England' },
   'la_liga': { name: 'La Liga', country: 'Spain' },
   'bundesliga': { name: 'Bundesliga', country: 'Germany' },
@@ -19,8 +30,27 @@ const LEAGUE_CONFIG: Record<string, { name: string; country: string; isTournamen
   'ligue_1': { name: 'Ligue 1', country: 'France' },
   'champions_league': { name: 'UEFA Champions League', country: 'Europe', isTournament: true, tournamentId: 'champions_league' },
   'europa_league': { name: 'UEFA Europa League', country: 'Europe', isTournament: true, tournamentId: 'europa_league' },
+  'conference_league': { name: 'Conference League', country: 'Europe' },
   'world_cup': { name: 'FIFA World Cup', country: 'International', isTournament: true, tournamentId: 'world_cup' },
   'mls': { name: 'MLS', country: 'USA' },
+  'eredivisie': { name: 'Eredivisie', country: 'Netherlands' },
+  'primeira_liga': { name: 'Primeira Liga', country: 'Portugal' },
+  'scottish_premiership': { name: 'Scottish Premiership', country: 'Scotland' },
+  'belgian_pro_league': { name: 'Belgian Pro League', country: 'Belgium' },
+  'super_lig': { name: 'Süper Lig', country: 'Turkey' },
+  'brasileirao': { name: 'Brasileirão', country: 'Brazil' },
+  'liga_mx': { name: 'Liga MX', country: 'Mexico' },
+  // FotMob numeric IDs (common ones)
+  '47': { name: 'Premier League', country: 'England' },
+  '87': { name: 'La Liga', country: 'Spain' },
+  '54': { name: 'Bundesliga', country: 'Germany' },
+  '55': { name: 'Serie A', country: 'Italy' },
+  '53': { name: 'Ligue 1', country: 'France' },
+  '130': { name: 'MLS', country: 'USA' },
+  '57': { name: 'Eredivisie', country: 'Netherlands' },
+  '61': { name: 'Primeira Liga', country: 'Portugal' },
+  '42': { name: 'UEFA Champions League', country: 'Europe', isTournament: true, tournamentId: 'champions_league' },
+  '73': { name: 'UEFA Europa League', country: 'Europe', isTournament: true, tournamentId: 'europa_league' },
 }
 
 interface LeaguePageParams {

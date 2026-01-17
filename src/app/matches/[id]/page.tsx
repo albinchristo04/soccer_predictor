@@ -720,51 +720,6 @@ export default function MatchDetailPage() {
 
             {/* Timeline Header */}
             <h3 className="text-lg font-semibold text-[var(--text-primary)]">Match Timeline</h3>
-                                </span>
-                              ))}
-                          </div>
-                        )}
-                        {match.events.filter(e => e.team === 'away').length === 0 && (
-                          <p className="text-sm text-[var(--text-tertiary)]">No notable events</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Quick Stats Row */}
-                  <div className="flex justify-center gap-8 mt-4 pt-4 border-t" style={{ borderColor: 'var(--border-color)' }}>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-[var(--accent-primary)]">
-                        {match.events.filter(e => e.team === 'home' && e.type === 'goal').length}
-                      </p>
-                      <p className="text-xs text-[var(--text-tertiary)]">Goals</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-amber-500">
-                        {match.events.filter(e => e.team === 'home' && e.type === 'yellow_card').length}
-                      </p>
-                      <p className="text-xs text-[var(--text-tertiary)]">Yellow</p>
-                    </div>
-                    <div className="h-8 w-px bg-[var(--border-color)]" />
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-emerald-500">
-                        {match.events.filter(e => e.team === 'away' && e.type === 'goal').length}
-                      </p>
-                      <p className="text-xs text-[var(--text-tertiary)]">Goals</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-amber-500">
-                        {match.events.filter(e => e.team === 'away' && e.type === 'yellow_card').length}
-                      </p>
-                      <p className="text-xs text-[var(--text-tertiary)]">Yellow</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Timeline Header */}
-            <h3 className="text-lg font-semibold text-[var(--text-primary)]">Match Timeline</h3>
             
             {match.events.length > 0 ? (
               <div className="relative">

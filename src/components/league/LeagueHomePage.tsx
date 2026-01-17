@@ -78,6 +78,7 @@ interface LeagueHomePageProps {
 }
 
 const LEAGUE_CONFIGS: Record<string, { color: string; gradient: string; flag: string }> = {
+  // Main leagues
   'premier_league': { color: '#3D195B', gradient: 'from-purple-900 to-purple-700', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
   'la_liga': { color: '#EE8707', gradient: 'from-orange-600 to-red-600', flag: '🇪🇸' },
   'bundesliga': { color: '#D20515', gradient: 'from-red-700 to-red-500', flag: '🇩🇪' },
@@ -85,8 +86,32 @@ const LEAGUE_CONFIGS: Record<string, { color: string; gradient: string; flag: st
   'ligue_1': { color: '#091C3E', gradient: 'from-blue-900 to-blue-700', flag: '🇫🇷' },
   'champions_league': { color: '#1A428A', gradient: 'from-blue-800 to-indigo-600', flag: '🇪🇺' },
   'europa_league': { color: '#F26F21', gradient: 'from-orange-500 to-amber-500', flag: '🇪🇺' },
+  'conference_league': { color: '#19A974', gradient: 'from-green-600 to-teal-500', flag: '🇪🇺' },
   'mls': { color: '#00245D', gradient: 'from-blue-900 to-red-600', flag: '🇺🇸' },
   'world_cup': { color: '#56042C', gradient: 'from-purple-900 to-red-800', flag: '🌍' },
+  // Additional leagues
+  'eredivisie': { color: '#E70012', gradient: 'from-orange-500 to-red-600', flag: '🇳🇱' },
+  'primeira_liga': { color: '#004D25', gradient: 'from-green-800 to-green-600', flag: '🇵🇹' },
+  'scottish_premiership': { color: '#003087', gradient: 'from-blue-800 to-blue-600', flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿' },
+  'belgian_pro_league': { color: '#000000', gradient: 'from-yellow-500 to-red-600', flag: '🇧🇪' },
+  'super_lig': { color: '#E30A17', gradient: 'from-red-700 to-red-500', flag: '🇹🇷' },
+  'brasileirao': { color: '#009739', gradient: 'from-green-600 to-yellow-500', flag: '🇧🇷' },
+  'liga_mx': { color: '#006847', gradient: 'from-green-700 to-red-600', flag: '🇲🇽' },
+  // ESPN-style IDs
+  'eng.1': { color: '#3D195B', gradient: 'from-purple-900 to-purple-700', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
+  'esp.1': { color: '#EE8707', gradient: 'from-orange-600 to-red-600', flag: '🇪🇸' },
+  'ger.1': { color: '#D20515', gradient: 'from-red-700 to-red-500', flag: '🇩🇪' },
+  'ita.1': { color: '#008FD7', gradient: 'from-blue-700 to-blue-500', flag: '🇮🇹' },
+  'fra.1': { color: '#091C3E', gradient: 'from-blue-900 to-blue-700', flag: '🇫🇷' },
+  'ned.1': { color: '#E70012', gradient: 'from-orange-500 to-red-600', flag: '🇳🇱' },
+  'por.1': { color: '#004D25', gradient: 'from-green-800 to-green-600', flag: '🇵🇹' },
+  'usa.1': { color: '#00245D', gradient: 'from-blue-900 to-red-600', flag: '🇺🇸' },
+  // FotMob numeric IDs
+  '47': { color: '#3D195B', gradient: 'from-purple-900 to-purple-700', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
+  '87': { color: '#EE8707', gradient: 'from-orange-600 to-red-600', flag: '🇪🇸' },
+  '54': { color: '#D20515', gradient: 'from-red-700 to-red-500', flag: '🇩🇪' },
+  '55': { color: '#008FD7', gradient: 'from-blue-700 to-blue-500', flag: '🇮🇹' },
+  '53': { color: '#091C3E', gradient: 'from-blue-900 to-blue-700', flag: '🇫🇷' },
 }
 
 export default function LeagueHomePage({ leagueId, leagueName, country }: LeagueHomePageProps) {
