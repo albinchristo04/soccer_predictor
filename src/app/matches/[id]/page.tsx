@@ -1,18 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import FormationDisplay, { PitchBackground, SubstitutesBench } from '@/components/lineup/FormationDisplay'
 import MatchWeather from '@/components/weather/MatchWeather'
 import RefereeInfo from '@/components/referee/RefereeInfo'
+import { HeadToHeadDisplay } from '@/components/match'
 
 interface MatchEvent {
-  type: 'goal' | 'assist' | 'yellow_card' | 'red_card' | 'substitution'
+  type: 'goal' | 'assist' | 'yellow_card' | 'red_card' | 'substitution' | 'var' | 'penalty_missed' | 'own_goal'
   minute: number
+  addedTime?: number
   player: string
   team: 'home' | 'away'
   relatedPlayer?: string
+  description?: string
 }
 
 interface TeamStanding {
@@ -39,10 +42,12 @@ interface MatchDetails {
   away_score: number | null
   status: string
   minute?: number
+  addedTime?: number
   venue?: string
   date: string
   league: string
   leagueId?: string
+  referee?: string
   events: MatchEvent[]
   lineups: {
     home: PlayerLineup[]
@@ -61,11 +66,12 @@ interface MatchDetails {
     homeWins: number
     draws: number
     awayWins: number
-    recentMatches: { home_score: number; away_score: number; date: string }[]
+    recentMatches: { home_score: number; away_score: number; date: string; homeTeam?: string; awayTeam?: string }[]
   }
   homeStanding?: TeamStanding
   awayStanding?: TeamStanding
   fullStandings?: TeamStanding[]
+  nextResumeTime?: Date
 }
 
 // Map league IDs for ESPN API
@@ -122,16 +128,46 @@ export default function MatchDetailPage() {
           const homeTeam = competition?.competitors?.find((c: any) => c.homeAway === 'home')
           const awayTeam = competition?.competitors?.find((c: any) => c.homeAway === 'away')
           
-          // Extract events/scoring plays
+          // Extract referee from game info
+          const officials = data.gameInfo?.officials || []
+          const mainReferee = officials.find((o: any) => o.position?.name?.toLowerCase() === 'referee') || officials[0]
+          const refereeName = mainReferee?.fullName || mainReferee?.displayName || null
+          
+          // Extract all events including cards, substitutions
           const events: MatchEvent[] = []
+          
+          // Scoring plays (goals)
           const scoringPlays = data.scoringPlays || []
           for (const play of scoringPlays) {
+            const isOwnGoal = play.text?.toLowerCase().includes('own goal')
             events.push({
-              type: 'goal',
+              type: isOwnGoal ? 'own_goal' : 'goal',
               minute: parseInt(play.clock?.displayValue) || 0,
               player: play.scoringPlay?.scorer?.athlete?.displayName || play.text?.trim() || 'Unknown',
               team: play.homeAway === 'home' ? 'home' : 'away',
               relatedPlayer: play.scoringPlay?.assists?.[0]?.athlete?.displayName,
+            })
+          }
+          
+          // Extract match facts events (cards, subs)
+          const matchFactEvents = data.content?.matchFacts?.events?.events || data.keyEvents || []
+          for (const evt of matchFactEvents) {
+            const evtType = evt.type?.toLowerCase() || evt.eventType?.toLowerCase() || ''
+            let type: MatchEvent['type'] = 'goal'
+            
+            if (evtType.includes('yellow')) type = 'yellow_card'
+            else if (evtType.includes('red') || evtType.includes('second yellow')) type = 'red_card'
+            else if (evtType.includes('sub')) type = 'substitution'
+            else if (evtType.includes('var')) type = 'var'
+            else continue  // Skip unknown types to avoid duplicating goals
+            
+            events.push({
+              type,
+              minute: evt.minute || evt.time?.minute || parseInt(evt.clock?.displayValue) || 0,
+              addedTime: evt.addedTime || evt.time?.injuryTime,
+              player: evt.player?.name || evt.athlete?.displayName || evt.text || 'Unknown',
+              team: evt.isHome || evt.homeAway === 'home' ? 'home' : 'away',
+              relatedPlayer: evt.relatedPlayer?.name || evt.playerOff?.name,
             })
           }
           
@@ -167,6 +203,7 @@ export default function MatchDetailPage() {
             venue: data.gameInfo?.venue?.fullName,
             date: data.header?.competitions?.[0]?.date || '',
             league: data.header?.league?.name || '',
+            referee: refereeName,
             events,
             lineups: {
               home: extractLineup(data.rosters?.[0]?.roster),
@@ -321,8 +358,43 @@ export default function MatchDetailPage() {
     )
   }
 
-  const isLive = match.status.includes('IN_PROGRESS') || match.status.includes('HALF')
+  const isLive = match.status.includes('IN_PROGRESS') || match.status.includes('HALF') || match.status.includes('LIVE')
+  const isHalftime = match.status.toLowerCase().includes('half') && !match.status.toLowerCase().includes('first') && !match.status.toLowerCase().includes('second')
   const isScheduled = match.status.toLowerCase().includes('scheduled') || match.status.toLowerCase().includes('pre')
+  const isFinished = match.status.includes('FINAL') || match.status.toLowerCase().includes('finished') || match.status.toLowerCase().includes('ft')
+
+  // Halftime countdown state
+  const [halftimeCountdown, setHalftimeCountdown] = useState<string>('')
+  
+  // Update halftime countdown
+  useEffect(() => {
+    if (!isHalftime) {
+      setHalftimeCountdown('')
+      return
+    }
+    
+    // Estimate halftime end (15 minutes from halftime start, usually around minute 45)
+    const estimatedResumeTime = new Date()
+    estimatedResumeTime.setMinutes(estimatedResumeTime.getMinutes() + 10) // Rough estimate
+    
+    const updateCountdown = () => {
+      const now = new Date()
+      const diff = estimatedResumeTime.getTime() - now.getTime()
+      
+      if (diff <= 0) {
+        setHalftimeCountdown('Resuming soon...')
+        return
+      }
+      
+      const minutes = Math.floor(diff / 60000)
+      const seconds = Math.floor((diff % 60000) / 1000)
+      setHalftimeCountdown(`${minutes}:${seconds.toString().padStart(2, '0')}`)
+    }
+    
+    updateCountdown()
+    const interval = setInterval(updateCountdown, 1000)
+    return () => clearInterval(interval)
+  }, [isHalftime])
 
   // Navigate back to the league page
   const handleBack = () => {
@@ -359,16 +431,34 @@ export default function MatchDetailPage() {
               </div>
               
               <div className="text-center px-4 md:px-8">
-                {isLive && (
+                {/* Live indicator */}
+                {isLive && !isHalftime && (
                   <div className="flex items-center justify-center gap-2 mb-2">
-                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-red-500 text-sm font-bold">LIVE</span>
                     <span className="text-red-400 text-sm font-bold">{match.minute}&apos;</span>
                   </div>
                 )}
+                
+                {/* Halftime indicator with countdown */}
+                {isHalftime && (
+                  <div className="mb-2 space-y-1">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="px-2 py-1 bg-amber-500/20 text-amber-500 rounded text-sm font-bold">HALF TIME</span>
+                    </div>
+                    {halftimeCountdown && (
+                      <p className="text-xs text-[var(--text-tertiary)]">
+                        Resumes in: <span className="font-mono text-amber-400">{halftimeCountdown}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
+                
                 <div className="text-4xl md:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
                   {isScheduled ? 'vs' : `${match.home_score} - ${match.away_score}`}
                 </div>
-                {!isLive && !isScheduled && match.status.includes('FINAL') && (
+                
+                {isFinished && (
                   <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>Full Time</p>
                 )}
                 {isScheduled && (
@@ -414,6 +504,63 @@ export default function MatchDetailPage() {
       <div className="max-w-4xl mx-auto px-4 py-6">
         {activeTab === 'summary' && (
           <div className="space-y-6">
+            {/* Match Info Card (Venue, Referee, Weather) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Venue Info */}
+              <div className="bg-[var(--card-bg)] border rounded-xl p-4" style={{ borderColor: 'var(--border-color)' }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                    <span className="text-xl">📍</span>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-tertiary)]">Venue</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{match.venue || 'TBD'}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Referee Info */}
+              <div className="bg-[var(--card-bg)] border rounded-xl p-4" style={{ borderColor: 'var(--border-color)' }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                    <span className="text-xl">👨‍⚖️</span>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-tertiary)]">Referee</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{match.referee || 'TBD'}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Date/Time */}
+              <div className="bg-[var(--card-bg)] border rounded-xl p-4" style={{ borderColor: 'var(--border-color)' }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <span className="text-xl">📅</span>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-tertiary)]">Date</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{formatDate(match.date)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Weather & Referee Details */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <MatchWeather 
+                matchId={matchId}
+                venue={match.venue}
+                homeTeam={match.home_team}
+                awayTeam={match.away_team}
+              />
+              <RefereeInfo
+                matchId={matchId}
+                homeTeam={match.home_team}
+                awayTeam={match.away_team}
+              />
+            </div>
+
             {/* Event Summary Card */}
             {match.events.length > 0 && (
               <div className="bg-[var(--card-bg)] border rounded-2xl overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
@@ -427,14 +574,16 @@ export default function MatchDetailPage() {
                       <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-3">{match.home_team}</h4>
                       <div className="space-y-2">
                         {/* Goals */}
-                        {match.events.filter(e => e.team === 'home' && e.type === 'goal').length > 0 && (
+                        {match.events.filter(e => e.team === 'home' && (e.type === 'goal' || e.type === 'own_goal')).length > 0 && (
                           <div className="flex flex-wrap gap-2">
                             {match.events
-                              .filter(e => e.team === 'home' && e.type === 'goal')
+                              .filter(e => e.team === 'home' && (e.type === 'goal' || e.type === 'own_goal'))
                               .map((e, i) => (
                                 <div key={i} className="text-sm">
-                                  <span className="text-[var(--text-primary)]">⚽ {e.player}</span>
-                                  <span className="text-[var(--text-tertiary)]"> {e.minute}&apos;</span>
+                                  <span className="text-[var(--text-primary)]">
+                                    {e.type === 'own_goal' ? '⚽🔴' : '⚽'} {e.player}
+                                  </span>
+                                  <span className="text-[var(--text-tertiary)]"> {e.minute}&apos;{e.addedTime ? `+${e.addedTime}` : ''}</span>
                                   {e.relatedPlayer && (
                                     <span className="text-[var(--text-tertiary)] text-xs ml-1">(assist: {e.relatedPlayer})</span>
                                   )}
@@ -454,6 +603,18 @@ export default function MatchDetailPage() {
                               ))}
                           </div>
                         )}
+                        {/* Substitutions */}
+                        {match.events.filter(e => e.team === 'home' && e.type === 'substitution').length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {match.events
+                              .filter(e => e.team === 'home' && e.type === 'substitution')
+                              .map((e, i) => (
+                                <span key={i} className="text-xs text-[var(--text-secondary)] bg-[var(--muted-bg)] px-2 py-1 rounded">
+                                  🔄 {e.player} ↔ {e.relatedPlayer || '?'} {e.minute}&apos;
+                                </span>
+                              ))}
+                          </div>
+                        )}
                         {match.events.filter(e => e.team === 'home').length === 0 && (
                           <p className="text-sm text-[var(--text-tertiary)]">No notable events</p>
                         )}
@@ -465,14 +626,16 @@ export default function MatchDetailPage() {
                       <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-3">{match.away_team}</h4>
                       <div className="space-y-2">
                         {/* Goals */}
-                        {match.events.filter(e => e.team === 'away' && e.type === 'goal').length > 0 && (
+                        {match.events.filter(e => e.team === 'away' && (e.type === 'goal' || e.type === 'own_goal')).length > 0 && (
                           <div className="flex flex-wrap gap-2">
                             {match.events
-                              .filter(e => e.team === 'away' && e.type === 'goal')
+                              .filter(e => e.team === 'away' && (e.type === 'goal' || e.type === 'own_goal'))
                               .map((e, i) => (
                                 <div key={i} className="text-sm">
-                                  <span className="text-[var(--text-primary)]">⚽ {e.player}</span>
-                                  <span className="text-[var(--text-tertiary)]"> {e.minute}&apos;</span>
+                                  <span className="text-[var(--text-primary)]">
+                                    {e.type === 'own_goal' ? '⚽🔴' : '⚽'} {e.player}
+                                  </span>
+                                  <span className="text-[var(--text-tertiary)]"> {e.minute}&apos;{e.addedTime ? `+${e.addedTime}` : ''}</span>
                                   {e.relatedPlayer && (
                                     <span className="text-[var(--text-tertiary)] text-xs ml-1">(assist: {e.relatedPlayer})</span>
                                   )}
@@ -488,6 +651,75 @@ export default function MatchDetailPage() {
                               .map((e, i) => (
                                 <span key={i} className="text-xs text-[var(--text-secondary)] bg-[var(--muted-bg)] px-2 py-1 rounded">
                                   {e.type === 'yellow_card' ? '🟨' : '🟥'} {e.player} {e.minute}&apos;
+                                </span>
+                              ))}
+                          </div>
+                        )}
+                        {/* Substitutions */}
+                        {match.events.filter(e => e.team === 'away' && e.type === 'substitution').length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {match.events
+                              .filter(e => e.team === 'away' && e.type === 'substitution')
+                              .map((e, i) => (
+                                <span key={i} className="text-xs text-[var(--text-secondary)] bg-[var(--muted-bg)] px-2 py-1 rounded">
+                                  🔄 {e.player} ↔ {e.relatedPlayer || '?'} {e.minute}&apos;
+                                </span>
+                              ))}
+                          </div>
+                        )}
+                        {match.events.filter(e => e.team === 'away').length === 0 && (
+                          <p className="text-sm text-[var(--text-tertiary)]">No notable events</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Quick Stats Row */}
+                  <div className="flex justify-center gap-8 mt-4 pt-4 border-t" style={{ borderColor: 'var(--border-color)' }}>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-[var(--accent-primary)]">
+                        {match.events.filter(e => e.team === 'home' && (e.type === 'goal' || e.type === 'own_goal')).length}
+                      </p>
+                      <p className="text-xs text-[var(--text-tertiary)]">Goals</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-amber-500">
+                        {match.events.filter(e => e.team === 'home' && e.type === 'yellow_card').length}
+                      </p>
+                      <p className="text-xs text-[var(--text-tertiary)]">Yellow</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-red-500">
+                        {match.events.filter(e => e.team === 'home' && e.type === 'red_card').length}
+                      </p>
+                      <p className="text-xs text-[var(--text-tertiary)]">Red</p>
+                    </div>
+                    <div className="h-8 w-px bg-[var(--border-color)]" />
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-emerald-500">
+                        {match.events.filter(e => e.team === 'away' && (e.type === 'goal' || e.type === 'own_goal')).length}
+                      </p>
+                      <p className="text-xs text-[var(--text-tertiary)]">Goals</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-amber-500">
+                        {match.events.filter(e => e.team === 'away' && e.type === 'yellow_card').length}
+                      </p>
+                      <p className="text-xs text-[var(--text-tertiary)]">Yellow</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-red-500">
+                        {match.events.filter(e => e.team === 'away' && e.type === 'red_card').length}
+                      </p>
+                      <p className="text-xs text-[var(--text-tertiary)]">Red</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Timeline Header */}
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">Match Timeline</h3>
                                 </span>
                               ))}
                           </div>
@@ -616,22 +848,7 @@ export default function MatchDetailPage() {
 
         {activeTab === 'lineup' && (
           <div className="space-y-6">
-            {/* Match Context: Weather & Referee */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <MatchWeather 
-                matchId={matchId}
-                venue={match.venue}
-                homeTeam={match.home_team}
-                awayTeam={match.away_team}
-              />
-              <RefereeInfo
-                matchId={matchId}
-                homeTeam={match.home_team}
-                awayTeam={match.away_team}
-              />
-            </div>
-
-            {/* Formation display */}
+            {/* Formation display - Lineup tab only shows formations */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Home Team Formation */}
               <div className="bg-[var(--card-bg)] border rounded-2xl overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
@@ -865,71 +1082,47 @@ export default function MatchDetailPage() {
 
         {activeTab === 'h2h' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Head to Head</h3>
-              {match.h2h.recentMatches.length === 0 && (
-                <span className="text-xs text-[var(--text-tertiary)] bg-[var(--muted-bg)] px-2 py-1 rounded">Sample data</span>
-              )}
-            </div>
-            
-            {/* H2H Summary */}
-            <div className="bg-[var(--card-bg)] border rounded-xl p-6" style={{ borderColor: 'var(--border-color)' }}>
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <p className="text-3xl font-bold text-[var(--accent-primary)]">{match.h2h.homeWins || '–'}</p>
-                  <p className="text-sm text-[var(--text-secondary)]">{match.home_team}</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-[var(--text-tertiary)]">{match.h2h.draws || '–'}</p>
-                  <p className="text-sm text-[var(--text-secondary)]">Draws</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-bold text-emerald-500">{match.h2h.awayWins || '–'}</p>
-                  <p className="text-sm text-[var(--text-secondary)]">{match.away_team}</p>
-                </div>
-              </div>
-              {match.h2h.homeWins === 0 && match.h2h.draws === 0 && match.h2h.awayWins === 0 && (
-                <p className="text-center text-xs text-[var(--text-tertiary)] mt-4">Historical H2H data not available</p>
-              )}
-            </div>
-            
-            {/* Recent Meetings */}
-            {match.h2h.recentMatches.length > 0 ? (
-              <div>
-                <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">Recent Meetings</h4>
-                <div className="space-y-2">
-                  {match.h2h.recentMatches.map((recentMatch, idx) => (
-                    <div 
-                      key={idx}
-                      className="flex items-center justify-between p-3 bg-[var(--muted-bg)] rounded-lg"
-                    >
-                      <span className="text-sm text-[var(--text-tertiary)] w-24">
-                        {new Date(recentMatch.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </span>
-                      <div className="flex items-center gap-3 flex-1 justify-center">
-                        <span className="text-sm text-[var(--text-primary)] font-medium text-right flex-1">{match.home_team}</span>
-                        <span className={`text-lg font-bold px-3 py-1 rounded ${
-                          recentMatch.home_score > recentMatch.away_score 
-                            ? 'text-[var(--accent-primary)] bg-[var(--accent-primary)]/10' 
-                            : recentMatch.home_score < recentMatch.away_score 
-                              ? 'text-emerald-500 bg-emerald-500/10'
-                              : 'text-[var(--text-tertiary)] bg-[var(--muted-bg)]'
-                        }`}>
-                          {recentMatch.home_score} - {recentMatch.away_score}
-                        </span>
-                        <span className="text-sm text-[var(--text-primary)] font-medium text-left flex-1">{match.away_team}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8 bg-[var(--muted-bg)] rounded-xl">
-                <span className="text-3xl mb-3 block">📊</span>
-                <p className="text-[var(--text-secondary)]">Recent meetings data not available</p>
-                <p className="text-xs text-[var(--text-tertiary)] mt-1">Historical match data between these teams</p>
-              </div>
-            )}
+            {/* Use the new HeadToHeadDisplay component */}
+            <HeadToHeadDisplay
+              homeTeam={match.home_team}
+              awayTeam={match.away_team}
+              matchId={matchId}
+              initialData={match.h2h.recentMatches.length > 0 ? {
+                totalMatches: match.h2h.homeWins + match.h2h.draws + match.h2h.awayWins,
+                team1: {
+                  name: match.home_team,
+                  wins: match.h2h.homeWins,
+                  goals: 0,
+                  cleanSheets: 0,
+                  homeWins: 0,
+                  awayWins: 0,
+                },
+                team2: {
+                  name: match.away_team,
+                  wins: match.h2h.awayWins,
+                  goals: 0,
+                  cleanSheets: 0,
+                  homeWins: 0,
+                  awayWins: 0,
+                },
+                draws: match.h2h.draws,
+                avgGoalsPerMatch: 0,
+                recentForm: [],
+                recentMatches: match.h2h.recentMatches.map((m, idx) => ({
+                  id: `h2h-${idx}`,
+                  date: m.date,
+                  competition: '',
+                  homeTeam: m.homeTeam || match.home_team,
+                  awayTeam: m.awayTeam || match.away_team,
+                  homeScore: m.home_score,
+                  awayScore: m.away_score,
+                  winner: m.home_score > m.away_score ? 'home' : m.away_score > m.home_score ? 'away' : 'draw',
+                })),
+                streaks: {
+                  longestWinStreak: { team: match.home_team, count: 0 },
+                },
+              } : undefined}
+            />
           </div>
         )}
       </div>

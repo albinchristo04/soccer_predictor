@@ -152,6 +152,43 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
           }))
         }
 
+        // Process matches
+        if (matchesRes.status === 'fulfilled' && matchesRes.value.ok) {
+          const matchesJson = await matchesRes.value.json()
+          const allMatches = matchesJson.matches || []
+          const now = new Date()
+          
+          // Separate into upcoming and recent
+          for (const match of allMatches) {
+            const matchDate = new Date(match.utcTime || match.date || '')
+            const isPlayed = match.status === 'played' || match.status === 'finished'
+            
+            if (isPlayed) {
+              leagueData.recentResults.push({
+                id: String(match.id || match.match_id || ''),
+                homeTeam: match.home?.name || match.home_team || 'Home',
+                awayTeam: match.away?.name || match.away_team || 'Away',
+                homeScore: match.home?.score ?? match.home_goals ?? 0,
+                awayScore: match.away?.score ?? match.away_goals ?? 0,
+                date: matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+              })
+            } else if (matchDate > now) {
+              leagueData.upcomingMatches.push({
+                id: String(match.id || match.match_id || ''),
+                homeTeam: match.home?.name || match.home_team || 'Home',
+                awayTeam: match.away?.name || match.away_team || 'Away',
+                date: matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                time: matchDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+                venue: match.venue?.name,
+              })
+            }
+          }
+          
+          // Limit and sort
+          leagueData.recentResults = leagueData.recentResults.slice(0, 10)
+          leagueData.upcomingMatches = leagueData.upcomingMatches.slice(0, 10)
+        }
+
         // Process news
         if (newsRes.status === 'fulfilled' && newsRes.value.ok) {
           const newsJson = await newsRes.value.json()
@@ -360,10 +397,36 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
               <div className="p-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
                 <h2 className="text-lg font-semibold text-[var(--text-primary)]">Upcoming Fixtures</h2>
               </div>
-              <div className="p-4">
-                <p className="text-[var(--text-tertiary)] text-center py-8">
-                  Upcoming matches will appear here
-                </p>
+              <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+                {data?.upcomingMatches && data.upcomingMatches.length > 0 ? (
+                  data.upcomingMatches.map((match) => (
+                    <Link
+                      key={match.id}
+                      href={`/matches/${match.id}?league=${leagueId}`}
+                      className="flex items-center justify-between p-4 hover:bg-[var(--muted-bg)] transition-colors"
+                    >
+                      <div className="flex-1">
+                        <p className="text-xs text-[var(--text-tertiary)] mb-1">{match.date} • {match.time}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-[var(--text-primary)]">{match.homeTeam}</span>
+                          <span className="text-[var(--text-tertiary)]">vs</span>
+                          <span className="font-medium text-[var(--text-primary)]">{match.awayTeam}</span>
+                        </div>
+                        {match.venue && (
+                          <p className="text-xs text-[var(--text-tertiary)] mt-1">📍 {match.venue}</p>
+                        )}
+                      </div>
+                      <svg className="w-5 h-5 text-[var(--text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="p-8 text-center">
+                    <span className="text-3xl mb-2 block">📅</span>
+                    <p className="text-[var(--text-tertiary)]">No upcoming fixtures scheduled</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -372,10 +435,43 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
               <div className="p-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
                 <h2 className="text-lg font-semibold text-[var(--text-primary)]">Recent Results</h2>
               </div>
-              <div className="p-4">
-                <p className="text-[var(--text-tertiary)] text-center py-8">
-                  Recent results will appear here
-                </p>
+              <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+                {data?.recentResults && data.recentResults.length > 0 ? (
+                  data.recentResults.map((match) => (
+                    <Link
+                      key={match.id}
+                      href={`/matches/${match.id}?league=${leagueId}`}
+                      className="flex items-center justify-between p-4 hover:bg-[var(--muted-bg)] transition-colors"
+                    >
+                      <div className="flex-1">
+                        <p className="text-xs text-[var(--text-tertiary)] mb-1">{match.date}</p>
+                        <div className="flex items-center gap-3">
+                          <span className={`font-medium ${match.homeScore > match.awayScore ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
+                            {match.homeTeam}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded font-bold text-sm ${
+                            match.homeScore > match.awayScore ? 'bg-green-500/20 text-green-500' :
+                            match.awayScore > match.homeScore ? 'bg-red-500/20 text-red-500' :
+                            'bg-gray-500/20 text-gray-500'
+                          }`}>
+                            {match.homeScore} - {match.awayScore}
+                          </span>
+                          <span className={`font-medium ${match.awayScore > match.homeScore ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
+                            {match.awayTeam}
+                          </span>
+                        </div>
+                      </div>
+                      <svg className="w-5 h-5 text-[var(--text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="p-8 text-center">
+                    <span className="text-3xl mb-2 block">⚽</span>
+                    <p className="text-[var(--text-tertiary)]">No recent results available</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

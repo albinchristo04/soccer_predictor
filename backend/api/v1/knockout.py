@@ -142,6 +142,78 @@ async def simulate_knockout(request: KnockoutSimulationRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+class TeamsListRequest(BaseModel):
+    """Request body for custom teams list."""
+    teams: List[str] = []
+
+
+def _format_simulation_response(result) -> dict:
+    """Format simulation result into API response."""
+    return {
+        "tournament": result.tournament_name,
+        "n_simulations": result.n_simulations,
+        "winner": {
+            "team": result.most_likely_winner,
+            "probability": round(result.winner_probability, 4)
+        },
+        "runner_up": {
+            "team": list(result.winner_probabilities.keys())[1] if len(result.winner_probabilities) > 1 else "",
+            "probability": round(list(result.winner_probabilities.values())[1], 4) if len(result.winner_probabilities) > 1 else 0
+        },
+        "round_probabilities": {
+            "champion": [
+                {"team": team, "probability": round(prob, 4)}
+                for team, prob in sorted(result.winner_probabilities.items(), key=lambda x: -x[1])
+            ],
+            "final": [
+                {"team": team, "probability": round(prob, 4)}
+                for team, prob in sorted(result.final_probabilities.items(), key=lambda x: -x[1])
+            ],
+            "semi_finals": [
+                {"team": team, "probability": round(prob, 4)}
+                for team, prob in sorted(result.semi_final_probabilities.items(), key=lambda x: -x[1])
+            ],
+            "quarter_finals": [
+                {"team": team, "probability": round(prob, 4)}
+                for team, prob in sorted(getattr(result, 'quarter_final_probabilities', result.semi_final_probabilities).items(), key=lambda x: -x[1])
+            ],
+        }
+    }
+
+
+@router.post("/champions-league")
+async def simulate_champions_league_post(
+    body: Optional[TeamsListRequest] = None,
+    n_simulations: int = Query(5000, ge=100, le=50000)
+):
+    """
+    Simulate Champions League knockout stage with custom teams.
+    """
+    simulator = get_knockout_simulator()
+    simulator.n_simulations = n_simulations
+    
+    # Use provided teams or defaults
+    if body and body.teams:
+        teams = [
+            KnockoutTeam(name=name, elo=1800 + (100 * (16 - idx)) if idx < 16 else 1800)
+            for idx, name in enumerate(body.teams)
+        ]
+    else:
+        teams = [
+            KnockoutTeam(
+                name=t["name"],
+                elo=t["elo"],
+                group=t["group"],
+                group_position=t["group_position"],
+                country=t["country"],
+            )
+            for t in CL_TEAMS_2025_26
+        ]
+    
+    result = simulator.simulate_champions_league(teams)
+    return _format_simulation_response(result)
+
+
 @router.get("/champions-league/simulate")
 async def simulate_champions_league(
     n_simulations: int = Query(5000, ge=100, le=50000)
@@ -187,6 +259,50 @@ async def simulate_champions_league(
     }
 
 
+UEL_TEAMS = [
+    {"name": "Roma", "elo": 1850, "group": "A", "group_position": 1, "country": "Italy"},
+    {"name": "Leverkusen", "elo": 1920, "group": "B", "group_position": 1, "country": "Germany"},
+    {"name": "Manchester United", "elo": 1880, "group": "C", "group_position": 1, "country": "England"},
+    {"name": "Real Sociedad", "elo": 1820, "group": "D", "group_position": 1, "country": "Spain"},
+    {"name": "West Ham", "elo": 1780, "group": "E", "group_position": 1, "country": "England"},
+    {"name": "Sporting CP", "elo": 1810, "group": "F", "group_position": 1, "country": "Portugal"},
+    {"name": "Marseille", "elo": 1790, "group": "G", "group_position": 1, "country": "France"},
+    {"name": "Brighton", "elo": 1770, "group": "H", "group_position": 1, "country": "England"},
+]
+
+
+@router.post("/europa-league")
+async def simulate_europa_league_post(
+    body: Optional[TeamsListRequest] = None,
+    n_simulations: int = Query(5000, ge=100, le=50000)
+):
+    """
+    Simulate Europa League knockout stage with custom teams.
+    """
+    simulator = get_knockout_simulator()
+    simulator.n_simulations = n_simulations
+    
+    if body and body.teams:
+        teams = [
+            KnockoutTeam(name=name, elo=1700 + (50 * (16 - idx)) if idx < 16 else 1700)
+            for idx, name in enumerate(body.teams)
+        ]
+    else:
+        teams = [
+            KnockoutTeam(
+                name=t["name"],
+                elo=t["elo"],
+                group=t.get("group", ""),
+                group_position=t.get("group_position", 1),
+                country=t.get("country", ""),
+            )
+            for t in UEL_TEAMS
+        ]
+    
+    result = simulator.simulate_europa_league(teams)
+    return _format_simulation_response(result)
+
+
 @router.get("/europa-league/simulate")
 async def simulate_europa_league(
     n_simulations: int = Query(5000, ge=100, le=50000)
@@ -221,6 +337,38 @@ async def simulate_europa_league(
             for team, prob in sorted(result.winner_probabilities.items(), key=lambda x: -x[1])
         ],
     }
+
+
+@router.post("/world-cup")
+async def simulate_world_cup_post(
+    body: Optional[TeamsListRequest] = None,
+    n_simulations: int = Query(5000, ge=100, le=50000)
+):
+    """
+    Simulate World Cup knockout stage with custom teams.
+    """
+    simulator = get_knockout_simulator()
+    simulator.n_simulations = n_simulations
+    
+    if body and body.teams:
+        teams = [
+            KnockoutTeam(name=name, elo=1800 + (80 * (16 - idx)) if idx < 16 else 1800, country=name)
+            for idx, name in enumerate(body.teams)
+        ]
+    else:
+        teams = [
+            KnockoutTeam(
+                name=t["name"],
+                elo=t["elo"],
+                group=t["group"],
+                group_position=t["group_position"],
+                country=t["country"],
+            )
+            for t in WORLD_CUP_TEAMS
+        ]
+    
+    result = simulator.simulate_world_cup(teams)
+    return _format_simulation_response(result)
 
 
 @router.get("/world-cup/simulate")

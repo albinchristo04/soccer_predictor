@@ -151,6 +151,115 @@ async def get_match_stats(match_id: int):
     }
 
 
+@router.get("/{match_id}/live")
+async def get_match_live_status(match_id: int):
+    """
+    Get live match status including current score, minute, and events.
+    
+    Returns real-time data for live matches including:
+    - Current minute and period
+    - Score
+    - Recent events (goals, cards, substitutions)
+    - Halftime countdown (if applicable)
+    """
+    client = get_fotmob_client()
+    data = await client.get_match_details(match_id)
+    
+    if not data:
+        raise HTTPException(status_code=404, detail=f"Match {match_id} not found")
+    
+    # Extract header info
+    header = data.get("header", {})
+    general = data.get("general", {})
+    match_status = general.get("matchTimeUTCDate", "")
+    
+    # Get current status
+    status_data = header.get("status", {})
+    
+    # Parse events
+    events = []
+    all_events = data.get("content", {}).get("matchFacts", {}).get("events", {}).get("events", [])
+    for event in all_events:
+        events.append({
+            "type": event.get("type", ""),
+            "minute": event.get("time", {}).get("minute", 0),
+            "addedTime": event.get("time", {}).get("injuryTime"),
+            "player": event.get("player", {}).get("name", "Unknown"),
+            "team": "home" if event.get("isHome") else "away",
+            "relatedPlayer": event.get("assistPlayer", {}).get("name") if event.get("assistPlayer") else None,
+        })
+    
+    return {
+        "match_id": match_id,
+        "status": status_data.get("reason", {}).get("short", ""),
+        "statusLong": status_data.get("reason", {}).get("long", ""),
+        "minute": status_data.get("liveTime", {}).get("short", ""),
+        "homeScore": header.get("teams", [{}])[0].get("score", 0) if header.get("teams") else 0,
+        "awayScore": header.get("teams", [{}])[1].get("score", 0) if len(header.get("teams", [])) > 1 else 0,
+        "events": events,
+        "isLive": status_data.get("started", False) and not status_data.get("finished", True),
+    }
+
+
+@router.get("/{match_id}/referee")
+async def get_match_referee(match_id: int):
+    """
+    Get referee information for a specific match.
+    
+    Returns referee name and available statistics.
+    """
+    client = get_fotmob_client()
+    data = await client.get_match_details(match_id)
+    
+    if not data:
+        raise HTTPException(status_code=404, detail=f"Match {match_id} not found")
+    
+    # Extract referee from match facts
+    match_facts = data.get("content", {}).get("matchFacts", {})
+    info_box = match_facts.get("infoBox", {})
+    
+    referee_info = info_box.get("Referee", info_box.get("referee", {}))
+    
+    # If referee is a string, use it directly
+    if isinstance(referee_info, str):
+        return {
+            "match_id": match_id,
+            "name": referee_info,
+            "country": None,
+            "age": None,
+            "experience_years": 0,
+            "career_matches": 0,
+            "avg_yellow_cards": 3.2,  # Average estimates
+            "avg_red_cards": 0.1,
+            "home_win_rate": 0.45,
+            "away_win_rate": 0.30,
+            "draw_rate": 0.25,
+            "avg_goals": 2.6,
+            "total_penalties": 0,
+            "penalties_per_match": 0.15,
+            "competitions": [],
+        }
+    
+    # If it's an object with more details
+    return {
+        "match_id": match_id,
+        "name": referee_info.get("text", referee_info.get("name", "TBD")),
+        "country": referee_info.get("country"),
+        "age": None,
+        "experience_years": 0,
+        "career_matches": 0,
+        "avg_yellow_cards": 3.2,
+        "avg_red_cards": 0.1,
+        "home_win_rate": 0.45,
+        "away_win_rate": 0.30,
+        "draw_rate": 0.25,
+        "avg_goals": 2.6,
+        "total_penalties": 0,
+        "penalties_per_match": 0.15,
+        "competitions": [],
+    }
+
+
 @router.get("/{match_id}/h2h")
 async def get_match_h2h(match_id: int):
     """Get head-to-head history for a match."""

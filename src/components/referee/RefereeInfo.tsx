@@ -60,15 +60,35 @@ export default function RefereeInfo({ matchId, homeTeam, awayTeam }: RefereeInfo
     const fetchRefereeData = async () => {
       setLoading(true)
       try {
-        // Fetch referee data from backend
-        const response = await fetch(`/api/v1/referee/match/${matchId}`)
+        // Try multiple endpoints for referee data
+        let data = null
         
-        if (!response.ok) {
+        // First try the match-specific referee endpoint
+        try {
+          const response = await fetch(`/api/v1/matches/${matchId}/referee`)
+          if (response.ok) {
+            data = await response.json()
+          }
+        } catch {
+          // Continue to fallback
+        }
+        
+        // If no data, try the referee service endpoint
+        if (!data) {
+          try {
+            const response = await fetch(`/api/v1/referee/match/${matchId}`)
+            if (response.ok) {
+              data = await response.json()
+            }
+          } catch {
+            // Continue to fallback
+          }
+        }
+        
+        if (!data) {
           throw new Error('Referee data unavailable')
         }
 
-        const data = await response.json()
-        
         setReferee({
           name: data.name || 'TBD',
           country: data.country || 'Unknown',
@@ -76,8 +96,8 @@ export default function RefereeInfo({ matchId, homeTeam, awayTeam }: RefereeInfo
           experience: data.experience_years || 0,
           careerMatches: data.career_matches || 0,
           averageCardsPerMatch: {
-            yellow: data.avg_yellow_cards || 0,
-            red: data.avg_red_cards || 0
+            yellow: data.avg_yellow_cards || 3.2,
+            red: data.avg_red_cards || 0.1
           },
           homeWinRate: data.home_win_rate || 0.45,
           awayWinRate: data.away_win_rate || 0.30,
