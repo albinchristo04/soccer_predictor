@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import FormationDisplay, { PitchBackground, SubstitutesBench } from '@/components/lineup/FormationDisplay'
+import MatchWeather from '@/components/weather/MatchWeather'
+import RefereeInfo from '@/components/referee/RefereeInfo'
 
 interface MatchEvent {
   type: 'goal' | 'assist' | 'yellow_card' | 'red_card' | 'substitution'
@@ -411,6 +414,123 @@ export default function MatchDetailPage() {
       <div className="max-w-4xl mx-auto px-4 py-6">
         {activeTab === 'summary' && (
           <div className="space-y-6">
+            {/* Event Summary Card */}
+            {match.events.length > 0 && (
+              <div className="bg-[var(--card-bg)] border rounded-2xl overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
+                <div className="p-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
+                  <h3 className="font-semibold text-[var(--text-primary)]">Match Summary</h3>
+                </div>
+                <div className="p-4">
+                  <div className="grid grid-cols-2 gap-6">
+                    {/* Home Team Summary */}
+                    <div>
+                      <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-3">{match.home_team}</h4>
+                      <div className="space-y-2">
+                        {/* Goals */}
+                        {match.events.filter(e => e.team === 'home' && e.type === 'goal').length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {match.events
+                              .filter(e => e.team === 'home' && e.type === 'goal')
+                              .map((e, i) => (
+                                <div key={i} className="text-sm">
+                                  <span className="text-[var(--text-primary)]">⚽ {e.player}</span>
+                                  <span className="text-[var(--text-tertiary)]"> {e.minute}&apos;</span>
+                                  {e.relatedPlayer && (
+                                    <span className="text-[var(--text-tertiary)] text-xs ml-1">(assist: {e.relatedPlayer})</span>
+                                  )}
+                                </div>
+                              ))}
+                          </div>
+                        )}
+                        {/* Cards */}
+                        {match.events.filter(e => e.team === 'home' && (e.type === 'yellow_card' || e.type === 'red_card')).length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {match.events
+                              .filter(e => e.team === 'home' && (e.type === 'yellow_card' || e.type === 'red_card'))
+                              .map((e, i) => (
+                                <span key={i} className="text-xs text-[var(--text-secondary)] bg-[var(--muted-bg)] px-2 py-1 rounded">
+                                  {e.type === 'yellow_card' ? '🟨' : '🟥'} {e.player} {e.minute}&apos;
+                                </span>
+                              ))}
+                          </div>
+                        )}
+                        {match.events.filter(e => e.team === 'home').length === 0 && (
+                          <p className="text-sm text-[var(--text-tertiary)]">No notable events</p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Away Team Summary */}
+                    <div>
+                      <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-3">{match.away_team}</h4>
+                      <div className="space-y-2">
+                        {/* Goals */}
+                        {match.events.filter(e => e.team === 'away' && e.type === 'goal').length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {match.events
+                              .filter(e => e.team === 'away' && e.type === 'goal')
+                              .map((e, i) => (
+                                <div key={i} className="text-sm">
+                                  <span className="text-[var(--text-primary)]">⚽ {e.player}</span>
+                                  <span className="text-[var(--text-tertiary)]"> {e.minute}&apos;</span>
+                                  {e.relatedPlayer && (
+                                    <span className="text-[var(--text-tertiary)] text-xs ml-1">(assist: {e.relatedPlayer})</span>
+                                  )}
+                                </div>
+                              ))}
+                          </div>
+                        )}
+                        {/* Cards */}
+                        {match.events.filter(e => e.team === 'away' && (e.type === 'yellow_card' || e.type === 'red_card')).length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {match.events
+                              .filter(e => e.team === 'away' && (e.type === 'yellow_card' || e.type === 'red_card'))
+                              .map((e, i) => (
+                                <span key={i} className="text-xs text-[var(--text-secondary)] bg-[var(--muted-bg)] px-2 py-1 rounded">
+                                  {e.type === 'yellow_card' ? '🟨' : '🟥'} {e.player} {e.minute}&apos;
+                                </span>
+                              ))}
+                          </div>
+                        )}
+                        {match.events.filter(e => e.team === 'away').length === 0 && (
+                          <p className="text-sm text-[var(--text-tertiary)]">No notable events</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Quick Stats Row */}
+                  <div className="flex justify-center gap-8 mt-4 pt-4 border-t" style={{ borderColor: 'var(--border-color)' }}>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-[var(--accent-primary)]">
+                        {match.events.filter(e => e.team === 'home' && e.type === 'goal').length}
+                      </p>
+                      <p className="text-xs text-[var(--text-tertiary)]">Goals</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-amber-500">
+                        {match.events.filter(e => e.team === 'home' && e.type === 'yellow_card').length}
+                      </p>
+                      <p className="text-xs text-[var(--text-tertiary)]">Yellow</p>
+                    </div>
+                    <div className="h-8 w-px bg-[var(--border-color)]" />
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-emerald-500">
+                        {match.events.filter(e => e.team === 'away' && e.type === 'goal').length}
+                      </p>
+                      <p className="text-xs text-[var(--text-tertiary)]">Goals</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-amber-500">
+                        {match.events.filter(e => e.team === 'away' && e.type === 'yellow_card').length}
+                      </p>
+                      <p className="text-xs text-[var(--text-tertiary)]">Yellow</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Timeline Header */}
             <h3 className="text-lg font-semibold text-[var(--text-primary)]">Match Timeline</h3>
             
@@ -496,6 +616,21 @@ export default function MatchDetailPage() {
 
         {activeTab === 'lineup' && (
           <div className="space-y-6">
+            {/* Match Context: Weather & Referee */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <MatchWeather 
+                matchId={matchId}
+                venue={match.venue}
+                homeTeam={match.home_team}
+                awayTeam={match.away_team}
+              />
+              <RefereeInfo
+                matchId={matchId}
+                homeTeam={match.home_team}
+                awayTeam={match.away_team}
+              />
+            </div>
+
             {/* Formation display */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Home Team Formation */}
@@ -509,107 +644,24 @@ export default function MatchDetailPage() {
                   )}
                 </div>
                 
-                {/* Pitch visualization */}
-                <div className="relative bg-gradient-to-b from-green-800 to-green-700 p-4 min-h-[320px]">
-                  {/* Pitch lines */}
-                  <div className="absolute inset-4 border-2 border-white/30 rounded-lg">
-                    <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-white/30" />
-                    <div className="absolute left-1/2 top-1/2 w-16 h-16 -ml-8 -mt-8 rounded-full border-2 border-white/30" />
-                    {/* Goal area */}
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-24 h-8 border-2 border-white/30 border-b-0" />
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-8 border-2 border-white/30 border-t-0" />
-                  </div>
-                  
-                  {match.lineups.home.length > 0 ? (
-                    <div className="relative z-10 h-full flex flex-col justify-between py-4 min-h-[300px]">
-                      {(() => {
-                        const players = match.lineups.home.slice(0, 11)
-                        const formation = match.lineups.homeFormation
-                        
-                        // Parse formation (e.g., "4-3-3" or "4-4-2")
-                        const parseFormation = (formationStr: string | undefined): number[] => {
-                          if (!formationStr) return [4, 3, 3] // Default 4-3-3
-                          const parts = formationStr.split('-').map(n => parseInt(n, 10)).filter(n => !isNaN(n))
-                          if (parts.length >= 2) return parts
-                          return [4, 3, 3]
-                        }
-                        
-                        const formationNumbers = parseFormation(formation)
-                        
-                        // Try to group by position first
-                        const gk = players.filter(p => p.position === 'GK' || p.position === 'G')
-                        const def = players.filter(p => ['CB', 'LB', 'RB', 'LWB', 'RWB', 'D', 'DF'].includes(p.position || ''))
-                        const mid = players.filter(p => ['CM', 'CDM', 'CAM', 'LM', 'RM', 'DM', 'AM', 'M', 'MF'].includes(p.position || ''))
-                        const fwd = players.filter(p => ['ST', 'LW', 'RW', 'CF', 'F', 'FW'].includes(p.position || ''))
-                        
-                        const hasPositions = gk.length > 0 || def.length > 0 || mid.length > 0 || fwd.length > 0
-                        
-                        // Render player node
-                        const renderPlayer = (p: PlayerLineup, i: number, color: string) => (
-                          <div key={i} className="text-center flex flex-col items-center">
-                            <div className={`w-11 h-11 rounded-full ${color} flex items-center justify-center text-white font-bold text-sm shadow-lg border-2 border-white/50`}>
-                              {p.jersey || (i + 1)}
-                            </div>
-                            <p className="text-xs text-white mt-1 max-w-[70px] truncate drop-shadow-lg font-semibold">{p.name.split(' ').pop()}</p>
-                          </div>
-                        )
-                        
-                        const renderRow = (rowPlayers: PlayerLineup[], color: string, startIndex: number = 0) => (
-                          <div className="flex justify-center gap-4 flex-wrap">
-                            {rowPlayers.map((p, i) => renderPlayer(p, startIndex + i, color))}
-                          </div>
-                        )
-                        
-                        if (hasPositions) {
-                          // Use actual positions
-                          return (
-                            <div className="flex flex-col justify-between h-full gap-6">
-                              {fwd.length > 0 && renderRow(fwd, 'bg-red-600')}
-                              {mid.length > 0 && renderRow(mid, 'bg-blue-600')}
-                              {def.length > 0 && renderRow(def, 'bg-indigo-600')}
-                              {gk.length > 0 && renderRow(gk, 'bg-amber-600')}
-                            </div>
-                          )
-                        }
-                        
-                        // Use formation numbers to distribute players
-                        // Start from player 1 (after GK which is at index 0)
-                        let playerIndex = 1
-                        const rows: { players: PlayerLineup[]; color: string }[] = []
-                        
-                        // Reverse formation for display (FWD at top)
-                        const reversedFormation = [...formationNumbers].reverse()
-                        const colors = ['bg-red-600', 'bg-blue-600', 'bg-indigo-600']
-                        
-                        reversedFormation.forEach((count, idx) => {
-                          const rowPlayers = players.slice(playerIndex, playerIndex + count)
-                          rows.push({ players: rowPlayers, color: colors[idx] || 'bg-blue-600' })
-                          playerIndex += count
-                        })
-                        
-                        // Add goalkeeper (player at index 0)
-                        rows.push({ players: players.slice(0, 1), color: 'bg-amber-600' })
-                        
-                        return (
-                          <div className="flex flex-col justify-between h-full gap-6">
-                            {rows.map((row, idx) => (
-                              <div key={idx} className="flex justify-center gap-4 flex-wrap">
-                                {row.players.map((p, i) => renderPlayer(p, i, row.color))}
-                              </div>
-                            ))}
-                          </div>
-                        )
-                      })()}
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-white/70 min-h-[300px]">
-                      <span>Lineup not available</span>
-                    </div>
-                  )}
-                </div>
+                {/* Pitch visualization with improved component */}
+                <PitchBackground>
+                  <FormationDisplay
+                    players={match.lineups.home}
+                    formation={match.lineups.homeFormation}
+                    teamName={match.home_team}
+                    teamColor="blue"
+                  />
+                </PitchBackground>
+                
+                {/* Substitutes */}
+                {match.lineups.home.length > 11 && (
+                  <SubstitutesBench players={match.lineups.home.slice(11)} />
+                )}
                 
                 {/* Player list */}
-                <div className="p-4 max-h-[200px] overflow-y-auto">
+                <div className="p-4 max-h-[200px] overflow-y-auto border-t" style={{ borderColor: 'var(--border-color)' }}>
+                  <p className="text-xs text-[var(--text-tertiary)] mb-2">Starting XI</p>
                   <div className="space-y-1">
                     {match.lineups.home.slice(0, 11).map((player, idx) => (
                       <div key={idx} className="flex items-center justify-between py-1 text-sm">
@@ -637,101 +689,24 @@ export default function MatchDetailPage() {
                   )}
                 </div>
                 
-                {/* Pitch visualization */}
-                <div className="relative bg-gradient-to-b from-green-800 to-green-700 p-4 min-h-[320px]">
-                  {/* Pitch lines */}
-                  <div className="absolute inset-4 border-2 border-white/30 rounded-lg">
-                    <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-white/30" />
-                    <div className="absolute left-1/2 top-1/2 w-16 h-16 -ml-8 -mt-8 rounded-full border-2 border-white/30" />
-                    {/* Goal area */}
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-24 h-8 border-2 border-white/30 border-b-0" />
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-8 border-2 border-white/30 border-t-0" />
-                  </div>
-                  
-                  {match.lineups.away.length > 0 ? (
-                    <div className="relative z-10 h-full flex flex-col justify-between py-4 min-h-[300px]">
-                      {(() => {
-                        const players = match.lineups.away.slice(0, 11)
-                        const formation = match.lineups.awayFormation
-                        
-                        // Parse formation
-                        const parseFormation = (formationStr: string | undefined): number[] => {
-                          if (!formationStr) return [4, 3, 3]
-                          const parts = formationStr.split('-').map(n => parseInt(n, 10)).filter(n => !isNaN(n))
-                          if (parts.length >= 2) return parts
-                          return [4, 3, 3]
-                        }
-                        
-                        const formationNumbers = parseFormation(formation)
-                        
-                        const gk = players.filter(p => p.position === 'GK' || p.position === 'G')
-                        const def = players.filter(p => ['CB', 'LB', 'RB', 'LWB', 'RWB', 'D', 'DF'].includes(p.position || ''))
-                        const mid = players.filter(p => ['CM', 'CDM', 'CAM', 'LM', 'RM', 'DM', 'AM', 'M', 'MF'].includes(p.position || ''))
-                        const fwd = players.filter(p => ['ST', 'LW', 'RW', 'CF', 'F', 'FW'].includes(p.position || ''))
-                        
-                        const hasPositions = gk.length > 0 || def.length > 0 || mid.length > 0 || fwd.length > 0
-                        
-                        const renderPlayer = (p: PlayerLineup, i: number, color: string) => (
-                          <div key={i} className="text-center flex flex-col items-center">
-                            <div className={`w-11 h-11 rounded-full ${color} flex items-center justify-center text-white font-bold text-sm shadow-lg border-2 border-white/50`}>
-                              {p.jersey || (i + 1)}
-                            </div>
-                            <p className="text-xs text-white mt-1 max-w-[70px] truncate drop-shadow-lg font-semibold">{p.name.split(' ').pop()}</p>
-                          </div>
-                        )
-                        
-                        const renderRow = (rowPlayers: PlayerLineup[], color: string) => (
-                          <div className="flex justify-center gap-4 flex-wrap">
-                            {rowPlayers.map((p, i) => renderPlayer(p, i, color))}
-                          </div>
-                        )
-                        
-                        if (hasPositions) {
-                          return (
-                            <div className="flex flex-col justify-between h-full gap-6">
-                              {fwd.length > 0 && renderRow(fwd, 'bg-red-500')}
-                              {mid.length > 0 && renderRow(mid, 'bg-orange-500')}
-                              {def.length > 0 && renderRow(def, 'bg-yellow-600')}
-                              {gk.length > 0 && renderRow(gk, 'bg-amber-600')}
-                            </div>
-                          )
-                        }
-                        
-                        // Start from player 1 (after GK which is at index 0)
-                        let playerIndex = 1
-                        const rows: { players: PlayerLineup[]; color: string }[] = []
-                        const reversedFormation = [...formationNumbers].reverse()
-                        const colors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-600']
-                        
-                        reversedFormation.forEach((count, idx) => {
-                          const rowPlayers = players.slice(playerIndex, playerIndex + count)
-                          rows.push({ players: rowPlayers, color: colors[idx] || 'bg-orange-500' })
-                          playerIndex += count
-                        })
-                        
-                        // Add goalkeeper (player at index 0)
-                        rows.push({ players: players.slice(0, 1), color: 'bg-amber-600' })
-                        
-                        return (
-                          <div className="flex flex-col justify-between h-full gap-6">
-                            {rows.map((row, idx) => (
-                              <div key={idx} className="flex justify-center gap-4 flex-wrap">
-                                {row.players.map((p, i) => renderPlayer(p, i, row.color))}
-                              </div>
-                            ))}
-                          </div>
-                        )
-                      })()}
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-white/70 min-h-[300px]">
-                      <span>Lineup not available</span>
-                    </div>
-                  )}
-                </div>
+                {/* Pitch visualization with improved component */}
+                <PitchBackground>
+                  <FormationDisplay
+                    players={match.lineups.away}
+                    formation={match.lineups.awayFormation}
+                    teamName={match.away_team}
+                    teamColor="orange"
+                  />
+                </PitchBackground>
+                
+                {/* Substitutes */}
+                {match.lineups.away.length > 11 && (
+                  <SubstitutesBench players={match.lineups.away.slice(11)} />
+                )}
                 
                 {/* Player list */}
-                <div className="p-4 max-h-[200px] overflow-y-auto">
+                <div className="p-4 max-h-[200px] overflow-y-auto border-t" style={{ borderColor: 'var(--border-color)' }}>
+                  <p className="text-xs text-[var(--text-tertiary)] mb-2">Starting XI</p>
                   <div className="space-y-1">
                     {match.lineups.away.slice(0, 11).map((player, idx) => (
                       <div key={idx} className="flex items-center justify-between py-1 text-sm">
