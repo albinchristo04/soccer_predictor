@@ -350,6 +350,15 @@ async function fetchFromFotMob(matchId: string): Promise<MatchDetailsResponse | 
   }
 }
 
+// Constants for H2H score simulation
+const H2H_SCORE_CONSTANTS = {
+  MAX_GOALS_PER_MATCH: 3,        // Maximum expected goals per team
+  MIN_HOME_GOALS: 1,             // Minimum goals for home team in fallback
+  MAX_AWAY_GOALS_OFFSET: 3,      // Max goals range for away team in fallback
+  HISTORICAL_MATCH_COUNT: 5,     // Number of simulated historical matches
+  MONTHS_BETWEEN_MATCHES: 4,     // Spacing between simulated matches
+}
+
 // Fetch H2H data from ESPN - enhanced to provide meaningful data
 async function fetchH2H(homeTeam: string, awayTeam: string, leagueId?: string): Promise<H2HData | null> {
   try {
@@ -403,15 +412,15 @@ async function fetchH2H(homeTeam: string, awayTeam: string, leagueId?: string): 
           const recentMatches: H2HMatch[] = []
           const now = new Date()
           
-          for (let i = 0; i < Math.min(5, totalH2HMatches); i++) {
+          for (let i = 0; i < Math.min(H2H_SCORE_CONSTANTS.HISTORICAL_MATCH_COUNT, totalH2HMatches); i++) {
             const matchDate = new Date(now)
-            matchDate.setMonth(matchDate.getMonth() - (3 + i * 4)) // Spread over past 2 years
+            matchDate.setMonth(matchDate.getMonth() - (3 + i * H2H_SCORE_CONSTANTS.MONTHS_BETWEEN_MATCHES)) // Spread over past 2 years
             
             // Simulate scores based on strength
             const isHomeMatch = i % 2 === 0
             const strongerAtHome = isHomeMatch ? homeStrength : awayStrength
-            const homeScore = Math.round(strongerAtHome * 3 + Math.random())
-            const awayScore = Math.round((1 - strongerAtHome) * 3 + Math.random())
+            const homeScore = Math.round(strongerAtHome * H2H_SCORE_CONSTANTS.MAX_GOALS_PER_MATCH + Math.random())
+            const awayScore = Math.round((1 - strongerAtHome) * H2H_SCORE_CONSTANTS.MAX_GOALS_PER_MATCH + Math.random())
             
             recentMatches.push({
               date: matchDate.toISOString(),
@@ -440,13 +449,13 @@ async function fetchH2H(homeTeam: string, awayTeam: string, leagueId?: string): 
     const recentMatches: H2HMatch[] = []
     const now = new Date()
     
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < H2H_SCORE_CONSTANTS.HISTORICAL_MATCH_COUNT; i++) {
       const matchDate = new Date(now)
-      matchDate.setMonth(matchDate.getMonth() - (3 + i * 4))
+      matchDate.setMonth(matchDate.getMonth() - (3 + i * H2H_SCORE_CONSTANTS.MONTHS_BETWEEN_MATCHES))
       
       const isHomeMatch = i % 2 === 0
-      const homeScore = Math.floor(Math.random() * 3) + 1
-      const awayScore = Math.floor(Math.random() * 3)
+      const homeScore = Math.floor(Math.random() * H2H_SCORE_CONSTANTS.MAX_AWAY_GOALS_OFFSET) + H2H_SCORE_CONSTANTS.MIN_HOME_GOALS
+      const awayScore = Math.floor(Math.random() * H2H_SCORE_CONSTANTS.MAX_AWAY_GOALS_OFFSET)
       
       recentMatches.push({
         date: matchDate.toISOString(),
