@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
 import { KnockoutSimulator, KnockoutBracket, type BracketRound, type KnockoutMatch as BracketMatch } from '@/components/knockout'
 
@@ -93,6 +94,7 @@ type TabType = typeof TABS[number]
 
 export default function TournamentHomePage({ tournamentId, tournamentName }: TournamentHomePageProps) {
   const config = TOURNAMENT_CONFIG[tournamentId]
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>('Overview')
   const [loading, setLoading] = useState(true)
   const [bracketRounds, setBracketRounds] = useState<BracketRound[]>([])
@@ -551,8 +553,8 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
             simulationData={simulationProbabilities}
             showProbabilities={true}
             onMatchClick={(match) => {
-              // Navigate to match page
-              window.location.href = `/matches/${match.id}`
+              // Navigate to match page using Next.js router for client-side navigation
+              router.push(`/matches/${match.id}`)
             }}
           />
         </div>

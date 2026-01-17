@@ -248,17 +248,28 @@ export default function KnockoutBracket({
 }: KnockoutBracketProps) {
   const config = TOURNAMENT_CONFIG[tournament]
   
+  // Mapping from display round names to simulation data keys
+  const ROUND_NAME_TO_KEY: Record<string, keyof SimulationData> = {
+    'round of 16': 'round_of_16',
+    'round of 32': 'round_of_16', // Map to closest available key
+    'quarter-finals': 'quarter_finals',
+    'quarter-final': 'quarter_finals',
+    'semi-finals': 'semi_finals',
+    'semi-final': 'semi_finals',
+    'final': 'final',
+    'third place': 'semi_finals', // Third place uses semi-final teams
+  }
+  
   // Helper to get probability for a team in a specific round
   const getTeamProbability = (teamName: string, roundName: string): number | undefined => {
     if (!simulationData || !showProbabilities) return undefined
     
-    const roundKey = roundName.toLowerCase()
-      .replace('round of 16', 'round_of_16')
-      .replace('round of 32', 'round_of_32')
-      .replace('-', '_')
-      .replace(' ', '_')
+    // Use the mapping to get the correct key, with fallback to string manipulation
+    const normalizedRound = roundName.toLowerCase()
+    const roundKey = ROUND_NAME_TO_KEY[normalizedRound] || 
+      normalizedRound.replace(/-/g, '_').replace(/ /g, '_') as keyof SimulationData
     
-    const roundData = simulationData[roundKey as keyof SimulationData]
+    const roundData = simulationData[roundKey]
     if (!roundData) return undefined
     
     const teamData = roundData.find(t => t.team.toLowerCase() === teamName.toLowerCase())
@@ -316,6 +327,11 @@ export default function KnockoutBracket({
           <div className="flex items-center justify-center gap-8">
             {config.rounds.map((roundName, roundIdx) => {
               const roundMatches = matchesByRound[roundName] || []
+              // Calculate expected number of matches for this round:
+              // In a knockout tournament, each round halves the number of teams.
+              // Starting from the first round (R16 = 8 matches), we have:
+              // R16: 2^3=8, QF: 2^2=4, SF: 2^1=2, Final: 2^0=1
+              // Formula: 2^(totalRounds - 1 - currentRoundIndex)
               const matchCount = roundMatches.length || Math.pow(2, config.rounds.length - 1 - roundIdx)
               
               return (
@@ -332,6 +348,7 @@ export default function KnockoutBracket({
                     className="flex flex-col gap-4"
                     style={{
                       // Increase spacing between matches as we go deeper in bracket
+                      // to align with the bracket structure visually
                       gap: `${Math.pow(2, roundIdx + 1) * 16}px`
                     }}
                   >

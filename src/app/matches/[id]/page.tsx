@@ -90,6 +90,7 @@ export default function MatchDetailPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'summary' | 'lineup' | 'stats' | 'h2h'>('summary')
   const [halftimeCountdown, setHalftimeCountdown] = useState<string>('')
+  const [retryCount, setRetryCount] = useState(0) // Used to trigger refetch
 
   // Derived state for live status - compute before hooks that depend on it
   const isLive = match?.status?.includes('IN_PROGRESS') || match?.status?.includes('HALF') || match?.status?.includes('LIVE') || false
@@ -542,7 +543,7 @@ export default function MatchDetailPage() {
     if (matchId) {
       fetchMatchDetails()
     }
-  }, [matchId, leagueId])
+  }, [matchId, leagueId, retryCount]) // retryCount triggers refetch when incremented
 
   const formatDate = (dateStr: string) => {
     try {
@@ -599,7 +600,10 @@ export default function MatchDetailPage() {
               ← Browse Matches
             </Link>
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                setLoading(true)
+                setRetryCount(prev => prev + 1) // Trigger refetch without full page reload
+              }}
               className="px-6 py-3 rounded-xl border font-semibold transition-colors hover:bg-[var(--muted-bg)]"
               style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
             >
