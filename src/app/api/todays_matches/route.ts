@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 interface Match {
+  id: string
   home_team: string
   away_team: string
   home_score: number | null
@@ -8,6 +9,7 @@ interface Match {
   time: string
   status: string
   league: string
+  leagueId: string
   match_id: string | number
   venue?: string
 }
@@ -20,23 +22,23 @@ const ESPN_LEAGUES = [
   { id: 'ger.1', name: 'Bundesliga' },
   { id: 'fra.1', name: 'Ligue 1' },
   { id: 'usa.1', name: 'MLS' },
-  { id: 'uefa.champions', name: 'Champions League' },
-  { id: 'uefa.europa', name: 'Europa League' },
+  { id: 'uefa.champions', name: 'UEFA Champions League' },
+  { id: 'uefa.europa', name: 'UEFA Europa League' },
+  { id: 'fifa.world', name: 'FIFA World Cup 2026' },
 ]
 
 async function fetchESPNMatches(): Promise<Match[]> {
   const allMatches: Match[] = []
   
-  // Get today's date boundaries for filtering
-  const MS_PER_DAY = 24 * 60 * 60 * 1000
+  // Get today's date in YYYYMMDD format for ESPN API
   const today = new Date()
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
-  const todayEnd = todayStart + MS_PER_DAY // End of today
+  const todayStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
   
   for (const league of ESPN_LEAGUES) {
     try {
+      // Use dates parameter to explicitly request today's matches
       const response = await fetch(
-        `https://site.api.espn.com/apis/site/v2/sports/soccer/${league.id}/scoreboard`,
+        `https://site.api.espn.com/apis/site/v2/sports/soccer/${league.id}/scoreboard?dates=${todayStr}`,
         {
           headers: {
             'Accept': 'application/json',
@@ -54,12 +56,6 @@ async function fetchESPNMatches(): Promise<Match[]> {
         const competition = event.competitions?.[0]
         if (!competition) continue
         
-        // Filter to only today's matches
-        const matchDate = new Date(event.date).getTime()
-        if (matchDate < todayStart || matchDate >= todayEnd) {
-          continue // Skip matches not from today
-        }
-        
         const homeTeam = competition.competitors?.find((c: any) => c.homeAway === 'home')
         const awayTeam = competition.competitors?.find((c: any) => c.homeAway === 'away')
         
@@ -74,6 +70,7 @@ async function fetchESPNMatches(): Promise<Match[]> {
         }
         
         allMatches.push({
+          id: String(event.id),
           home_team: homeTeam.team?.displayName || homeTeam.team?.name || '',
           away_team: awayTeam.team?.displayName || awayTeam.team?.name || '',
           home_score: status !== 'upcoming' ? parseInt(homeTeam.score || '0') : null,
@@ -81,6 +78,7 @@ async function fetchESPNMatches(): Promise<Match[]> {
           time: event.date || '',
           status,
           league: league.name,
+          leagueId: league.id,
           match_id: event.id,
           venue: competition.venue?.fullName,
         })
@@ -96,6 +94,20 @@ async function fetchESPNMatches(): Promise<Match[]> {
 async function fetchFotMobMatches(): Promise<Match[]> {
   const matches: Match[] = []
   const today = new Date().toISOString().split('T')[0].replace(/-/g, '')
+  
+  // Map FotMob league names to ESPN league IDs
+  const FOTMOB_LEAGUE_MAPPING: Record<string, string> = {
+    'Premier League': 'eng.1',
+    'La Liga': 'esp.1',
+    'Serie A': 'ita.1',
+    'Bundesliga': 'ger.1',
+    'Ligue 1': 'fra.1',
+    'MLS': 'usa.1',
+    'Champions League': 'uefa.champions',
+    'UEFA Champions League': 'uefa.champions',
+    'Europa League': 'uefa.europa',
+    'UEFA Europa League': 'uefa.europa',
+  }
   
   try {
     const response = await fetch(`https://www.fotmob.com/api/matches?date=${today}`, {
@@ -117,6 +129,7 @@ async function fetchFotMobMatches(): Promise<Match[]> {
     if (data.leagues && Array.isArray(data.leagues)) {
       for (const league of data.leagues) {
         const leagueName = league.name || 'Unknown'
+        const leagueId = FOTMOB_LEAGUE_MAPPING[leagueName] || ''
         
         for (const match of league.matches || []) {
           const isFinished = match.status?.finished === true
@@ -130,6 +143,7 @@ async function fetchFotMobMatches(): Promise<Match[]> {
           }
           
           matches.push({
+            id: String(match.id),
             home_team: match.home?.name || match.home?.shortName || '',
             away_team: match.away?.name || match.away?.shortName || '',
             home_score: match.home?.score ?? null,
@@ -137,6 +151,7 @@ async function fetchFotMobMatches(): Promise<Match[]> {
             time: match.status?.utcTime || '',
             status,
             league: leagueName,
+            leagueId: leagueId,
             match_id: match.id,
           })
         }

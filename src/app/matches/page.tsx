@@ -1,32 +1,22 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
+import MatchCalendar from '@/components/match/MatchCalendar';
+import { leagueFlagUrls } from '@/data/leagues';
 
-// League configuration with ESPN IDs
+// League configuration with ESPN IDs and flag codes
 const LEAGUES = [
-  { id: 'eng.1', name: 'Premier League', country: 'England', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
-  { id: 'esp.1', name: 'La Liga', country: 'Spain', flag: '🇪🇸' },
-  { id: 'ita.1', name: 'Serie A', country: 'Italy', flag: '🇮🇹' },
-  { id: 'ger.1', name: 'Bundesliga', country: 'Germany', flag: '🇩🇪' },
-  { id: 'fra.1', name: 'Ligue 1', country: 'France', flag: '🇫🇷' },
-  { id: 'usa.1', name: 'MLS', country: 'USA', flag: '🇺🇸' },
-  { id: 'uefa.champions', name: 'Champions League', country: 'Europe', flag: '🏆' },
-  { id: 'uefa.europa', name: 'Europa League', country: 'Europe', flag: '🏆' },
+  { id: 'eng.1', name: 'Premier League', country: 'England', flagCode: 'ENG' },
+  { id: 'esp.1', name: 'La Liga', country: 'Spain', flagCode: 'ES' },
+  { id: 'ita.1', name: 'Serie A', country: 'Italy', flagCode: 'IT' },
+  { id: 'ger.1', name: 'Bundesliga', country: 'Germany', flagCode: 'DE' },
+  { id: 'fra.1', name: 'Ligue 1', country: 'France', flagCode: 'FR' },
+  { id: 'usa.1', name: 'MLS', country: 'USA', flagCode: 'US' },
+  { id: 'uefa.champions', name: 'UEFA Champions League', country: 'Europe', flagCode: 'EU' },
+  { id: 'uefa.europa', name: 'UEFA Europa League', country: 'Europe', flagCode: 'EU' },
+  { id: 'fifa.world', name: 'FIFA World Cup 2026', country: 'USA/Mexico/Canada', flagCode: 'WORLD' },
 ];
-
-interface Match {
-  id: string;
-  home_team: string;
-  away_team: string;
-  home_score: number | null;
-  away_score: number | null;
-  time: string;
-  status: string;
-  minute?: number;
-  venue?: string;
-}
 
 interface Standing {
   position: number;
@@ -41,61 +31,43 @@ interface Standing {
   points: number;
 }
 
+interface GroupStanding {
+  groupName: string;
+  teams: Standing[];
+}
+
 export default function MatchesPage() {
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const [selectedLeague, setSelectedLeague] = useState<typeof LEAGUES[0] | null>(null);
-  const [matches, setMatches] = useState<Match[]>([]);
+  const leagueParam = searchParams.get('league');
+  
+  // Initialize selected league from URL if available
+  const initialLeague = leagueParam ? LEAGUES.find(l => l.id === leagueParam) : null;
+  const [selectedLeague, setSelectedLeague] = useState<typeof LEAGUES[0] | null>(initialLeague);
   const [standings, setStandings] = useState<Standing[]>([]);
-  const [loadingMatches, setLoadingMatches] = useState(false);
+  const [groupStandings, setGroupStandings] = useState<GroupStanding[]>([]);
   const [loadingStandings, setLoadingStandings] = useState(false);
   const [activeTab, setActiveTab] = useState<'fixtures' | 'standings'>('fixtures');
-  const [dateFilter, setDateFilter] = useState<'past' | 'today' | 'upcoming'>('today');
 
-  // Fetch matches when league is selected
+  // Check if the league uses groups (World Cup, Champions League, Europa League)
+  const isGroupStage = selectedLeague?.id === 'fifa.world' || 
+                       selectedLeague?.id === 'uefa.champions' || 
+                       selectedLeague?.id === 'uefa.europa';
+
+  // Update URL when league changes
+  const handleSelectLeague = (league: typeof LEAGUES[0]) => {
+    setSelectedLeague(league);
+    router.push(`/matches?league=${league.id}`);
+  };
+
+  const handleBackToLeagues = () => {
+    setSelectedLeague(null);
+    router.push('/matches');
+  };
+
+  // Fetch standings when league is selected
   useEffect(() => {
     if (!selectedLeague) return;
-
-    const fetchMatches = async () => {
-      setLoadingMatches(true);
-      try {
-        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${selectedLeague.id}/scoreboard`);
-        if (res.ok) {
-          const data = await res.json();
-          const matchList: Match[] = (data.events || []).map((event: any) => {
-            const competition = event.competitions?.[0];
-            const homeTeam = competition?.competitors?.find((c: any) => c.homeAway === 'home');
-            const awayTeam = competition?.competitors?.find((c: any) => c.homeAway === 'away');
-            const statusType = competition?.status?.type?.name || 'STATUS_SCHEDULED';
-            
-            let status = 'upcoming';
-            let minute: number | undefined;
-            if (statusType === 'STATUS_FINAL' || statusType === 'STATUS_FULL_TIME') {
-              status = 'completed';
-            } else if (statusType === 'STATUS_IN_PROGRESS' || statusType === 'STATUS_HALFTIME' || statusType.includes('HALF')) {
-              status = 'live';
-              minute = competition?.status?.displayClock ? parseInt(competition.status.displayClock) : undefined;
-            }
-
-            return {
-              id: event.id,
-              home_team: homeTeam?.team?.displayName || '',
-              away_team: awayTeam?.team?.displayName || '',
-              home_score: status !== 'upcoming' ? parseInt(homeTeam?.score || '0') : null,
-              away_score: status !== 'upcoming' ? parseInt(awayTeam?.score || '0') : null,
-              time: event.date || '',
-              status,
-              minute,
-              venue: competition?.venue?.fullName,
-            };
-          });
-          setMatches(matchList);
-        }
-      } catch (e) {
-        console.error('Error fetching matches:', e);
-      } finally {
-        setLoadingMatches(false);
-      }
-    };
 
     const fetchStandings = async () => {
       setLoadingStandings(true);
@@ -103,21 +75,52 @@ export default function MatchesPage() {
         const res = await fetch(`https://site.api.espn.com/apis/v2/sports/soccer/${selectedLeague.id}/standings`);
         if (res.ok) {
           const data = await res.json();
-          const entries = data.children?.[0]?.standings?.entries || [];
-          const standingsList: Standing[] = entries.map((entry: any) => ({
-            position: entry.stats?.find((s: any) => s.name === 'rank')?.value || 0,
-            team: entry.team?.displayName || '',
-            played: entry.stats?.find((s: any) => s.name === 'gamesPlayed')?.value || 0,
-            won: entry.stats?.find((s: any) => s.name === 'wins')?.value || 0,
-            drawn: entry.stats?.find((s: any) => s.name === 'ties')?.value || 0,
-            lost: entry.stats?.find((s: any) => s.name === 'losses')?.value || 0,
-            goalsFor: entry.stats?.find((s: any) => s.name === 'pointsFor')?.value || 0,
-            goalsAgainst: entry.stats?.find((s: any) => s.name === 'pointsAgainst')?.value || 0,
-            goalDifference: entry.stats?.find((s: any) => s.name === 'pointDifferential')?.value || 0,
-            points: entry.stats?.find((s: any) => s.name === 'points')?.value || 0,
-          }));
-          standingsList.sort((a, b) => a.position - b.position);
-          setStandings(standingsList);
+          
+          // Check if this is a group-based competition (World Cup, UCL, UEL)
+          const children = data.children || [];
+          
+          if (children.length > 1 || (children.length === 1 && children[0].name?.toLowerCase().includes('group'))) {
+            // Multiple groups - extract all of them
+            const groups: GroupStanding[] = [];
+            for (const child of children) {
+              const groupName = child.name || child.abbreviation || 'Group';
+              const entries = child.standings?.entries || [];
+              const teams: Standing[] = entries.map((entry: any, idx: number) => ({
+                position: entry.stats?.find((s: any) => s.name === 'rank')?.value || idx + 1,
+                team: entry.team?.displayName || '',
+                played: entry.stats?.find((s: any) => s.name === 'gamesPlayed')?.value || 0,
+                won: entry.stats?.find((s: any) => s.name === 'wins')?.value || 0,
+                drawn: entry.stats?.find((s: any) => s.name === 'ties')?.value || 0,
+                lost: entry.stats?.find((s: any) => s.name === 'losses')?.value || 0,
+                goalsFor: entry.stats?.find((s: any) => s.name === 'pointsFor')?.value || 0,
+                goalsAgainst: entry.stats?.find((s: any) => s.name === 'pointsAgainst')?.value || 0,
+                goalDifference: entry.stats?.find((s: any) => s.name === 'pointDifferential')?.value || 0,
+                points: entry.stats?.find((s: any) => s.name === 'points')?.value || 0,
+              }));
+              teams.sort((a, b) => a.position - b.position);
+              groups.push({ groupName, teams });
+            }
+            setGroupStandings(groups);
+            setStandings([]);
+          } else {
+            // Single table (regular league)
+            const entries = children[0]?.standings?.entries || [];
+            const standingsList: Standing[] = entries.map((entry: any) => ({
+              position: entry.stats?.find((s: any) => s.name === 'rank')?.value || 0,
+              team: entry.team?.displayName || '',
+              played: entry.stats?.find((s: any) => s.name === 'gamesPlayed')?.value || 0,
+              won: entry.stats?.find((s: any) => s.name === 'wins')?.value || 0,
+              drawn: entry.stats?.find((s: any) => s.name === 'ties')?.value || 0,
+              lost: entry.stats?.find((s: any) => s.name === 'losses')?.value || 0,
+              goalsFor: entry.stats?.find((s: any) => s.name === 'pointsFor')?.value || 0,
+              goalsAgainst: entry.stats?.find((s: any) => s.name === 'pointsAgainst')?.value || 0,
+              goalDifference: entry.stats?.find((s: any) => s.name === 'pointDifferential')?.value || 0,
+              points: entry.stats?.find((s: any) => s.name === 'points')?.value || 0,
+            }));
+            standingsList.sort((a, b) => a.position - b.position);
+            setStandings(standingsList);
+            setGroupStandings([]);
+          }
         }
       } catch (e) {
         console.error('Error fetching standings:', e);
@@ -126,27 +129,8 @@ export default function MatchesPage() {
       }
     };
 
-    fetchMatches();
     fetchStandings();
   }, [selectedLeague]);
-
-  const formatMatchTime = (timeStr: string): string => {
-    try {
-      const date = new Date(timeStr);
-      return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-    } catch {
-      return 'TBD';
-    }
-  };
-
-  const formatMatchDate = (timeStr: string): string => {
-    try {
-      const date = new Date(timeStr);
-      return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    } catch {
-      return '';
-    }
-  };
 
   // League selection view
   if (!selectedLeague) {
@@ -160,12 +144,20 @@ export default function MatchesPage() {
             {LEAGUES.map((league) => (
               <button
                 key={league.id}
-                onClick={() => setSelectedLeague(league)}
-                className="group flex items-center gap-4 p-5 rounded-2xl border transition-all text-left fm-card"
+                onClick={() => handleSelectLeague(league)}
+                className="group flex items-center gap-4 p-5 rounded-2xl border transition-all text-left fm-card hover:scale-[1.02] hover:shadow-lg"
               >
-                <span className="text-3xl">{league.flag}</span>
+                {leagueFlagUrls[league.flagCode] ? (
+                  <img 
+                    src={leagueFlagUrls[league.flagCode]} 
+                    alt={league.country}
+                    className="w-8 h-auto rounded shadow-sm"
+                  />
+                ) : (
+                  <span className="text-3xl">🏆</span>
+                )}
                 <div>
-                  <p className="text-lg font-semibold group-hover:text-indigo-300 transition-colors" style={{ color: 'var(--text-primary)' }}>
+                  <p className="text-lg font-semibold group-hover:text-indigo-400 transition-colors" style={{ color: 'var(--text-primary)' }}>
                     {league.name}
                   </p>
                   <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{league.country}</p>
@@ -188,7 +180,7 @@ export default function MatchesPage() {
       <div style={{ backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)' }}>
         <div className="max-w-6xl mx-auto px-4 py-6">
           <button
-            onClick={() => setSelectedLeague(null)}
+            onClick={handleBackToLeagues}
             className="flex items-center gap-2 hover:opacity-80 mb-4 transition-colors"
             style={{ color: 'var(--text-secondary)' }}
           >
@@ -199,7 +191,15 @@ export default function MatchesPage() {
           </button>
           
           <div className="flex items-center gap-4">
-            <span className="text-4xl">{selectedLeague.flag}</span>
+            {leagueFlagUrls[selectedLeague.flagCode] ? (
+              <img 
+                src={leagueFlagUrls[selectedLeague.flagCode]} 
+                alt={selectedLeague.country}
+                className="w-10 h-auto rounded shadow-sm"
+              />
+            ) : (
+              <span className="text-4xl">🏆</span>
+            )}
             <div>
               <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{selectedLeague.name}</h1>
               <p style={{ color: 'var(--text-secondary)' }}>{selectedLeague.country}</p>
@@ -236,83 +236,59 @@ export default function MatchesPage() {
 
       <div className="max-w-6xl mx-auto px-4 py-6">
         {activeTab === 'fixtures' ? (
-          <div>
-            {loadingMatches ? (
-              <div className="flex justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500" />
-              </div>
-            ) : matches.length > 0 ? (
-              <div className="space-y-3">
-                {matches.map((match) => (
-                  <Link
-                    key={match.id}
-                    href={`/matches/${match.id}?league=${selectedLeague.id}`}
-                    className={`block p-4 rounded-xl border transition-all ${
-                      match.status === 'live'
-                        ? 'bg-red-950/30 border-red-800/50 hover:border-red-600/50'
-                        : 'bg-slate-800/50 border-slate-700/50 hover:border-indigo-500/50'
-                    }`}
-                  >
-                    <div className="flex items-center">
-                      {/* Date/Time */}
-                      <div className="w-20 text-center flex-shrink-0">
-                        {match.status === 'live' ? (
-                          <div className="flex flex-col items-center">
-                            <span className="text-red-400 font-bold text-sm animate-pulse">LIVE</span>
-                            {match.minute && (
-                              <span className="text-red-400 text-xs">{match.minute}&apos;</span>
-                            )}
-                          </div>
-                        ) : match.status === 'completed' ? (
-                          <span className="text-slate-500 text-sm">FT</span>
-                        ) : (
-                          <div className="flex flex-col items-center">
-                            <span className="text-slate-500 text-xs">{formatMatchDate(match.time)}</span>
-                            <span className="text-indigo-400 font-medium text-sm">{formatMatchTime(match.time)}</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Teams & Score */}
-                      <div className="flex-1 flex items-center justify-center gap-4">
-                        <span className="flex-1 text-right text-white font-medium">{match.home_team}</span>
-                        <div className="w-16 text-center">
-                          {match.status === 'upcoming' ? (
-                            <span className="text-slate-500">vs</span>
-                          ) : (
-                            <span className={`font-bold text-lg ${match.status === 'live' ? 'text-white' : 'text-slate-300'}`}>
-                              {match.home_score} - {match.away_score}
-                            </span>
-                          )}
-                        </div>
-                        <span className="flex-1 text-left text-white font-medium">{match.away_team}</span>
-                      </div>
-                      
-                      {/* Arrow */}
-                      <div className="w-8 text-right">
-                        <svg className="w-5 h-5 text-slate-500 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
-                    </div>
-                    {match.venue && (
-                      <p className="text-center text-slate-500 text-xs mt-2">{match.venue}</p>
-                    )}
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-slate-400">
-                <span className="text-4xl mb-4 block">📅</span>
-                <p>No fixtures available for this league</p>
-              </div>
-            )}
-          </div>
+          <MatchCalendar leagueId={selectedLeague.id} leagueName={selectedLeague.name} />
         ) : (
           <div>
             {loadingStandings ? (
               <div className="flex justify-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500" />
+              </div>
+            ) : groupStandings.length > 0 ? (
+              // Group-based standings (World Cup, UCL, UEL)
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {groupStandings.map((group) => (
+                  <div key={group.groupName} className="bg-[var(--card-bg)] rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border-color)' }}>
+                    <div className="px-4 py-3 bg-[var(--muted-bg)] border-b" style={{ borderColor: 'var(--border-color)' }}>
+                      <h3 className="font-bold text-[var(--text-primary)]">{group.groupName}</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-[var(--text-tertiary)] border-b" style={{ borderColor: 'var(--border-color)' }}>
+                            <th className="text-left py-2 px-3">#</th>
+                            <th className="text-left py-2 px-3">Team</th>
+                            <th className="text-center py-2 px-1">P</th>
+                            <th className="text-center py-2 px-1">W</th>
+                            <th className="text-center py-2 px-1">D</th>
+                            <th className="text-center py-2 px-1">L</th>
+                            <th className="text-center py-2 px-1">GD</th>
+                            <th className="text-center py-2 px-2 font-bold">Pts</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {group.teams.map((team, idx) => (
+                            <tr
+                              key={team.team}
+                              className={`border-b transition-colors hover:bg-[var(--card-hover)] ${
+                                idx < 2 ? 'border-l-2 border-l-green-500' : ''
+                              }`}
+                              style={{ borderColor: 'var(--border-color)' }}
+                            >
+                              <td className="py-2 px-3 text-[var(--text-tertiary)]">{idx + 1}</td>
+                              <td className="py-2 px-3 text-[var(--text-primary)] font-medium truncate max-w-[120px]">{team.team}</td>
+                              <td className="py-2 px-1 text-center text-[var(--text-secondary)]">{team.played}</td>
+                              <td className="py-2 px-1 text-center text-[var(--text-secondary)]">{team.won}</td>
+                              <td className="py-2 px-1 text-center text-[var(--text-secondary)]">{team.drawn}</td>
+                              <td className="py-2 px-1 text-center text-[var(--text-secondary)]">{team.lost}</td>
+                              <td className="py-2 px-1 text-center text-[var(--text-secondary)]">{team.goalDifference > 0 ? '+' : ''}{team.goalDifference}</td>
+                              <td className="py-2 px-2 text-center text-[var(--text-primary)] font-bold">{team.points}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : standings.length > 0 ? (
               <div className="overflow-x-auto">

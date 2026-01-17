@@ -4,12 +4,14 @@ import { useState, useEffect } from 'react'
 
 interface NewsArticle {
   id: string
-  headline: string
+  title: string
   description: string
   published: string
-  images: { url: string; caption?: string }[]
-  links: { web: { href: string } }
-  categories?: { description: string }[]
+  image: string | null
+  imageCaption?: string | null
+  url: string
+  type: string
+  category?: string
 }
 
 export default function NewsPage() {
@@ -100,17 +102,17 @@ export default function NewsPage() {
         {articles.length > 0 && (
           <div className="mb-10">
             <a
-              href={articles[0].links?.web?.href || '#'}
+              href={articles[0].url || '#'}
               target="_blank"
               rel="noopener noreferrer"
               className="group block rounded-3xl overflow-hidden border transition-all hover:border-indigo-500/50 fm-card"
             >
               <div className="grid grid-cols-1 lg:grid-cols-2">
                 <div className="aspect-video lg:aspect-auto relative">
-                  {articles[0].images?.[0]?.url ? (
+                  {articles[0].image ? (
                     <img
-                      src={articles[0].images[0].url}
-                      alt={articles[0].headline}
+                      src={articles[0].image}
+                      alt={articles[0].title}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -126,7 +128,7 @@ export default function NewsPage() {
                 </div>
                 <div className="p-8 flex flex-col justify-center">
                   <h2 className="text-2xl font-bold mb-4 group-hover:text-indigo-400 transition-colors" style={{ color: 'var(--text-primary)' }}>
-                    {articles[0].headline}
+                    {articles[0].title}
                   </h2>
                   <p className="mb-4 line-clamp-3" style={{ color: 'var(--text-secondary)' }}>
                     {articles[0].description}
@@ -148,16 +150,16 @@ export default function NewsPage() {
           {articles.slice(1).map((article) => (
             <a
               key={article.id}
-              href={article.links?.web?.href || '#'}
+              href={article.url || '#'}
               target="_blank"
               rel="noopener noreferrer"
               className="group rounded-2xl overflow-hidden border transition-all hover:shadow-lg hover:shadow-indigo-500/10 fm-card"
             >
               <div className="aspect-video relative">
-                {article.images?.[0]?.url ? (
+                {article.image ? (
                   <img
-                    src={article.images[0].url}
-                    alt={article.headline}
+                    src={article.image}
+                    alt={article.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 ) : (
@@ -168,7 +170,7 @@ export default function NewsPage() {
               </div>
               <div className="p-5">
                 <h3 className="text-lg font-semibold mb-2 line-clamp-2 group-hover:text-indigo-400 transition-colors" style={{ color: 'var(--text-primary)' }}>
-                  {article.headline}
+                  {article.title}
                 </h3>
                 <p className="text-sm mb-3 line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
                   {article.description}
