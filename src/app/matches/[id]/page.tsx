@@ -586,6 +586,7 @@ export default function MatchDetailPage() {
                 matchId={matchId}
                 homeTeam={match.home_team}
                 awayTeam={match.away_team}
+                refereeName={match.referee}
               />
             </div>
 
