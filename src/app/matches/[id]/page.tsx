@@ -571,11 +571,41 @@ export default function MatchDetailPage() {
   if (!match) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--background)' }}>
-        <div className="text-center">
-          <p className="mb-4" style={{ color: 'var(--text-secondary)' }}>Match not found</p>
-          <Link href="/matches" className="text-indigo-400 hover:text-indigo-300">
-            ← Back to matches
-          </Link>
+        <div className="text-center max-w-md mx-auto px-4">
+          <span className="text-5xl mb-4 block">⚽</span>
+          <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Match Not Available</h2>
+          <p className="mb-4" style={{ color: 'var(--text-secondary)' }}>
+            We couldn&apos;t load details for this match. This might be because:
+          </p>
+          <ul className="text-left mb-6 space-y-2" style={{ color: 'var(--text-tertiary)' }}>
+            <li className="flex items-start gap-2">
+              <span>•</span>
+              <span>The match hasn&apos;t started yet and detailed data isn&apos;t available</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span>•</span>
+              <span>The match ID has changed or is from a different data source</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span>•</span>
+              <span>Our data providers are temporarily unavailable</span>
+            </li>
+          </ul>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link 
+              href="/matches" 
+              className="px-6 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors"
+            >
+              ← Browse Matches
+            </Link>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 rounded-xl border font-semibold transition-colors hover:bg-[var(--muted-bg)]"
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+            >
+              🔄 Try Again
+            </button>
+          </div>
         </div>
       </div>
     )

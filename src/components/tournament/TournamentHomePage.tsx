@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
-import KnockoutSimulator from '@/components/knockout/KnockoutSimulator'
+import { KnockoutSimulator, KnockoutBracket, type BracketRound, type KnockoutMatch as BracketMatch } from '@/components/knockout'
 
 interface TournamentHomePageProps {
   tournamentId: 'champions_league' | 'europa_league' | 'world_cup'
@@ -95,6 +95,13 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
   const config = TOURNAMENT_CONFIG[tournamentId]
   const [activeTab, setActiveTab] = useState<TabType>('Overview')
   const [loading, setLoading] = useState(true)
+  const [bracketRounds, setBracketRounds] = useState<BracketRound[]>([])
+  const [simulationProbabilities, setSimulationProbabilities] = useState<{
+    champion: { team: string; probability: number }[]
+    final: { team: string; probability: number }[]
+    semi_finals: { team: string; probability: number }[]
+    quarter_finals: { team: string; probability: number }[]
+  } | null>(null)
   const [data, setData] = useState<TournamentData>({
     groups: [],
     knockoutMatches: [],
@@ -181,6 +188,38 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
 
           newData.recentResults = newData.recentResults.slice(0, 10)
           newData.upcomingMatches = newData.upcomingMatches.slice(0, 10)
+          
+          // Build bracket rounds from knockout matches
+          const roundsMap: Record<string, BracketMatch[]> = {}
+          for (const match of newData.knockoutMatches) {
+            const round = match.round || 'Unknown'
+            if (!roundsMap[round]) {
+              roundsMap[round] = []
+            }
+            roundsMap[round].push({
+              id: match.id,
+              homeTeam: match.homeTeam,
+              awayTeam: match.awayTeam,
+              homeScore: match.homeScore,
+              awayScore: match.awayScore,
+              date: match.date,
+              time: match.time,
+              status: match.status as 'scheduled' | 'live' | 'finished',
+              round: round,
+              winner: match.homeScore !== undefined && match.awayScore !== undefined
+                ? match.homeScore > match.awayScore ? 'home' 
+                : match.awayScore > match.homeScore ? 'away' 
+                : null
+                : null,
+            })
+          }
+          
+          // Convert to bracket rounds array
+          const bracketData: BracketRound[] = Object.entries(roundsMap).map(([name, matches]) => ({
+            name,
+            matches,
+          }))
+          setBracketRounds(bracketData)
         }
 
         // Process news
@@ -205,6 +244,34 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
 
     fetchData()
   }, [config.leagueId])
+  
+  // Fetch simulation probabilities for the tournament
+  useEffect(() => {
+    const fetchSimulation = async () => {
+      try {
+        const endpoint = tournamentId === 'champions_league' 
+          ? '/api/v1/knockout/champions-league/simulate'
+          : tournamentId === 'europa_league'
+          ? '/api/v1/knockout/europa-league/simulate'
+          : '/api/v1/knockout/world-cup/simulate'
+        
+        const res = await fetch(`${endpoint}?n_simulations=5000`)
+        if (res.ok) {
+          const simData = await res.json()
+          setSimulationProbabilities({
+            champion: simData.winnerProbabilities || [],
+            final: simData.finalProbabilities || [],
+            semi_finals: simData.semiFinalProbabilities || [],
+            quarter_finals: simData.quarterFinalProbabilities || [],
+          })
+        }
+      } catch (error) {
+        console.error('Error fetching simulation:', error)
+      }
+    }
+    
+    fetchSimulation()
+  }, [tournamentId])
 
   const renderGroupsTable = (group: Group) => (
     <div key={group.name} className="bg-[var(--card-bg)] rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
@@ -472,6 +539,22 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
           >
             🎲 Simulate Tournament
           </button>
+        </div>
+      )}
+      
+      {/* Bracket Visualization with Probabilities */}
+      {simulationProbabilities && (
+        <div className="mt-8">
+          <KnockoutBracket
+            tournament={config.knockoutType}
+            rounds={bracketRounds}
+            simulationData={simulationProbabilities}
+            showProbabilities={true}
+            onMatchClick={(match) => {
+              // Navigate to match page
+              window.location.href = `/matches/${match.id}`
+            }}
+          />
         </div>
       )}
     </div>
