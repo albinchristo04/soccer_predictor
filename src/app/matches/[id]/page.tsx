@@ -82,274 +82,6 @@ interface MatchDetails {
   commentary?: { minute: number; text: string }[]
 }
 
-// Team History Section Component
-interface TeamHistoryData {
-  team: string
-  recentForm: string[]
-  recentMatches: {
-    date: string
-    opponent: string
-    homeAway: 'home' | 'away'
-    score: string
-    result: 'W' | 'D' | 'L'
-    competition: string
-  }[]
-  seasonStats: {
-    matches: number
-    wins: number
-    draws: number
-    losses: number
-    goalsFor: number
-    goalsAgainst: number
-    cleanSheets: number
-  }
-}
-
-function TeamHistorySection({ homeTeam, awayTeam, matchId }: { homeTeam: string; awayTeam: string; matchId: string }) {
-  const [homeHistory, setHomeHistory] = useState<TeamHistoryData | null>(null)
-  const [awayHistory, setAwayHistory] = useState<TeamHistoryData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [selectedTeam, setSelectedTeam] = useState<'home' | 'away'>('home')
-
-  useEffect(() => {
-    const fetchTeamHistory = async () => {
-      setLoading(true)
-      try {
-        // Try to fetch real team history data
-        const [homeRes, awayRes] = await Promise.allSettled([
-          fetch(`/api/v1/teams/${encodeURIComponent(homeTeam)}/history`),
-          fetch(`/api/v1/teams/${encodeURIComponent(awayTeam)}/history`)
-        ])
-
-        // Generate sample data if API doesn't return data
-        const generateTeamHistory = (team: string, isHome: boolean): TeamHistoryData => {
-          const forms = ['W', 'D', 'L']
-          const recentForm = Array.from({ length: 5 }, () => forms[Math.floor(Math.random() * 3)])
-          const opponents = isHome 
-            ? ['Newcastle', 'Brighton', 'Wolves', 'Bournemouth', 'Fulham']
-            : ['Everton', 'Crystal Palace', 'Brentford', 'West Ham', 'Aston Villa']
-          
-          const recentMatches = opponents.map((opponent, idx) => {
-            const result = recentForm[idx] as 'W' | 'D' | 'L'
-            const goalsFor = result === 'W' ? Math.floor(Math.random() * 3) + 1 : result === 'D' ? Math.floor(Math.random() * 2) + 1 : Math.floor(Math.random() * 2)
-            const goalsAgainst = result === 'L' ? Math.floor(Math.random() * 3) + 1 : result === 'D' ? goalsFor : Math.floor(Math.random() * goalsFor)
-            
-            const matchDate = new Date()
-            matchDate.setDate(matchDate.getDate() - (idx + 1) * 7)
-            
-            return {
-              date: matchDate.toISOString().split('T')[0],
-              opponent,
-              homeAway: idx % 2 === 0 ? 'home' as const : 'away' as const,
-              score: `${goalsFor} - ${goalsAgainst}`,
-              result,
-              competition: 'Premier League'
-            }
-          })
-          
-          const wins = recentForm.filter(r => r === 'W').length * 3
-          const draws = recentForm.filter(r => r === 'D').length * 2
-          const losses = recentForm.filter(r => r === 'L').length * 2
-          
-          return {
-            team,
-            recentForm,
-            recentMatches,
-            seasonStats: {
-              matches: 21,
-              wins: wins + Math.floor(Math.random() * 5),
-              draws: draws + Math.floor(Math.random() * 3),
-              losses: losses + Math.floor(Math.random() * 3),
-              goalsFor: 35 + Math.floor(Math.random() * 20),
-              goalsAgainst: 20 + Math.floor(Math.random() * 15),
-              cleanSheets: Math.floor(Math.random() * 10) + 3
-            }
-          }
-        }
-
-        // Process responses or generate data
-        let homeData: TeamHistoryData
-        let awayData: TeamHistoryData
-        
-        if (homeRes.status === 'fulfilled' && homeRes.value.ok) {
-          const data = await homeRes.value.json()
-          homeData = data.history || generateTeamHistory(homeTeam, true)
-        } else {
-          homeData = generateTeamHistory(homeTeam, true)
-        }
-        
-        if (awayRes.status === 'fulfilled' && awayRes.value.ok) {
-          const data = await awayRes.value.json()
-          awayData = data.history || generateTeamHistory(awayTeam, false)
-        } else {
-          awayData = generateTeamHistory(awayTeam, false)
-        }
-
-        setHomeHistory(homeData)
-        setAwayHistory(awayData)
-      } catch (error) {
-        console.error('Error fetching team history:', error)
-        // Generate fallback data
-        setHomeHistory({
-          team: homeTeam,
-          recentForm: ['W', 'W', 'D', 'W', 'L'],
-          recentMatches: [],
-          seasonStats: { matches: 21, wins: 14, draws: 4, losses: 3, goalsFor: 42, goalsAgainst: 18, cleanSheets: 8 }
-        })
-        setAwayHistory({
-          team: awayTeam,
-          recentForm: ['D', 'W', 'W', 'L', 'W'],
-          recentMatches: [],
-          seasonStats: { matches: 21, wins: 12, draws: 5, losses: 4, goalsFor: 35, goalsAgainst: 22, cleanSheets: 6 }
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchTeamHistory()
-  }, [homeTeam, awayTeam, matchId])
-
-  const getResultColor = (result: string) => {
-    switch (result) {
-      case 'W': return 'bg-green-500 text-white'
-      case 'D': return 'bg-gray-400 text-white'
-      case 'L': return 'bg-red-500 text-white'
-      default: return 'bg-gray-200 text-gray-600'
-    }
-  }
-
-  const currentHistory = selectedTeam === 'home' ? homeHistory : awayHistory
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent-primary)]"></div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Team Selector */}
-      <div className="flex gap-2 justify-center">
-        <button
-          onClick={() => setSelectedTeam('home')}
-          className={`px-6 py-3 rounded-xl font-medium transition-all ${
-            selectedTeam === 'home'
-              ? 'bg-[var(--accent-primary)] text-black'
-              : 'bg-[var(--card-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-color)]'
-          }`}
-        >
-          {homeTeam}
-        </button>
-        <button
-          onClick={() => setSelectedTeam('away')}
-          className={`px-6 py-3 rounded-xl font-medium transition-all ${
-            selectedTeam === 'away'
-              ? 'bg-[var(--accent-primary)] text-black'
-              : 'bg-[var(--card-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-color)]'
-          }`}
-        >
-          {awayTeam}
-        </button>
-      </div>
-
-      {currentHistory && (
-        <>
-          {/* Recent Form */}
-          <div className="bg-[var(--card-bg)] border rounded-2xl p-6" style={{ borderColor: 'var(--border-color)' }}>
-            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Recent Form (Last 5)</h3>
-            <div className="flex gap-2 justify-center">
-              {currentHistory.recentForm.map((result, idx) => (
-                <div
-                  key={idx}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${getResultColor(result)}`}
-                >
-                  {result}
-                </div>
-              ))}
-            </div>
-            <div className="text-center mt-4">
-              <p className="text-sm text-[var(--text-tertiary)]">
-                {currentHistory.recentForm.filter(r => r === 'W').length * 3 + currentHistory.recentForm.filter(r => r === 'D').length} points from last 5
-              </p>
-            </div>
-          </div>
-
-          {/* Season Stats */}
-          <div className="bg-[var(--card-bg)] border rounded-2xl p-6" style={{ borderColor: 'var(--border-color)' }}>
-            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Season Statistics</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-[var(--muted-bg)] rounded-xl">
-                <p className="text-2xl font-bold text-[var(--text-primary)]">{currentHistory.seasonStats.matches}</p>
-                <p className="text-xs text-[var(--text-tertiary)]">Played</p>
-              </div>
-              <div className="text-center p-4 bg-green-500/10 rounded-xl">
-                <p className="text-2xl font-bold text-green-500">{currentHistory.seasonStats.wins}</p>
-                <p className="text-xs text-[var(--text-tertiary)]">Wins</p>
-              </div>
-              <div className="text-center p-4 bg-gray-500/10 rounded-xl">
-                <p className="text-2xl font-bold text-gray-400">{currentHistory.seasonStats.draws}</p>
-                <p className="text-xs text-[var(--text-tertiary)]">Draws</p>
-              </div>
-              <div className="text-center p-4 bg-red-500/10 rounded-xl">
-                <p className="text-2xl font-bold text-red-500">{currentHistory.seasonStats.losses}</p>
-                <p className="text-xs text-[var(--text-tertiary)]">Losses</p>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-3 gap-4 mt-4">
-              <div className="text-center p-3 bg-[var(--muted-bg)] rounded-xl">
-                <p className="text-lg font-bold text-[var(--text-primary)]">{currentHistory.seasonStats.goalsFor}</p>
-                <p className="text-xs text-[var(--text-tertiary)]">Goals For</p>
-              </div>
-              <div className="text-center p-3 bg-[var(--muted-bg)] rounded-xl">
-                <p className="text-lg font-bold text-[var(--text-primary)]">{currentHistory.seasonStats.goalsAgainst}</p>
-                <p className="text-xs text-[var(--text-tertiary)]">Goals Against</p>
-              </div>
-              <div className="text-center p-3 bg-[var(--muted-bg)] rounded-xl">
-                <p className="text-lg font-bold text-[var(--text-primary)]">{currentHistory.seasonStats.cleanSheets}</p>
-                <p className="text-xs text-[var(--text-tertiary)]">Clean Sheets</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Recent Matches */}
-          {currentHistory.recentMatches.length > 0 && (
-            <div className="bg-[var(--card-bg)] border rounded-2xl overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
-              <div className="p-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
-                <h3 className="font-semibold text-[var(--text-primary)]">Recent Matches</h3>
-              </div>
-              <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
-                {currentHistory.recentMatches.map((match, idx) => (
-                  <div key={idx} className="p-4 flex items-center justify-between hover:bg-[var(--muted-bg)] transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${getResultColor(match.result)}`}>
-                        {match.result}
-                      </div>
-                      <div>
-                        <p className="font-medium text-[var(--text-primary)]">
-                          {match.homeAway === 'home' ? `vs ${match.opponent}` : `@ ${match.opponent}`}
-                        </p>
-                        <p className="text-xs text-[var(--text-tertiary)]">{match.competition}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-[var(--text-primary)]">{match.score}</p>
-                      <p className="text-xs text-[var(--text-tertiary)]">{match.date}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
-
 export default function MatchDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -359,7 +91,7 @@ export default function MatchDetailPage() {
   
   const [match, setMatch] = useState<MatchDetails | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'summary' | 'lineup' | 'stats' | 'h2h' | 'team_history'>('summary')
+  const [activeTab, setActiveTab] = useState<'summary' | 'lineup' | 'stats' | 'h2h'>('summary')
   const [halftimeCountdown, setHalftimeCountdown] = useState<string>('')
   const [retryCount, setRetryCount] = useState(0) // Used to trigger refetch
 
@@ -777,7 +509,7 @@ export default function MatchDetailPage() {
       <div className="bg-[var(--background-secondary)] border-b sticky top-16 z-10" style={{ borderColor: 'var(--border-color)' }}>
         <div className="max-w-4xl mx-auto px-4">
           <div className="flex gap-4 overflow-x-auto justify-center">
-            {['summary', 'lineup', 'stats', 'h2h', 'team_history'].map((tab) => (
+            {['summary', 'lineup', 'stats', 'h2h'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
@@ -787,7 +519,7 @@ export default function MatchDetailPage() {
                     : 'text-[var(--text-secondary)] border-transparent hover:text-[var(--text-primary)]'
                 }`}
               >
-                {tab === 'h2h' ? 'Head to Head' : tab === 'team_history' ? 'Team History' : tab}
+                {tab === 'h2h' ? 'H2H & Form' : tab}
               </button>
             ))}
           </div>
@@ -1403,16 +1135,6 @@ export default function MatchDetailPage() {
                   longestWinStreak: { team: match.home_team, count: 0 },
                 },
               } : undefined}
-            />
-          </div>
-        )}
-
-        {activeTab === 'team_history' && (
-          <div className="space-y-6">
-            <TeamHistorySection 
-              homeTeam={match.home_team}
-              awayTeam={match.away_team}
-              matchId={matchId}
             />
           </div>
         )}
