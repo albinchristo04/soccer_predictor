@@ -25,6 +25,14 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Error messages for authentication
+const AUTH_ERRORS = {
+  GOOGLE_NOT_CONFIGURED: 'Google authentication is not configured on the server. Please use email/password login or contact the administrator.',
+  SERVER_ERROR: 'Server error during Google authentication. Please try again later or use email/password login.',
+  NETWORK_ERROR: 'Unable to connect to authentication server. Please check your internet connection or try again later.',
+  DEFAULT: 'Google login failed',
+}
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -146,13 +154,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!response.ok) {
         // Handle common Google OAuth errors
         if (response.status === 404) {
-          throw new Error('Google authentication is not configured on the server. Please use email/password login or contact the administrator.');
+          throw new Error(AUTH_ERRORS.GOOGLE_NOT_CONFIGURED);
         }
         if (response.status === 500) {
-          throw new Error('Server error during Google authentication. Please try again later or use email/password login.');
+          throw new Error(AUTH_ERRORS.SERVER_ERROR);
         }
-        const error = await response.json().catch(() => ({ detail: 'Google login failed' }));
-        throw new Error(error.detail || 'Google login failed');
+        const error = await response.json().catch(() => ({ detail: AUTH_ERRORS.DEFAULT }));
+        throw new Error(error.detail || AUTH_ERRORS.DEFAULT);
       }
 
       const data = await response.json();
@@ -173,7 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       // Re-throw with better error message
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        throw new Error('Unable to connect to authentication server. Please check your internet connection or try again later.');
+        throw new Error(AUTH_ERRORS.NETWORK_ERROR);
       }
       throw error;
     }

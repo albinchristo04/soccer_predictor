@@ -500,6 +500,19 @@ const TEAM_TIERS = {
   STRONG: ['roma', 'lazio', 'sevilla', 'villarreal', 'newcastle', 'aston villa', 'brighton', 'west ham', 'leicester', 'benfica', 'porto'],
 }
 
+// Tier order for calculating tier difference
+const TIER_ORDER = ['elite', 'top', 'strong', 'average'] as const
+
+// Confidence calculation constants
+const CONFIDENCE_CONFIG = {
+  MIN_PROB_BASELINE: 0.25,    // Probability baseline (when all equal, 0.33 is threshold)
+  PROB_SCALE: 120,            // Multiplier to scale probability spread (0-60 range)
+  TIER_BONUS_PER_LEVEL: 8,    // Confidence bonus per tier difference level
+  BASE_CONFIDENCE: 35,        // Baseline confidence added to all predictions
+  MIN_CONFIDENCE: 55,         // Minimum confidence floor
+  MAX_CONFIDENCE: 92,         // Maximum confidence ceiling
+}
+
 function getTeamTier(teamName: string): 'elite' | 'top' | 'strong' | 'average' {
   const name = teamName.toLowerCase()
   if (TEAM_TIERS.ELITE.some(t => name.includes(t))) return 'elite'
@@ -560,14 +573,14 @@ function generatePrediction(homeTeam: string, awayTeam: string, _leagueId?: stri
   // Calculate confidence based on probability spread and tier difference
   // Higher confidence when there's a clear favorite
   const maxProb = Math.max(homeWin, draw, awayWin)
-  const tierDiff = Math.abs(['elite', 'top', 'strong', 'average'].indexOf(homeTier) - 
-                            ['elite', 'top', 'strong', 'average'].indexOf(awayTier))
+  const tierDiff = Math.abs(TIER_ORDER.indexOf(homeTier) - TIER_ORDER.indexOf(awayTier))
   
-  // Base confidence from probability spread (0-60), bonus from tier difference (0-25)
+  // Base confidence from probability spread, bonus from tier difference
   // Results in 60-85% confidence for clear matchups, 55-70% for even matchups
-  const baseConfidence = Math.round((maxProb - 0.25) * 120)  // 0-60 range
-  const tierBonus = tierDiff * 8  // 0-24 bonus for tier difference
-  const confidence = Math.min(92, Math.max(55, baseConfidence + tierBonus + 35))
+  const { MIN_PROB_BASELINE, PROB_SCALE, TIER_BONUS_PER_LEVEL, BASE_CONFIDENCE, MIN_CONFIDENCE, MAX_CONFIDENCE } = CONFIDENCE_CONFIG
+  const baseConfidence = Math.round((maxProb - MIN_PROB_BASELINE) * PROB_SCALE)
+  const tierBonus = tierDiff * TIER_BONUS_PER_LEVEL
+  const confidence = Math.min(MAX_CONFIDENCE, Math.max(MIN_CONFIDENCE, baseConfidence + tierBonus + BASE_CONFIDENCE))
   
   return {
     home_win: Math.round(homeWin * 100) / 100,
