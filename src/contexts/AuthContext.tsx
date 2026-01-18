@@ -134,33 +134,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const loginWithGoogle = async (googleToken: string) => {
-    const response = await fetch(`${API_BASE}/api/v1/auth/google`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ token: googleToken }),
-    });
+    try {
+      const response = await fetch(`${API_BASE}/api/v1/auth/google`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token: googleToken }),
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Google login failed');
-    }
+      if (!response.ok) {
+        // Handle common Google OAuth errors
+        if (response.status === 404) {
+          throw new Error('Google authentication is not configured on the server. Please use email/password login or contact the administrator.');
+        }
+        if (response.status === 500) {
+          throw new Error('Server error during Google authentication. Please try again later or use email/password login.');
+        }
+        const error = await response.json().catch(() => ({ detail: 'Google login failed' }));
+        throw new Error(error.detail || 'Google login failed');
+      }
 
-    const data = await response.json();
-    localStorage.setItem('access_token', data.access_token);
-    localStorage.setItem('refresh_token', data.refresh_token);
+      const data = await response.json();
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
 
-    // Fetch user profile
-    const userResponse = await fetch(`${API_BASE}/api/v1/auth/me`, {
-      headers: {
-        'Authorization': `Bearer ${data.access_token}`,
-      },
-    });
+      // Fetch user profile
+      const userResponse = await fetch(`${API_BASE}/api/v1/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${data.access_token}`,
+        },
+      });
 
-    if (userResponse.ok) {
-      const userData = await userResponse.json();
-      setUser(userData);
+      if (userResponse.ok) {
+        const userData = await userResponse.json();
+        setUser(userData);
+      }
+    } catch (error) {
+      // Re-throw with better error message
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error('Unable to connect to authentication server. Please check your internet connection or try again later.');
+      }
+      throw error;
     }
   };
 

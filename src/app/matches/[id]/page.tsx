@@ -5,7 +5,6 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import FormationDisplay, { PitchBackground, SubstitutesBench } from '@/components/lineup/FormationDisplay'
 import MatchWeather from '@/components/weather/MatchWeather'
-import RefereeInfo from '@/components/referee/RefereeInfo'
 import { HeadToHeadDisplay } from '@/components/match'
 
 interface MatchEvent {
@@ -574,21 +573,13 @@ export default function MatchDetailPage() {
               </div>
             </div>
 
-            {/* Weather & Referee Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <MatchWeather 
-                matchId={matchId}
-                venue={match.venue}
-                homeTeam={match.home_team}
-                awayTeam={match.away_team}
-              />
-              <RefereeInfo
-                matchId={matchId}
-                homeTeam={match.home_team}
-                awayTeam={match.away_team}
-                refereeName={match.referee}
-              />
-            </div>
+            {/* Weather - spans full width */}
+            <MatchWeather 
+              matchId={matchId}
+              venue={match.venue}
+              homeTeam={match.home_team}
+              awayTeam={match.away_team}
+            />
 
             {/* Event Summary Card */}
             {match.events.length > 0 && (

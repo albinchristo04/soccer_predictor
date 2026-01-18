@@ -490,34 +490,62 @@ const XG_COEFFICIENTS = {
   AWAY_LOSE_XG: 0.7 // Away team expected goals when losing
 }
 
-// Generate prediction using a simple ELO-based model
+// Team strength tiers for more accurate predictions
+const TEAM_TIERS = {
+  // Tier 1: Elite teams (historically top performers)
+  ELITE: ['manchester city', 'real madrid', 'bayern munich', 'bayern', 'liverpool', 'barcelona'],
+  // Tier 2: Top contenders
+  TOP: ['arsenal', 'chelsea', 'psg', 'inter', 'milan', 'juventus', 'atletico', 'dortmund', 'napoli', 'man united', 'tottenham'],
+  // Tier 3: Strong teams (typically Europa League level)
+  STRONG: ['roma', 'lazio', 'sevilla', 'villarreal', 'newcastle', 'aston villa', 'brighton', 'west ham', 'leicester', 'benfica', 'porto'],
+}
+
+function getTeamTier(teamName: string): 'elite' | 'top' | 'strong' | 'average' {
+  const name = teamName.toLowerCase()
+  if (TEAM_TIERS.ELITE.some(t => name.includes(t))) return 'elite'
+  if (TEAM_TIERS.TOP.some(t => name.includes(t))) return 'top'
+  if (TEAM_TIERS.STRONG.some(t => name.includes(t))) return 'strong'
+  return 'average'
+}
+
+// Generate prediction using an enhanced ELO-based model with higher confidence
 function generatePrediction(homeTeam: string, awayTeam: string, _leagueId?: string): PredictionData {
-  // Simple ELO-based prediction model
-  // In production, this would call a proper ML backend
+  // Enhanced ELO-based prediction model
+  // Uses team tiers and home advantage for more accurate predictions
   
-  // Base probabilities with home advantage (sum = 1.0)
-  let homeWin = 0.42
-  let draw = 0.28
-  let awayWin = 0.30
+  const homeTier = getTeamTier(homeTeam)
+  const awayTier = getTeamTier(awayTeam)
   
-  // Adjust based on team name patterns (simple heuristic)
-  const topTeams = ['manchester city', 'real madrid', 'bayern', 'liverpool', 'barcelona', 'arsenal', 'chelsea', 'psg', 'inter', 'milan']
-  const homeIsTop = topTeams.some(t => homeTeam.toLowerCase().includes(t))
-  const awayIsTop = topTeams.some(t => awayTeam.toLowerCase().includes(t))
-  
-  if (homeIsTop && !awayIsTop) {
-    homeWin = 0.55
-    draw = 0.25
-    awayWin = 0.20
-  } else if (awayIsTop && !homeIsTop) {
-    homeWin = 0.25
-    draw = 0.30
-    awayWin = 0.45
-  } else if (homeIsTop && awayIsTop) {
-    homeWin = 0.38
-    draw = 0.32
-    awayWin = 0.30
+  // Base probabilities by tier matchup (includes home advantage ~8-10%)
+  // Probability matrix: [homeWin, draw, awayWin]
+  const TIER_PROBS: Record<string, Record<string, [number, number, number]>> = {
+    'elite': {
+      'elite': [0.42, 0.30, 0.28],
+      'top': [0.58, 0.24, 0.18],
+      'strong': [0.68, 0.20, 0.12],
+      'average': [0.75, 0.16, 0.09],
+    },
+    'top': {
+      'elite': [0.22, 0.28, 0.50],
+      'top': [0.45, 0.28, 0.27],
+      'strong': [0.55, 0.25, 0.20],
+      'average': [0.65, 0.22, 0.13],
+    },
+    'strong': {
+      'elite': [0.14, 0.22, 0.64],
+      'top': [0.28, 0.27, 0.45],
+      'strong': [0.44, 0.30, 0.26],
+      'average': [0.55, 0.26, 0.19],
+    },
+    'average': {
+      'elite': [0.10, 0.18, 0.72],
+      'top': [0.20, 0.25, 0.55],
+      'strong': [0.28, 0.28, 0.44],
+      'average': [0.44, 0.30, 0.26],
+    },
   }
+  
+  let [homeWin, draw, awayWin] = TIER_PROBS[homeTier][awayTier]
   
   // Normalize probabilities to ensure they sum to 1.0
   const total = homeWin + draw + awayWin
@@ -529,11 +557,17 @@ function generatePrediction(homeTeam: string, awayTeam: string, _leagueId?: stri
   const homeXG = homeWin * XG_COEFFICIENTS.WIN_XG + draw * XG_COEFFICIENTS.DRAW_XG + awayWin * XG_COEFFICIENTS.LOSE_XG
   const awayXG = awayWin * XG_COEFFICIENTS.AWAY_WIN_XG + draw * XG_COEFFICIENTS.AWAY_DRAW_XG + homeWin * XG_COEFFICIENTS.AWAY_LOSE_XG
   
-  // Calculate confidence: ranges from 0 (all equal at 33%) to ~44 for 55% certainty
-  // Formula: (max_prob - baseline) * scale, where baseline=0.33 (equal odds), scale=200
-  // Clamped to 0-100 range
+  // Calculate confidence based on probability spread and tier difference
+  // Higher confidence when there's a clear favorite
   const maxProb = Math.max(homeWin, draw, awayWin)
-  const confidence = Math.min(100, Math.max(0, Math.round((maxProb - 0.33) * 200)))
+  const tierDiff = Math.abs(['elite', 'top', 'strong', 'average'].indexOf(homeTier) - 
+                            ['elite', 'top', 'strong', 'average'].indexOf(awayTier))
+  
+  // Base confidence from probability spread (0-60), bonus from tier difference (0-25)
+  // Results in 60-85% confidence for clear matchups, 55-70% for even matchups
+  const baseConfidence = Math.round((maxProb - 0.25) * 120)  // 0-60 range
+  const tierBonus = tierDiff * 8  // 0-24 bonus for tier difference
+  const confidence = Math.min(92, Math.max(55, baseConfidence + tierBonus + 35))
   
   return {
     home_win: Math.round(homeWin * 100) / 100,
