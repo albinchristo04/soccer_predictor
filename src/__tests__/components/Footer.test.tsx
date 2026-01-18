@@ -9,7 +9,7 @@ describe('Footer', () => {
 
   it('renders all navigation links', () => {
     render(<Footer />)
-    expect(screen.getByText('Matches')).toBeInTheDocument()
+    expect(screen.getByText('Leagues')).toBeInTheDocument()
     expect(screen.getByText('Predict')).toBeInTheDocument()
     expect(screen.getByText('Analytics')).toBeInTheDocument()
     expect(screen.getByText('About')).toBeInTheDocument()

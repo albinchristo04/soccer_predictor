@@ -250,15 +250,22 @@ Once deployed, the app can be installed as a Progressive Web App:
 
 ## 🔧 Configuration
 
-Environment variables (create `.env` file):
+Environment variables (create `.env.local` file for frontend):
+
+```env
+# Frontend API URL
+NEXT_PUBLIC_API_URL=http://localhost:8000
+
+# Google OAuth (required for Google Sign-In)
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id-here
+```
+
+Backend environment variables (create `.env` file):
 
 ```env
 # API Settings
 FOTMOB_RATE_LIMIT=60
 FOTMOB_CACHE_TTL=300
-
-# Frontend
-NEXT_PUBLIC_API_URL=http://localhost:8000
 
 # Authentication
 JWT_SECRET_KEY=your-secret-key-here
@@ -267,6 +274,23 @@ GOOGLE_CLIENT_ID=your-google-client-id
 # Database (optional, for production)
 DATABASE_URL=postgresql://...
 ```
+
+### Setting up Google OAuth
+
+To enable Google Sign-In:
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Navigate to "APIs & Services" > "Credentials"
+4. Click "Create Credentials" > "OAuth 2.0 Client ID"
+5. Select "Web application" as the application type
+6. Add your authorized JavaScript origins:
+   - `http://localhost:3000` (development)
+   - `https://your-domain.com` (production)
+7. Add authorized redirect URIs if needed
+8. Copy the Client ID and set it as `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
+
+**Note:** If `NEXT_PUBLIC_GOOGLE_CLIENT_ID` is not set, the app will show an email/password login form instead. Google Sign-In will display an error message asking users to contact the administrator.
 
 ---
 

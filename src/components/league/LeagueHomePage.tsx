@@ -292,42 +292,87 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--background)' }}>
-      {/* Hero Header */}
+      {/* Hero Header - FotMob Style */}
       <div className={`bg-gradient-to-r ${config.gradient} py-8 px-4`}>
         <div className="max-w-6xl mx-auto">
+          {/* Back Button */}
+          <Link
+            href="/matches"
+            className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-4 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Leagues
+          </Link>
+          
           <div className="flex items-center gap-4 mb-4">
             <span className="text-4xl">{config.flag}</span>
             <div>
               <h1 className="text-3xl font-bold text-white">{leagueName}</h1>
-              <p className="text-white/80">{data?.season} Season</p>
+              <p className="text-white/80">{data?.season} Season • {country}</p>
             </div>
           </div>
 
-          {/* Quick Stats */}
-          {data?.simulation && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                <p className="text-white/70 text-sm">Title Favorite</p>
-                <p className="text-white font-bold text-lg">{data.simulation.mostLikelyChampion}</p>
-                <p className="text-white/80 text-sm">{(data.simulation.championProbability * 100).toFixed(1)}% chance</p>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                <p className="text-white/70 text-sm">Current Leader</p>
-                <p className="text-white font-bold text-lg">{data?.standings[0]?.teamName || 'TBD'}</p>
-                <p className="text-white/80 text-sm">{data?.standings[0]?.points || 0} points</p>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                <p className="text-white/70 text-sm">Top Scorer</p>
-                <p className="text-white font-bold text-lg">{data?.topScorers[0]?.name || 'TBD'}</p>
-                <p className="text-white/80 text-sm">{data?.topScorers[0]?.goals || 0} goals</p>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                <p className="text-white/70 text-sm">Matches Played</p>
-                <p className="text-white font-bold text-lg">{data?.standings[0]?.played || 0}</p>
-                <p className="text-white/80 text-sm">matchweeks</p>
-              </div>
+          {/* Quick Stats - Always show based on available data */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+            {/* Current Leader */}
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+              <p className="text-white/70 text-sm">Current Leader</p>
+              <p className="text-white font-bold text-lg">{data?.standings[0]?.teamName || 'TBD'}</p>
+              <p className="text-white/80 text-sm">{data?.standings[0]?.points || 0} points</p>
             </div>
-          )}
+            
+            {/* Top Scorer or point diff leader */}
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+              <p className="text-white/70 text-sm">{data?.topScorers[0] ? 'Top Scorer' : 'Best GD'}</p>
+              {data?.topScorers[0] ? (
+                <>
+                  <p className="text-white font-bold text-lg truncate">{data.topScorers[0].name}</p>
+                  <p className="text-white/80 text-sm">{data.topScorers[0].goals} goals</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-white font-bold text-lg">{data?.standings[0]?.teamName || 'TBD'}</p>
+                  <p className="text-white/80 text-sm">
+                    {data?.standings[0]?.goalDiff > 0 ? '+' : ''}{data?.standings[0]?.goalDiff || 0} GD
+                  </p>
+                </>
+              )}
+            </div>
+            
+            {/* Matches Played */}
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+              <p className="text-white/70 text-sm">Matchweek</p>
+              <p className="text-white font-bold text-lg">{data?.standings[0]?.played || 0}</p>
+              <p className="text-white/80 text-sm">matches played</p>
+            </div>
+            
+            {/* Upcoming Matches */}
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+              <p className="text-white/70 text-sm">Coming Up</p>
+              <p className="text-white font-bold text-lg">{data?.upcomingMatches?.length || 0}</p>
+              <p className="text-white/80 text-sm">fixtures scheduled</p>
+            </div>
+            
+            {/* Show prediction if available */}
+            {data?.simulation && (
+              <div className="bg-amber-500/20 backdrop-blur-sm rounded-xl p-4 col-span-2 md:col-span-4 border border-amber-500/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-amber-300 text-sm font-medium">🏆 AI Prediction</p>
+                    <p className="text-white font-bold text-lg">{data.simulation.mostLikelyChampion} to win the title</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-amber-400">
+                      {(data.simulation.championProbability * 100).toFixed(0)}%
+                    </p>
+                    <p className="text-white/60 text-xs">probability</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
-import KnockoutSimulator from '@/components/knockout/KnockoutSimulator'
+import { KnockoutSimulator, KnockoutBracket, type BracketRound, type KnockoutMatch as BracketMatch } from '@/components/knockout'
 
 interface TournamentHomePageProps {
   tournamentId: 'champions_league' | 'europa_league' | 'world_cup'
@@ -93,8 +94,16 @@ type TabType = typeof TABS[number]
 
 export default function TournamentHomePage({ tournamentId, tournamentName }: TournamentHomePageProps) {
   const config = TOURNAMENT_CONFIG[tournamentId]
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>('Overview')
   const [loading, setLoading] = useState(true)
+  const [bracketRounds, setBracketRounds] = useState<BracketRound[]>([])
+  const [simulationProbabilities, setSimulationProbabilities] = useState<{
+    champion: { team: string; probability: number }[]
+    final: { team: string; probability: number }[]
+    semi_finals: { team: string; probability: number }[]
+    quarter_finals: { team: string; probability: number }[]
+  } | null>(null)
   const [data, setData] = useState<TournamentData>({
     groups: [],
     knockoutMatches: [],
@@ -181,6 +190,38 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
 
           newData.recentResults = newData.recentResults.slice(0, 10)
           newData.upcomingMatches = newData.upcomingMatches.slice(0, 10)
+          
+          // Build bracket rounds from knockout matches
+          const roundsMap: Record<string, BracketMatch[]> = {}
+          for (const match of newData.knockoutMatches) {
+            const round = match.round || 'Unknown'
+            if (!roundsMap[round]) {
+              roundsMap[round] = []
+            }
+            roundsMap[round].push({
+              id: match.id,
+              homeTeam: match.homeTeam,
+              awayTeam: match.awayTeam,
+              homeScore: match.homeScore,
+              awayScore: match.awayScore,
+              date: match.date,
+              time: match.time,
+              status: match.status as 'scheduled' | 'live' | 'finished',
+              round: round,
+              winner: match.homeScore !== undefined && match.awayScore !== undefined
+                ? match.homeScore > match.awayScore ? 'home' 
+                : match.awayScore > match.homeScore ? 'away' 
+                : null
+                : null,
+            })
+          }
+          
+          // Convert to bracket rounds array
+          const bracketData: BracketRound[] = Object.entries(roundsMap).map(([name, matches]) => ({
+            name,
+            matches,
+          }))
+          setBracketRounds(bracketData)
         }
 
         // Process news
@@ -205,6 +246,34 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
 
     fetchData()
   }, [config.leagueId])
+  
+  // Fetch simulation probabilities for the tournament
+  useEffect(() => {
+    const fetchSimulation = async () => {
+      try {
+        const endpoint = tournamentId === 'champions_league' 
+          ? '/api/v1/knockout/champions-league/simulate'
+          : tournamentId === 'europa_league'
+          ? '/api/v1/knockout/europa-league/simulate'
+          : '/api/v1/knockout/world-cup/simulate'
+        
+        const res = await fetch(`${endpoint}?n_simulations=5000`)
+        if (res.ok) {
+          const simData = await res.json()
+          setSimulationProbabilities({
+            champion: simData.winnerProbabilities || [],
+            final: simData.finalProbabilities || [],
+            semi_finals: simData.semiFinalProbabilities || [],
+            quarter_finals: simData.quarterFinalProbabilities || [],
+          })
+        }
+      } catch (error) {
+        console.error('Error fetching simulation:', error)
+      }
+    }
+    
+    fetchSimulation()
+  }, [tournamentId])
 
   const renderGroupsTable = (group: Group) => (
     <div key={group.name} className="bg-[var(--card-bg)] rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
@@ -413,65 +482,70 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
   )
 
   const renderKnockoutBracket = () => (
-    <div className="bg-[var(--card-bg)] rounded-xl border p-6" style={{ borderColor: 'var(--border-color)' }}>
-      <h2 className="text-xl font-bold text-[var(--text-primary)] mb-6">Knockout Stage</h2>
+    <div className="space-y-6">
+      {/* Main Bracket Visualization - Always show */}
+      <KnockoutBracket
+        tournament={config.knockoutType}
+        rounds={bracketRounds}
+        simulationData={simulationProbabilities || undefined}
+        showProbabilities={!!simulationProbabilities}
+        onMatchClick={(match) => {
+          // Navigate to match page using Next.js router for client-side navigation
+          router.push(`/matches/${match.id}`)
+        }}
+      />
       
-      {data.knockoutMatches.length > 0 ? (
-        <div className="space-y-8">
-          {/* Group knockout matches by round */}
-          {['Final', 'Semi-Final', 'Quarter-Final', 'Round of 16'].map(round => {
-            const roundMatches = data.knockoutMatches.filter(m => 
-              m.round?.toLowerCase().includes(round.toLowerCase())
-            )
-            if (roundMatches.length === 0) return null
+      {/* Detailed Match List */}
+      {data.knockoutMatches.length > 0 && (
+        <div className="bg-[var(--card-bg)] rounded-xl border p-6" style={{ borderColor: 'var(--border-color)' }}>
+          <h2 className="text-xl font-bold text-[var(--text-primary)] mb-6">Knockout Matches</h2>
+          
+          <div className="space-y-8">
+            {/* Group knockout matches by round */}
+            {['Final', 'Semi-Final', 'Quarter-Final', 'Round of 16'].map(round => {
+              const roundMatches = data.knockoutMatches.filter(m => 
+                m.round?.toLowerCase().includes(round.toLowerCase())
+              )
+              if (roundMatches.length === 0) return null
 
-            return (
-              <div key={round}>
-                <h3 className={`text-lg font-semibold text-[var(--text-primary)] mb-4 pb-2 border-b`} style={{ borderColor: 'var(--border-color)' }}>
-                  {round}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {roundMatches.map(match => (
-                    <Link
-                      key={match.id}
-                      href={`/matches/${match.id}`}
-                      className="p-4 rounded-xl bg-[var(--muted-bg)] hover:bg-[var(--muted-bg-hover)] transition-colors"
-                    >
-                      <div className="flex justify-between items-center">
-                        <div className="flex-1">
-                          <div className={`flex items-center gap-2 ${match.homeScore !== undefined && match.homeScore > (match.awayScore || 0) ? 'font-bold' : ''}`}>
-                            <span className="text-[var(--text-primary)]">{match.homeTeam}</span>
-                            {match.homeScore !== undefined && (
-                              <span className="font-bold text-[var(--text-primary)]">{match.homeScore}</span>
-                            )}
+              return (
+                <div key={round}>
+                  <h3 className={`text-lg font-semibold text-[var(--text-primary)] mb-4 pb-2 border-b`} style={{ borderColor: 'var(--border-color)' }}>
+                    {round}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {roundMatches.map(match => (
+                      <Link
+                        key={match.id}
+                        href={`/matches/${match.id}`}
+                        className="p-4 rounded-xl bg-[var(--muted-bg)] hover:bg-[var(--muted-bg-hover)] transition-colors"
+                      >
+                        <div className="flex justify-between items-center">
+                          <div className="flex-1">
+                            <div className={`flex items-center gap-2 ${match.homeScore !== undefined && match.homeScore > (match.awayScore || 0) ? 'font-bold' : ''}`}>
+                              <span className="text-[var(--text-primary)]">{match.homeTeam}</span>
+                              {match.homeScore !== undefined && (
+                                <span className="font-bold text-[var(--text-primary)]">{match.homeScore}</span>
+                              )}
+                            </div>
+                            <div className={`flex items-center gap-2 ${match.awayScore !== undefined && match.awayScore > (match.homeScore || 0) ? 'font-bold' : ''}`}>
+                              <span className="text-[var(--text-primary)]">{match.awayTeam}</span>
+                              {match.awayScore !== undefined && (
+                                <span className="font-bold text-[var(--text-primary)]">{match.awayScore}</span>
+                              )}
+                            </div>
                           </div>
-                          <div className={`flex items-center gap-2 ${match.awayScore !== undefined && match.awayScore > (match.homeScore || 0) ? 'font-bold' : ''}`}>
-                            <span className="text-[var(--text-primary)]">{match.awayTeam}</span>
-                            {match.awayScore !== undefined && (
-                              <span className="font-bold text-[var(--text-primary)]">{match.awayScore}</span>
-                            )}
+                          <div className="text-right text-sm text-[var(--text-tertiary)]">
+                            {match.date}
                           </div>
                         </div>
-                        <div className="text-right text-sm text-[var(--text-tertiary)]">
-                          {match.date}
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
+                      </Link>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <p className="text-[var(--text-tertiary)] mb-4">Knockout stage matches will appear here once available</p>
-          <button
-            onClick={() => setActiveTab('Simulator')}
-            className={`px-6 py-3 rounded-xl bg-gradient-to-r ${config.gradient} text-white font-semibold hover:opacity-90 transition-opacity`}
-          >
-            🎲 Simulate Tournament
-          </button>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -479,6 +553,17 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
+      {/* Back Button */}
+      <Link
+        href="/matches"
+        className="inline-flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] mb-4 transition-colors"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Back to Leagues
+      </Link>
+      
       {/* Header */}
       <div className={`bg-gradient-to-r ${config.gradient} rounded-2xl p-8 mb-6`}>
         <div className="flex items-center gap-4">

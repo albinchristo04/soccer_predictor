@@ -5,7 +5,6 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import FormationDisplay, { PitchBackground, SubstitutesBench } from '@/components/lineup/FormationDisplay'
 import MatchWeather from '@/components/weather/MatchWeather'
-import RefereeInfo from '@/components/referee/RefereeInfo'
 import { HeadToHeadDisplay } from '@/components/match'
 
 interface MatchEvent {
@@ -72,12 +71,15 @@ interface MatchDetails {
   awayStanding?: TeamStanding
   fullStandings?: TeamStanding[]
   nextResumeTime?: Date
+  prediction?: {
+    home_win: number
+    draw: number
+    away_win: number
+    predicted_score: { home: number; away: number }
+    confidence: number
+  }
+  commentary?: { minute: number; text: string }[]
 }
-
-// Map league IDs for ESPN API
-const LEAGUE_ENDPOINTS = [
-  'eng.1', 'esp.1', 'ita.1', 'ger.1', 'fra.1', 'usa.1', 'uefa.champions', 'uefa.europa', 'fifa.world'
-]
 
 export default function MatchDetailPage() {
   const params = useParams()
@@ -90,6 +92,7 @@ export default function MatchDetailPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'summary' | 'lineup' | 'stats' | 'h2h'>('summary')
   const [halftimeCountdown, setHalftimeCountdown] = useState<string>('')
+  const [retryCount, setRetryCount] = useState(0) // Used to trigger refetch
 
   // Derived state for live status - compute before hooks that depend on it
   const isLive = match?.status?.includes('IN_PROGRESS') || match?.status?.includes('HALF') || match?.status?.includes('LIVE') || false
@@ -127,413 +130,122 @@ export default function MatchDetailPage() {
   useEffect(() => {
     const fetchMatchDetails = async () => {
       try {
-        // Try fetching from different league endpoints until we find the match
-        let matchData = null
-        let dataSource: 'espn' | 'fotmob' = 'espn'
+        // Use our server-side API proxy to fetch match details
+        // This avoids CORS issues and handles fallbacks between ESPN and FotMob
+        const url = `/api/match/${matchId}${leagueId ? `?league=${leagueId}` : ''}`
+        const res = await fetch(url)
         
-        // If league ID is provided, try that first
-        if (leagueId) {
-          const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueId}/summary?event=${matchId}`)
-          if (res.ok) {
-            matchData = await res.json()
-          }
+        if (!res.ok) {
+          console.error('Match not found:', res.status)
+          setMatch(null)
+          setLoading(false)
+          return
         }
         
-        // If no data yet, try each league endpoint
-        if (!matchData || !matchData.header) {
-          for (const league of LEAGUE_ENDPOINTS) {
-            try {
-              const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/summary?event=${matchId}`)
-              if (res.ok) {
-                const data = await res.json()
-                if (data.header?.competitions?.[0]) {
-                  matchData = data
-                  break
-                }
-              }
-            } catch {
-              continue
-            }
-          }
+        const data = await res.json()
+        
+        // Map the API response to MatchDetails format
+        const matchDetails: MatchDetails = {
+          id: data.id,
+          home_team: data.home_team,
+          away_team: data.away_team,
+          home_score: data.home_score,
+          away_score: data.away_score,
+          status: data.status === 'finished' ? 'STATUS_FINAL' : 
+                  data.status === 'live' ? 'STATUS_IN_PROGRESS' : 'STATUS_SCHEDULED',
+          minute: data.minute,
+          venue: data.venue,
+          date: data.date,
+          league: data.league,
+          leagueId: data.leagueId,
+          referee: data.referee,
+          events: (data.events || []).map((e: { type: string; minute: number; addedTime?: number; player: string; team: string; relatedPlayer?: string }) => ({
+            type: e.type as MatchEvent['type'],
+            minute: e.minute,
+            addedTime: e.addedTime,
+            player: e.player,
+            team: e.team as 'home' | 'away',
+            relatedPlayer: e.relatedPlayer,
+          })),
+          lineups: {
+            home: data.lineups?.home || [],
+            away: data.lineups?.away || [],
+            homeFormation: data.lineups?.homeFormation,
+            awayFormation: data.lineups?.awayFormation,
+          },
+          stats: data.stats || {
+            possession: [50, 50],
+            shots: [0, 0],
+            shotsOnTarget: [0, 0],
+            corners: [0, 0],
+            fouls: [0, 0],
+          },
+          h2h: data.h2h || {
+            homeWins: 0,
+            draws: 0,
+            awayWins: 0,
+            recentMatches: [],
+          },
+          prediction: data.prediction,
+          commentary: data.commentary || [],
         }
         
-        // If still no data, try FotMob API (for matches sourced from FotMob)
-        if (!matchData || !matchData.header) {
+        // Try to fetch standings for team positions
+        if (data.leagueId) {
           try {
-            const fotmobRes = await fetch(`https://www.fotmob.com/api/matchDetails?matchId=${matchId}`, {
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'application/json',
-              },
-            })
-            if (fotmobRes.ok) {
-              const fotmobData = await fotmobRes.json()
-              if (fotmobData.general) {
-                matchData = fotmobData
-                dataSource = 'fotmob'
-              }
-            }
-          } catch (e) {
-            console.error('FotMob fallback failed:', e)
-          }
-        }
-        
-        // Process ESPN data
-        if (matchData && matchData.header && dataSource === 'espn') {
-          const data = matchData
-          const competition = data.header?.competitions?.[0]
-          const homeTeam = competition?.competitors?.find((c: any) => c.homeAway === 'home')
-          const awayTeam = competition?.competitors?.find((c: any) => c.homeAway === 'away')
-          
-          // Extract referee from multiple possible locations
-          let refereeName: string | null = null
-          
-          // Try gameInfo.officials first (most common)
-          const officials = data.gameInfo?.officials || data.officials || []
-          if (officials.length > 0) {
-            const mainReferee = officials.find((o: any) => 
-              o.position?.name?.toLowerCase() === 'referee' || 
-              o.position?.displayName?.toLowerCase() === 'referee' ||
-              o.order === 1
-            ) || officials[0]
-            refereeName = mainReferee?.fullName || mainReferee?.displayName || mainReferee?.athlete?.displayName || null
-          }
-          
-          // Try from competition status details
-          if (!refereeName && competition?.status?.detail) {
-            const detail = competition.status.detail
-            const refMatch = detail.match(/Referee:\s*([^,\n]+)/i)
-            if (refMatch) {
-              refereeName = refMatch[1].trim()
-            }
-          }
-          
-          // Try from boxscore or content
-          if (!refereeName) {
-            const boxscoreOfficials = data.boxscore?.officials || data.content?.gameInfo?.officials || []
-            if (boxscoreOfficials.length > 0) {
-              const mainRef = boxscoreOfficials.find((o: any) => o.position?.toLowerCase().includes('referee')) || boxscoreOfficials[0]
-              refereeName = mainRef?.displayName || mainRef?.name || null
-            }
-          }
-          
-          // Extract all events including cards, substitutions
-          const events: MatchEvent[] = []
-          
-          // Scoring plays (goals)
-          const scoringPlays = data.scoringPlays || []
-          for (const play of scoringPlays) {
-            const isOwnGoal = play.text?.toLowerCase().includes('own goal')
-            events.push({
-              type: isOwnGoal ? 'own_goal' : 'goal',
-              minute: parseInt(play.clock?.displayValue) || 0,
-              player: play.scoringPlay?.scorer?.athlete?.displayName || play.text?.trim() || 'Unknown',
-              team: play.homeAway === 'home' ? 'home' : 'away',
-              relatedPlayer: play.scoringPlay?.assists?.[0]?.athlete?.displayName,
-            })
-          }
-          
-          // Extract match facts events (cards, subs)
-          const matchFactEvents = data.content?.matchFacts?.events?.events || data.keyEvents || []
-          for (const evt of matchFactEvents) {
-            const evtType = evt.type?.toLowerCase() || evt.eventType?.toLowerCase() || ''
-            let type: MatchEvent['type'] = 'goal'
-            
-            if (evtType.includes('yellow')) type = 'yellow_card'
-            else if (evtType.includes('red') || evtType.includes('second yellow')) type = 'red_card'
-            else if (evtType.includes('sub')) type = 'substitution'
-            else if (evtType.includes('var')) type = 'var'
-            else continue  // Skip unknown types to avoid duplicating goals
-            
-            events.push({
-              type,
-              minute: evt.minute || evt.time?.minute || parseInt(evt.clock?.displayValue) || 0,
-              addedTime: evt.addedTime || evt.time?.injuryTime,
-              player: evt.player?.name || evt.athlete?.displayName || evt.text || 'Unknown',
-              team: evt.isHome || evt.homeAway === 'home' ? 'home' : 'away',
-              relatedPlayer: evt.relatedPlayer?.name || evt.playerOff?.name,
-            })
-          }
-          
-          // Extract stats helper function
-          const getStatValue = (name: string, teamIndex: number) => {
-            const teamStats = data.boxscore?.teams?.[teamIndex]?.statistics || []
-            const stat = teamStats.find((s: any) => s.name?.toLowerCase() === name.toLowerCase())
-            return parseInt(stat?.displayValue) || 0
-          }
-          
-          // Extract lineup with position information
-          const extractLineup = (roster: any[]): PlayerLineup[] => {
-            if (!roster) return []
-            return roster.map((p: any) => ({
-              name: p.athlete?.displayName || 'Unknown',
-              position: p.position?.abbreviation || p.athlete?.position?.abbreviation || undefined,
-              jersey: p.jersey ? parseInt(p.jersey, 10) : undefined,
-            }))
-          }
-          
-          // Get formation from ESPN data
-          const homeFormation = data.rosters?.[0]?.formation || data.boxscore?.teams?.[0]?.formation || undefined
-          const awayFormation = data.rosters?.[1]?.formation || data.boxscore?.teams?.[1]?.formation || undefined
-
-          const matchDetails: MatchDetails = {
-            id: matchId,
-            home_team: homeTeam?.team?.displayName || 'Home Team',
-            away_team: awayTeam?.team?.displayName || 'Away Team',
-            home_score: parseInt(homeTeam?.score) || 0,
-            away_score: parseInt(awayTeam?.score) || 0,
-            status: competition?.status?.type?.name || 'scheduled',
-            minute: parseInt(competition?.status?.displayClock) || undefined,
-            venue: data.gameInfo?.venue?.fullName,
-            date: data.header?.competitions?.[0]?.date || '',
-            league: data.header?.league?.name || '',
-            referee: refereeName,
-            events,
-            lineups: {
-              home: extractLineup(data.rosters?.[0]?.roster),
-              away: extractLineup(data.rosters?.[1]?.roster),
-              homeFormation,
-              awayFormation,
-            },
-            stats: {
-              possession: [getStatValue('possessionPct', 0), getStatValue('possessionPct', 1)],
-              shots: [getStatValue('totalShots', 0), getStatValue('totalShots', 1)],
-              shotsOnTarget: [getStatValue('shotsOnTarget', 0), getStatValue('shotsOnTarget', 1)],
-              corners: [getStatValue('wonCorners', 0), getStatValue('wonCorners', 1)],
-              fouls: [getStatValue('foulsCommitted', 0), getStatValue('foulsCommitted', 1)],
-            },
-            h2h: {
-              homeWins: 0,
-              draws: 0,
-              awayWins: 0,
-              recentMatches: [],
-            }
-          }
-          
-          // Try to extract H2H data from ESPN response
-          const headToHead = data.headToHeadHistory || data.previousMeetings || data.headToHead
-          if (headToHead) {
-            // Count wins/draws from recent meetings
-            const recentGames = headToHead.events || headToHead.games || []
-            let homeWins = 0, awayWins = 0, draws = 0
-            const recentMatches: { home_score: number; away_score: number; date: string }[] = []
-            
-            for (const game of recentGames.slice(0, 10)) {
-              const homeScore = parseInt(game.homeTeam?.score || game.score?.home || '0', 10)
-              const awayScore = parseInt(game.awayTeam?.score || game.score?.away || '0', 10)
+            const standingsRes = await fetch(
+              `https://site.api.espn.com/apis/v2/sports/soccer/${data.leagueId}/standings`
+            )
+            if (standingsRes.ok) {
+              const standingsData = await standingsRes.json()
+              const entries = standingsData.children?.[0]?.standings?.entries || []
               
-              if (homeScore > awayScore) homeWins++
-              else if (awayScore > homeScore) awayWins++
-              else draws++
+              const homeTeamName = matchDetails.home_team.toLowerCase()
+              const awayTeamName = matchDetails.away_team.toLowerCase()
               
-              recentMatches.push({
-                home_score: homeScore,
-                away_score: awayScore,
-                date: game.date || game.gameDate || '',
-              })
-            }
-            
-            matchDetails.h2h = { homeWins, draws, awayWins, recentMatches }
-          }
-          
-          // Try to fetch league standings to get team positions
-          const leagueSlug = leagueId || data.header?.league?.slug || ''
-          if (leagueSlug) {
-            try {
-              const standingsRes = await fetch(
-                `https://site.api.espn.com/apis/v2/sports/soccer/${leagueSlug}/standings`
-              )
-              if (standingsRes.ok) {
-                const standingsData = await standingsRes.json()
-                const entries = standingsData.children?.[0]?.standings?.entries || []
+              const fullStandings: TeamStanding[] = []
+              
+              for (let i = 0; i < entries.length; i++) {
+                const entry = entries[i]
+                const teamDisplayName = entry.team?.displayName || 'Unknown'
+                const teamName = teamDisplayName.toLowerCase()
                 
-                const homeTeamName = matchDetails.home_team.toLowerCase()
-                const awayTeamName = matchDetails.away_team.toLowerCase()
-                
-                // Build full standings array
-                const fullStandings: TeamStanding[] = []
-                
-                for (let i = 0; i < entries.length; i++) {
-                  const entry = entries[i]
-                  const teamDisplayName = entry.team?.displayName || 'Unknown'
-                  const teamName = teamDisplayName.toLowerCase()
-                  
-                  const getStatVal = (name: string) => {
-                    const stat = entry.stats?.find((s: any) => s.name === name)
-                    return parseInt(stat?.value || '0', 10)
-                  }
-                  
-                  const standing: TeamStanding = {
-                    position: i + 1,
-                    played: getStatVal('gamesPlayed'),
-                    won: getStatVal('wins'),
-                    drawn: getStatVal('ties'),
-                    lost: getStatVal('losses'),
-                    points: getStatVal('points'),
-                    teamName: teamDisplayName,
-                  }
-                  
-                  fullStandings.push(standing)
-                  
-                  if (teamName.includes(homeTeamName) || homeTeamName.includes(teamName)) {
-                    matchDetails.homeStanding = standing
-                  }
-                  if (teamName.includes(awayTeamName) || awayTeamName.includes(teamName)) {
-                    matchDetails.awayStanding = standing
-                  }
+                const getStatVal = (name: string) => {
+                  const stat = entry.stats?.find((s: { name: string }) => s.name === name)
+                  return parseInt(stat?.value || '0', 10)
                 }
                 
-                matchDetails.fullStandings = fullStandings
+                const standing: TeamStanding = {
+                  position: i + 1,
+                  played: getStatVal('gamesPlayed'),
+                  won: getStatVal('wins'),
+                  drawn: getStatVal('ties'),
+                  lost: getStatVal('losses'),
+                  points: getStatVal('points'),
+                  teamName: teamDisplayName,
+                }
+                
+                fullStandings.push(standing)
+                
+                if (teamName.includes(homeTeamName) || homeTeamName.includes(teamName)) {
+                  matchDetails.homeStanding = standing
+                }
+                if (teamName.includes(awayTeamName) || awayTeamName.includes(teamName)) {
+                  matchDetails.awayStanding = standing
+                }
               }
-            } catch {
-              // Standings not available, continue without them
+              
+              matchDetails.fullStandings = fullStandings
             }
+          } catch {
+            // Standings not available, continue without them
           }
-          
-          matchDetails.leagueId = leagueSlug
-          setMatch(matchDetails)
         }
         
-        // Process FotMob data
-        if (matchData && matchData.general && dataSource === 'fotmob') {
-          const general = matchData.general
-          const content = matchData.content
-          const header = matchData.header
-          
-          // Extract status
-          let status = 'scheduled'
-          const started = general.started
-          const finished = general.finished
-          if (finished) {
-            status = 'STATUS_FINAL'
-          } else if (started) {
-            status = general.matchTimeUTC ? 'STATUS_IN_PROGRESS' : 'STATUS_HALFTIME'
-          }
-          
-          // Extract events from FotMob
-          const events: MatchEvent[] = []
-          const matchEvents = content?.matchFacts?.events?.events || []
-          for (const evt of matchEvents) {
-            const evtType = evt.type?.toLowerCase() || ''
-            let type: MatchEvent['type'] = 'goal'
-            
-            if (evtType === 'goal' || evtType === 'scoring') {
-              type = evt.ownGoal ? 'own_goal' : 'goal'
-            } else if (evtType === 'yellowcard' || evtType.includes('yellow')) {
-              type = 'yellow_card'
-            } else if (evtType === 'redcard' || evtType.includes('red')) {
-              type = 'red_card'
-            } else if (evtType === 'substitution' || evtType.includes('sub')) {
-              type = 'substitution'
-            } else if (evtType.includes('var')) {
-              type = 'var'
-            } else {
-              continue
-            }
-            
-            events.push({
-              type,
-              minute: evt.time || evt.minute || 0,
-              addedTime: evt.addedTime,
-              player: evt.nameStr || evt.player?.name || 'Unknown',
-              team: evt.isHome ? 'home' : 'away',
-              relatedPlayer: evt.assistStr || evt.assist?.name,
-            })
-          }
-          
-          // Extract stats from FotMob
-          const statsObj = content?.stats?.Ede?.stats?.[0]?.stats || []
-          const getStatPair = (title: string): [number, number] => {
-            const stat = statsObj.find((s: any) => s.title?.toLowerCase() === title.toLowerCase())
-            if (!stat) return [0, 0]
-            return [
-              parseInt(stat.stats?.[0]) || 0,
-              parseInt(stat.stats?.[1]) || 0,
-            ]
-          }
-          
-          // Extract lineups from FotMob
-          const extractFotmobLineup = (lineup: any): PlayerLineup[] => {
-            if (!lineup?.players) return []
-            const players: PlayerLineup[] = []
-            for (const row of lineup.players) {
-              for (const p of row || []) {
-                players.push({
-                  name: p.name?.fullName || p.name?.shortName || 'Unknown',
-                  position: p.positionStringShort || p.position,
-                  jersey: p.shirt,
-                })
-              }
-            }
-            return players
-          }
-          
-          const homeLineup = extractFotmobLineup(content?.lineup?.homeTeam)
-          const awayLineup = extractFotmobLineup(content?.lineup?.awayTeam)
-          
-          // Extract referee from FotMob
-          const refereeData = content?.matchFacts?.infoBox?.Referee
-          const refereeName = refereeData?.text || null
-          
-          const matchDetails: MatchDetails = {
-            id: matchId,
-            home_team: general.homeTeam?.name || 'Home Team',
-            away_team: general.awayTeam?.name || 'Away Team',
-            home_score: general.homeTeam?.score ?? 0,
-            away_score: general.awayTeam?.score ?? 0,
-            status,
-            minute: general.matchTimeUTCDate ? Math.floor((Date.now() - new Date(general.matchTimeUTCDate).getTime()) / 60000) : undefined,
-            venue: content?.matchFacts?.infoBox?.Stadium?.text || general.venue?.name,
-            date: general.matchTimeUTC || '',
-            league: general.leagueName || general.parentLeagueName || '',
-            referee: refereeName,
-            events,
-            lineups: {
-              home: homeLineup,
-              away: awayLineup,
-              homeFormation: content?.lineup?.homeTeam?.formation,
-              awayFormation: content?.lineup?.awayTeam?.formation,
-            },
-            stats: {
-              possession: getStatPair('Ball possession'),
-              shots: getStatPair('Total shots'),
-              shotsOnTarget: getStatPair('Shots on target'),
-              corners: getStatPair('Corners'),
-              fouls: getStatPair('Fouls'),
-            },
-            h2h: {
-              homeWins: 0,
-              draws: 0,
-              awayWins: 0,
-              recentMatches: [],
-            },
-          }
-          
-          // Extract H2H from FotMob
-          const h2hData = content?.h2h?.matches || []
-          let homeWins = 0, awayWins = 0, draws = 0
-          const recentMatches: { home_score: number; away_score: number; date: string }[] = []
-          
-          for (const game of h2hData.slice(0, 10)) {
-            const homeScore = game.homeTeam?.score ?? 0
-            const awayScore = game.awayTeam?.score ?? 0
-            
-            if (homeScore > awayScore) homeWins++
-            else if (awayScore > homeScore) awayWins++
-            else draws++
-            
-            recentMatches.push({
-              home_score: homeScore,
-              away_score: awayScore,
-              date: game.matchDate || '',
-            })
-          }
-          
-          matchDetails.h2h = { homeWins, draws, awayWins, recentMatches }
-          setMatch(matchDetails)
-        }
+        setMatch(matchDetails)
       } catch (e) {
         console.error('Error fetching match details:', e)
+        setMatch(null)
       } finally {
         setLoading(false)
       }
@@ -542,7 +254,7 @@ export default function MatchDetailPage() {
     if (matchId) {
       fetchMatchDetails()
     }
-  }, [matchId, leagueId])
+  }, [matchId, leagueId, retryCount]) // retryCount triggers refetch when incremented
 
   const formatDate = (dateStr: string) => {
     try {
@@ -571,11 +283,44 @@ export default function MatchDetailPage() {
   if (!match) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--background)' }}>
-        <div className="text-center">
-          <p className="mb-4" style={{ color: 'var(--text-secondary)' }}>Match not found</p>
-          <Link href="/matches" className="text-indigo-400 hover:text-indigo-300">
-            ← Back to matches
-          </Link>
+        <div className="text-center max-w-md mx-auto px-4">
+          <span className="text-5xl mb-4 block">⚽</span>
+          <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Match Not Available</h2>
+          <p className="mb-4" style={{ color: 'var(--text-secondary)' }}>
+            We couldn&apos;t load details for this match. This might be because:
+          </p>
+          <ul className="text-left mb-6 space-y-2" style={{ color: 'var(--text-tertiary)' }}>
+            <li className="flex items-start gap-2">
+              <span>•</span>
+              <span>The match hasn&apos;t started yet and detailed data isn&apos;t available</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span>•</span>
+              <span>The match ID has changed or is from a different data source</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span>•</span>
+              <span>Our data providers are temporarily unavailable</span>
+            </li>
+          </ul>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link 
+              href="/matches" 
+              className="px-6 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors"
+            >
+              ← Browse Leagues
+            </Link>
+            <button
+              onClick={() => {
+                setLoading(true)
+                setRetryCount(prev => prev + 1) // Trigger refetch without full page reload
+              }}
+              className="px-6 py-3 rounded-xl border font-semibold transition-colors hover:bg-[var(--muted-bg)]"
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+            >
+              🔄 Try Again
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -584,6 +329,32 @@ export default function MatchDetailPage() {
   // Additional derived state (isLive and isHalftime already computed above before hooks)
   const isScheduled = match.status.toLowerCase().includes('scheduled') || match.status.toLowerCase().includes('pre')
   const isFinished = match.status.includes('FINAL') || match.status.toLowerCase().includes('finished') || match.status.toLowerCase().includes('ft')
+
+  // Helper function to evaluate prediction accuracy
+  const getPredictionAccuracy = (): { type: 'exact' | 'close' | 'miss'; message: string } => {
+    if (!match.prediction || match.home_score === null || match.away_score === null) {
+      return { type: 'miss', message: '' }
+    }
+    
+    const predictedHome = match.prediction.predicted_score.home
+    const predictedAway = match.prediction.predicted_score.away
+    const actualHome = match.home_score
+    const actualAway = match.away_score
+    
+    // Exact score match
+    if (predictedHome === actualHome && predictedAway === actualAway) {
+      return { type: 'exact', message: '✅ Exact prediction!' }
+    }
+    
+    // Close prediction: goal difference within 1
+    const predictedDiff = predictedHome - predictedAway
+    const actualDiff = actualHome - actualAway
+    if (Math.abs(predictedDiff - actualDiff) <= 1) {
+      return { type: 'close', message: '⚡ Close prediction' }
+    }
+    
+    return { type: 'miss', message: `Actual: ${actualHome} - ${actualAway}` }
+  }
 
   // Navigate back to the league page
   const handleBack = () => {
@@ -607,7 +378,7 @@ export default function MatchDetailPage() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back to {match.league || 'matches'}
+            Back to {match.league || 'leagues'}
           </button>
           
           {/* Match Header - Centered */}
@@ -664,6 +435,71 @@ export default function MatchDetailPage() {
             {match.venue && (
               <p className="text-sm text-center" style={{ color: 'var(--text-tertiary)' }}>📍 {match.venue}</p>
             )}
+            
+            {/* ML Prediction Card - shown for all matches */}
+            {match.prediction && (
+              <div className="mt-4 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/30 rounded-xl p-4">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <span className="text-lg">🤖</span>
+                  <span className="text-sm font-semibold text-indigo-400">AI Prediction</span>
+                  <span className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full">
+                    {match.prediction.confidence}% confidence
+                  </span>
+                </div>
+                
+                <div className="flex items-center justify-center gap-6">
+                  {/* Predicted Score */}
+                  <div className="text-center">
+                    <p className="text-xs text-[var(--text-tertiary)] mb-1">Predicted Score</p>
+                    <p className="text-2xl font-bold text-indigo-400">
+                      {match.prediction.predicted_score.home} - {match.prediction.predicted_score.away}
+                    </p>
+                  </div>
+                  
+                  <div className="h-10 w-px bg-[var(--border-color)]" />
+                  
+                  {/* Win Probabilities */}
+                  <div className="flex gap-3">
+                    <div className="text-center">
+                      <p className="text-xs text-[var(--text-tertiary)] mb-1">Home</p>
+                      <p className={`text-lg font-bold ${match.prediction.home_win > match.prediction.away_win ? 'text-green-500' : 'text-[var(--text-secondary)]'}`}>
+                        {Math.round(match.prediction.home_win * 100)}%
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-[var(--text-tertiary)] mb-1">Draw</p>
+                      <p className="text-lg font-bold text-[var(--text-secondary)]">
+                        {Math.round(match.prediction.draw * 100)}%
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-[var(--text-tertiary)] mb-1">Away</p>
+                      <p className={`text-lg font-bold ${match.prediction.away_win > match.prediction.home_win ? 'text-green-500' : 'text-[var(--text-secondary)]'}`}>
+                        {Math.round(match.prediction.away_win * 100)}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Comparison with actual result for finished matches */}
+                {isFinished && match.home_score !== null && match.away_score !== null && (() => {
+                  const accuracy = getPredictionAccuracy()
+                  return (
+                    <div className="mt-3 pt-3 border-t border-indigo-500/20">
+                      <div className="flex items-center justify-center gap-2 text-xs">
+                        <span className={`font-semibold ${
+                          accuracy.type === 'exact' ? 'text-green-500' : 
+                          accuracy.type === 'close' ? 'text-amber-500' : 
+                          'text-[var(--text-tertiary)]'
+                        }`}>
+                          {accuracy.message}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -676,13 +512,13 @@ export default function MatchDetailPage() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
-                className={`py-4 px-2 font-medium capitalize transition-colors border-b-2 ${
+                className={`py-4 px-2 font-medium capitalize transition-colors border-b-2 whitespace-nowrap ${
                   activeTab === tab
                     ? 'text-[var(--accent-primary)] border-[var(--accent-primary)]'
                     : 'text-[var(--text-secondary)] border-transparent hover:text-[var(--text-primary)]'
                 }`}
               >
-                {tab === 'h2h' ? 'Head to Head' : tab}
+                {tab === 'h2h' ? 'H2H & Form' : tab}
               </button>
             ))}
           </div>
@@ -703,7 +539,7 @@ export default function MatchDetailPage() {
                   </div>
                   <div>
                     <p className="text-xs text-[var(--text-tertiary)]">Venue</p>
-                    <p className="text-sm font-medium text-[var(--text-primary)]">{match.venue || 'TBD'}</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{match.venue || 'Not announced'}</p>
                   </div>
                 </div>
               </div>
@@ -716,7 +552,9 @@ export default function MatchDetailPage() {
                   </div>
                   <div>
                     <p className="text-xs text-[var(--text-tertiary)]">Referee</p>
-                    <p className="text-sm font-medium text-[var(--text-primary)]">{match.referee || 'TBD'}</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">
+                      {match.referee || (isScheduled ? 'Not yet assigned' : 'Not available')}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -735,20 +573,13 @@ export default function MatchDetailPage() {
               </div>
             </div>
 
-            {/* Weather & Referee Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <MatchWeather 
-                matchId={matchId}
-                venue={match.venue}
-                homeTeam={match.home_team}
-                awayTeam={match.away_team}
-              />
-              <RefereeInfo
-                matchId={matchId}
-                homeTeam={match.home_team}
-                awayTeam={match.away_team}
-              />
-            </div>
+            {/* Weather - spans full width */}
+            <MatchWeather 
+              matchId={matchId}
+              venue={match.venue}
+              homeTeam={match.home_team}
+              awayTeam={match.away_team}
+            />
 
             {/* Event Summary Card */}
             {match.events.length > 0 && (
@@ -976,15 +807,44 @@ export default function MatchDetailPage() {
                   </div>
                 )}
               </div>
-            ) : (
+            ) : match.status.includes('scheduled') ? (
               <div className="text-center py-12">
-                <span className="text-4xl mb-4 block">⚽</span>
-                <p className="text-[var(--text-secondary)]">No events recorded yet</p>
+                <span className="text-4xl mb-4 block">⏳</span>
+                <p className="text-[var(--text-secondary)]">Match not started yet</p>
                 <p className="text-[var(--text-tertiary)] text-sm mt-2">
-                  {match.status.includes('scheduled') 
-                    ? 'Events will appear here once the match starts' 
-                    : 'Check back for updates'}
+                  Events will appear here once the match starts
                 </p>
+              </div>
+            ) : null}
+            
+            {/* Commentary Section - FotMob-style */}
+            {match.commentary && match.commentary.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">📝 Match Commentary</h3>
+                <div className="bg-[var(--card-bg)] border rounded-2xl overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
+                  <div className="max-h-[400px] overflow-y-auto">
+                    {match.commentary
+                      .sort((a, b) => b.minute - a.minute)
+                      .map((item, idx) => (
+                        <div 
+                          key={idx} 
+                          className="p-4 border-b last:border-b-0 hover:bg-[var(--muted-bg)] transition-colors"
+                          style={{ borderColor: 'var(--border-color)' }}
+                        >
+                          <div className="flex gap-4">
+                            <div className="flex-shrink-0">
+                              <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] font-bold text-sm">
+                                {item.minute}&apos;
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-[var(--text-primary)]">{item.text}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>

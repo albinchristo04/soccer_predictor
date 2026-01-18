@@ -29,7 +29,7 @@ export const Footer = () => {
             </h3>
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               <Link href="/upcoming" className="text-sm text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors">
-                Matches
+                Leagues
               </Link>
               <Link href="/predict" className="text-sm text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors">
                 Predict

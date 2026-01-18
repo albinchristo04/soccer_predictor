@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import MatchCalendar from '@/components/match/MatchCalendar';
 import { leagueFlagUrls } from '@/data/leagues';
 
@@ -54,10 +55,10 @@ export default function MatchesPage() {
                        selectedLeague?.id === 'uefa.champions' || 
                        selectedLeague?.id === 'uefa.europa';
 
-  // Update URL when league changes
+  // Update URL when league changes - navigate directly to the full league page
   const handleSelectLeague = (league: typeof LEAGUES[0]) => {
-    setSelectedLeague(league);
-    router.push(`/matches?league=${league.id}`);
+    // Navigate directly to the full league/tournament home page
+    router.push(`/leagues/${league.id}`);
   };
 
   const handleBackToLeagues = () => {
@@ -137,7 +138,7 @@ export default function MatchesPage() {
     return (
       <div className="min-h-screen" style={{ backgroundColor: 'var(--background)' }}>
         <div className="max-w-4xl mx-auto px-4 py-12">
-          <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Matches</h1>
+          <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Leagues</h1>
           <p className="mb-8" style={{ color: 'var(--text-secondary)' }}>Select a league to view fixtures, results, and standings</p>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -204,6 +205,17 @@ export default function MatchesPage() {
               <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{selectedLeague.name}</h1>
               <p style={{ color: 'var(--text-secondary)' }}>{selectedLeague.country}</p>
             </div>
+            
+            {/* Link to full league home page */}
+            <Link
+              href={`/leagues/${selectedLeague.id}`}
+              className="ml-auto px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-medium hover:opacity-90 transition-opacity flex items-center gap-2"
+            >
+              <span>View Full Page</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </Link>
           </div>
           
           {/* Tabs */}
@@ -230,6 +242,15 @@ export default function MatchesPage() {
             >
               Standings
             </button>
+            {/* Show Knockout tab for tournaments */}
+            {isGroupStage && (
+              <Link
+                href={`/leagues/${selectedLeague.id}`}
+                className="px-4 py-2 rounded-lg font-medium transition-colors bg-gradient-to-r from-amber-500 to-orange-500 text-black hover:opacity-90"
+              >
+                🏆 Knockout Bracket
+              </Link>
+            )}
           </div>
         </div>
       </div>

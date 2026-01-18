@@ -46,9 +46,10 @@ interface RefereeInfoProps {
   matchId: string
   homeTeam?: string
   awayTeam?: string
+  refereeName?: string // Pass the referee name from match data to avoid TBD inconsistency
 }
 
-export default function RefereeInfo({ matchId, homeTeam, awayTeam }: RefereeInfoProps) {
+export default function RefereeInfo({ matchId, homeTeam, awayTeam, refereeName }: RefereeInfoProps) {
   const [referee, setReferee] = useState<RefereeStats | null>(null)
   const [homeHistory, setHomeHistory] = useState<TeamRefereeHistory | null>(null)
   const [awayHistory, setAwayHistory] = useState<TeamRefereeHistory | null>(null)
@@ -90,7 +91,7 @@ export default function RefereeInfo({ matchId, homeTeam, awayTeam }: RefereeInfo
         }
 
         setReferee({
-          name: data.name || 'TBD',
+          name: data.name || refereeName || 'Not available',
           country: data.country || 'Unknown',
           age: data.age,
           experience: data.experience_years || 0,
@@ -142,20 +143,20 @@ export default function RefereeInfo({ matchId, homeTeam, awayTeam }: RefereeInfo
 
         setImpact(data.prediction_impact || null)
       } catch (err) {
-        // Fallback mock data
+        // Use the referee name from match data if available, otherwise show "Not available"
         setReferee({
-          name: 'Referee TBD',
-          country: 'England',
-          experience: 8,
-          careerMatches: 245,
+          name: refereeName || 'Not available',
+          country: 'Unknown',
+          experience: 0,
+          careerMatches: 0,
           averageCardsPerMatch: { yellow: 3.4, red: 0.12 },
           homeWinRate: 0.46,
           awayWinRate: 0.29,
           drawRate: 0.25,
           averageGoalsPerMatch: 2.78,
-          penaltiesAwarded: 42,
+          penaltiesAwarded: 0,
           penaltiesPerMatch: 0.17,
-          competitions: ['Premier League', 'FA Cup', 'UEFA Europa League']
+          competitions: []
         })
       } finally {
         setLoading(false)
@@ -163,7 +164,7 @@ export default function RefereeInfo({ matchId, homeTeam, awayTeam }: RefereeInfo
     }
 
     fetchRefereeData()
-  }, [matchId, homeTeam, awayTeam])
+  }, [matchId, homeTeam, awayTeam, refereeName])
 
   const getCardTendencyColor = (yellowPerMatch: number): string => {
     if (yellowPerMatch < 2.5) return 'text-green-500'

@@ -266,11 +266,14 @@ function TodaysMatchesWidget() {
                               <span className="text-xs font-semibold text-red-500">{match.minute ? `${match.minute}'` : 'LIVE'}</span>
                             </div>
                           </div>
-                        ) : match.status === 'finished' ? (
-                          <div className="flex items-center justify-center gap-1">
-                            <span className="text-lg font-bold text-[var(--text-secondary)]">{match.home_score}</span>
-                            <span className="text-[var(--text-tertiary)]">-</span>
-                            <span className="text-lg font-bold text-[var(--text-secondary)]">{match.away_score}</span>
+                        ) : match.status === 'finished' || match.status === 'completed' ? (
+                          <div className="flex flex-col items-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <span className="text-lg font-bold text-[var(--text-secondary)]">{match.home_score}</span>
+                              <span className="text-[var(--text-tertiary)]">-</span>
+                              <span className="text-lg font-bold text-[var(--text-secondary)]">{match.away_score}</span>
+                            </div>
+                            <span className="text-xs text-[var(--text-tertiary)]">FT</span>
                           </div>
                         ) : (
                           <div className="flex flex-col items-center">

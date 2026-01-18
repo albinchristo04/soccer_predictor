@@ -17,7 +17,7 @@ export const Navbar = () => {
 
   const navLinks = [
     { href: '/', label: 'Home', icon: '🏠' },
-    { href: '/matches', label: 'Matches', icon: '📅' },
+    { href: '/matches', label: 'Leagues', icon: '🏆' },
     { href: '/predict', label: 'Predict', icon: '🎯' },
     { href: '/news', label: 'News', icon: '📰' },
     { href: '/about', label: 'About', icon: 'ℹ️' },
