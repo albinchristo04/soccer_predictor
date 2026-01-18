@@ -482,81 +482,70 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
   )
 
   const renderKnockoutBracket = () => (
-    <div className="bg-[var(--card-bg)] rounded-xl border p-6" style={{ borderColor: 'var(--border-color)' }}>
-      <h2 className="text-xl font-bold text-[var(--text-primary)] mb-6">Knockout Stage</h2>
+    <div className="space-y-6">
+      {/* Main Bracket Visualization - Always show */}
+      <KnockoutBracket
+        tournament={config.knockoutType}
+        rounds={bracketRounds}
+        simulationData={simulationProbabilities || undefined}
+        showProbabilities={!!simulationProbabilities}
+        onMatchClick={(match) => {
+          // Navigate to match page using Next.js router for client-side navigation
+          router.push(`/matches/${match.id}`)
+        }}
+      />
       
-      {data.knockoutMatches.length > 0 ? (
-        <div className="space-y-8">
-          {/* Group knockout matches by round */}
-          {['Final', 'Semi-Final', 'Quarter-Final', 'Round of 16'].map(round => {
-            const roundMatches = data.knockoutMatches.filter(m => 
-              m.round?.toLowerCase().includes(round.toLowerCase())
-            )
-            if (roundMatches.length === 0) return null
+      {/* Detailed Match List */}
+      {data.knockoutMatches.length > 0 && (
+        <div className="bg-[var(--card-bg)] rounded-xl border p-6" style={{ borderColor: 'var(--border-color)' }}>
+          <h2 className="text-xl font-bold text-[var(--text-primary)] mb-6">Knockout Matches</h2>
+          
+          <div className="space-y-8">
+            {/* Group knockout matches by round */}
+            {['Final', 'Semi-Final', 'Quarter-Final', 'Round of 16'].map(round => {
+              const roundMatches = data.knockoutMatches.filter(m => 
+                m.round?.toLowerCase().includes(round.toLowerCase())
+              )
+              if (roundMatches.length === 0) return null
 
-            return (
-              <div key={round}>
-                <h3 className={`text-lg font-semibold text-[var(--text-primary)] mb-4 pb-2 border-b`} style={{ borderColor: 'var(--border-color)' }}>
-                  {round}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {roundMatches.map(match => (
-                    <Link
-                      key={match.id}
-                      href={`/matches/${match.id}`}
-                      className="p-4 rounded-xl bg-[var(--muted-bg)] hover:bg-[var(--muted-bg-hover)] transition-colors"
-                    >
-                      <div className="flex justify-between items-center">
-                        <div className="flex-1">
-                          <div className={`flex items-center gap-2 ${match.homeScore !== undefined && match.homeScore > (match.awayScore || 0) ? 'font-bold' : ''}`}>
-                            <span className="text-[var(--text-primary)]">{match.homeTeam}</span>
-                            {match.homeScore !== undefined && (
-                              <span className="font-bold text-[var(--text-primary)]">{match.homeScore}</span>
-                            )}
+              return (
+                <div key={round}>
+                  <h3 className={`text-lg font-semibold text-[var(--text-primary)] mb-4 pb-2 border-b`} style={{ borderColor: 'var(--border-color)' }}>
+                    {round}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {roundMatches.map(match => (
+                      <Link
+                        key={match.id}
+                        href={`/matches/${match.id}`}
+                        className="p-4 rounded-xl bg-[var(--muted-bg)] hover:bg-[var(--muted-bg-hover)] transition-colors"
+                      >
+                        <div className="flex justify-between items-center">
+                          <div className="flex-1">
+                            <div className={`flex items-center gap-2 ${match.homeScore !== undefined && match.homeScore > (match.awayScore || 0) ? 'font-bold' : ''}`}>
+                              <span className="text-[var(--text-primary)]">{match.homeTeam}</span>
+                              {match.homeScore !== undefined && (
+                                <span className="font-bold text-[var(--text-primary)]">{match.homeScore}</span>
+                              )}
+                            </div>
+                            <div className={`flex items-center gap-2 ${match.awayScore !== undefined && match.awayScore > (match.homeScore || 0) ? 'font-bold' : ''}`}>
+                              <span className="text-[var(--text-primary)]">{match.awayTeam}</span>
+                              {match.awayScore !== undefined && (
+                                <span className="font-bold text-[var(--text-primary)]">{match.awayScore}</span>
+                              )}
+                            </div>
                           </div>
-                          <div className={`flex items-center gap-2 ${match.awayScore !== undefined && match.awayScore > (match.homeScore || 0) ? 'font-bold' : ''}`}>
-                            <span className="text-[var(--text-primary)]">{match.awayTeam}</span>
-                            {match.awayScore !== undefined && (
-                              <span className="font-bold text-[var(--text-primary)]">{match.awayScore}</span>
-                            )}
+                          <div className="text-right text-sm text-[var(--text-tertiary)]">
+                            {match.date}
                           </div>
                         </div>
-                        <div className="text-right text-sm text-[var(--text-tertiary)]">
-                          {match.date}
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
+                      </Link>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <p className="text-[var(--text-tertiary)] mb-4">Knockout stage matches will appear here once available</p>
-          <button
-            onClick={() => setActiveTab('Simulator')}
-            className={`px-6 py-3 rounded-xl bg-gradient-to-r ${config.gradient} text-white font-semibold hover:opacity-90 transition-opacity`}
-          >
-            🎲 Simulate Tournament
-          </button>
-        </div>
-      )}
-      
-      {/* Bracket Visualization with Probabilities */}
-      {simulationProbabilities && (
-        <div className="mt-8">
-          <KnockoutBracket
-            tournament={config.knockoutType}
-            rounds={bracketRounds}
-            simulationData={simulationProbabilities}
-            showProbabilities={true}
-            onMatchClick={(match) => {
-              // Navigate to match page using Next.js router for client-side navigation
-              router.push(`/matches/${match.id}`)
-            }}
-          />
+              )
+            })}
+          </div>
         </div>
       )}
     </div>

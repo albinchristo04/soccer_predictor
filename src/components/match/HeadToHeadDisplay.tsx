@@ -75,8 +75,21 @@ interface HeadToHeadDisplayProps {
   awayTeam: string
   matchId?: string
   initialData?: HeadToHeadStats
-  showTeamForm?: boolean  // New prop to show team form/history
+  /** Whether to show team form/history alongside H2H data */
+  showTeamForm?: boolean
 }
+
+// Constants for realistic data generation
+const TOP_TEAMS = ['Liverpool', 'Manchester City', 'Arsenal', 'Chelsea', 'Manchester United', 
+  'Tottenham', 'Newcastle', 'Real Madrid', 'Barcelona', 'Bayern Munich', 'PSG', 'Inter Milan',
+  'AC Milan', 'Juventus', 'Dortmund', 'Atletico Madrid', 'Napoli', 'Aston Villa', 'Brighton']
+
+const DEFAULT_OPPONENTS = {
+  home: ['Newcastle', 'Brighton', 'Wolves', 'Bournemouth', 'Fulham'],
+  away: ['Everton', 'Crystal Palace', 'Brentford', 'West Ham', 'Aston Villa']
+}
+
+const DEFAULT_SEASON_MATCHES = 21  // Default for Premier League
 
 export default function HeadToHeadDisplay({
   homeTeam,
@@ -167,7 +180,7 @@ export default function HeadToHeadDisplay({
     }
 
     fetchH2H()
-  }, [homeTeam, awayTeam, matchId, initialData])
+  }, [homeTeam, awayTeam, matchId, initialData, showTeamForm])
 
   const parseH2HData = (data: any, team1: string, team2: string): HeadToHeadStats => {
     const matches = data.matches || data.recentMatches || data.h2h?.matches || []
@@ -321,13 +334,8 @@ export default function HeadToHeadDisplay({
 
   // Generate realistic H2H data based on team names (for when API doesn't return data)
   const generateRealisticH2H = (team1: string, team2: string): HeadToHeadStats => {
-    // List of known top teams for more realistic data
-    const topTeams = ['Liverpool', 'Manchester City', 'Arsenal', 'Chelsea', 'Manchester United', 
-      'Tottenham', 'Newcastle', 'Real Madrid', 'Barcelona', 'Bayern Munich', 'PSG', 'Inter Milan',
-      'AC Milan', 'Juventus', 'Dortmund', 'Atletico Madrid', 'Napoli', 'Aston Villa', 'Brighton']
-    
-    const isTeam1Top = topTeams.some(t => team1.toLowerCase().includes(t.toLowerCase()))
-    const isTeam2Top = topTeams.some(t => team2.toLowerCase().includes(t.toLowerCase()))
+    const isTeam1Top = TOP_TEAMS.some(t => team1.toLowerCase().includes(t.toLowerCase()))
+    const isTeam2Top = TOP_TEAMS.some(t => team2.toLowerCase().includes(t.toLowerCase()))
     
     // Seed based on team names for consistent results
     const seed = (team1 + team2).split('').reduce((a, b) => a + b.charCodeAt(0), 0)
@@ -418,8 +426,7 @@ export default function HeadToHeadDisplay({
 
   // Generate team form data
   const generateTeamForm = (team: string, isHome: boolean): TeamFormData => {
-    const topTeams = ['Liverpool', 'Manchester City', 'Arsenal', 'Chelsea', 'Real Madrid', 'Barcelona', 'Bayern Munich']
-    const isTopTeam = topTeams.some(t => team.toLowerCase().includes(t.toLowerCase()))
+    const isTopTeam = TOP_TEAMS.some(t => team.toLowerCase().includes(t.toLowerCase()))
     
     // Seed for consistent results
     const seed = team.split('').reduce((a, b) => a + b.charCodeAt(0), 0) + (isHome ? 1000 : 2000)
@@ -439,10 +446,8 @@ export default function HeadToHeadDisplay({
       else recentForm.push('L')
     }
     
-    // Generate recent matches
-    const opponents = isHome 
-      ? ['Newcastle', 'Brighton', 'Wolves', 'Bournemouth', 'Fulham']
-      : ['Everton', 'Crystal Palace', 'Brentford', 'West Ham', 'Aston Villa']
+    // Generate recent matches using default opponents
+    const opponents = isHome ? DEFAULT_OPPONENTS.home : DEFAULT_OPPONENTS.away
     
     const recentMatches: TeamRecentMatch[] = opponents.map((opponent, idx) => {
       const result = recentForm[idx] as 'W' | 'D' | 'L'
@@ -476,7 +481,7 @@ export default function HeadToHeadDisplay({
       recentForm,
       recentMatches,
       seasonStats: {
-        matches: 21,
+        matches: DEFAULT_SEASON_MATCHES,
         wins: wins * 3 + Math.floor(seededRandom(60) * 5),
         draws: draws * 2 + Math.floor(seededRandom(70) * 3),
         losses: losses * 2 + Math.floor(seededRandom(80) * 3),
