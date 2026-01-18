@@ -500,10 +500,20 @@ export default function HeadToHeadDisplay({
     const formDraws = recentForm.filter(r => r === 'D').length
     const formLosses = recentForm.filter(r => r === 'L').length
     
-    // Scale up to season level
-    const seasonWinRate = isTopTeam ? 0.55 : 0.35
-    const seasonDrawRate = 0.25
+    // Combine recent form influence with season-level rates
+    // formWins/formDraws/formLosses influence the season stats slightly
+    const formWinBonus = (formWins / 5) * 0.1  // Max +10% if all 5 wins
+    const formDrawBonus = (formDraws / 5) * 0.05  // Max +5% if all 5 draws
+    
+    // Scale up to season level with form influence
+    const adjustedWinRate = (isTopTeam ? 0.55 : 0.35) + formWinBonus - (formLosses / 5) * 0.1
+    const adjustedDrawRate = 0.25 + formDrawBonus
     const seasonMatches = DEFAULT_SEASON_MATCHES
+    
+    // Calculate wins and draws first, then losses to ensure they sum correctly
+    const seasonWins = Math.round(seasonMatches * adjustedWinRate * (0.8 + seededRandom(60) * 0.4))
+    const seasonDraws = Math.round(seasonMatches * adjustedDrawRate * (0.7 + seededRandom(70) * 0.6))
+    const seasonLosses = Math.max(0, seasonMatches - seasonWins - seasonDraws)
     
     return {
       team,
@@ -511,9 +521,9 @@ export default function HeadToHeadDisplay({
       recentMatches,
       seasonStats: {
         matches: seasonMatches,
-        wins: Math.round(seasonMatches * seasonWinRate * (0.8 + seededRandom(60) * 0.4)),
-        draws: Math.round(seasonMatches * seasonDrawRate * (0.7 + seededRandom(70) * 0.6)),
-        losses: Math.max(0, seasonMatches - Math.round(seasonMatches * seasonWinRate) - Math.round(seasonMatches * seasonDrawRate)),
+        wins: seasonWins,
+        draws: seasonDraws,
+        losses: seasonLosses,
         goalsFor: isTopTeam ? 40 + Math.floor(seededRandom(90) * 20) : 25 + Math.floor(seededRandom(90) * 15),
         goalsAgainst: isTopTeam ? 15 + Math.floor(seededRandom(100) * 10) : 25 + Math.floor(seededRandom(100) * 15),
         cleanSheets: isTopTeam ? 8 + Math.floor(seededRandom(110) * 5) : 4 + Math.floor(seededRandom(110) * 4)
