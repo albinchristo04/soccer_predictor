@@ -295,6 +295,17 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
       {/* Hero Header - FotMob Style */}
       <div className={`bg-gradient-to-r ${config.gradient} py-8 px-4`}>
         <div className="max-w-6xl mx-auto">
+          {/* Back Button */}
+          <Link
+            href="/matches"
+            className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-4 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Leagues
+          </Link>
+          
           <div className="flex items-center gap-4 mb-4">
             <span className="text-4xl">{config.flag}</span>
             <div>

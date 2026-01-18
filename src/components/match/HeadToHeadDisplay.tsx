@@ -84,10 +84,15 @@ const TOP_TEAMS = ['Liverpool', 'Manchester City', 'Arsenal', 'Chelsea', 'Manche
   'Tottenham', 'Newcastle', 'Real Madrid', 'Barcelona', 'Bayern Munich', 'PSG', 'Inter Milan',
   'AC Milan', 'Juventus', 'Dortmund', 'Atletico Madrid', 'Napoli', 'Aston Villa', 'Brighton']
 
-const DEFAULT_OPPONENTS = {
-  home: ['Newcastle', 'Brighton', 'Wolves', 'Bournemouth', 'Fulham'],
-  away: ['Everton', 'Crystal Palace', 'Brentford', 'West Ham', 'Aston Villa']
-}
+// All possible opponents - will be filtered to exclude the team itself
+const ALL_POSSIBLE_OPPONENTS = [
+  'Newcastle', 'Brighton', 'Wolves', 'Bournemouth', 'Fulham',
+  'Everton', 'Crystal Palace', 'Brentford', 'West Ham', 'Aston Villa',
+  'Southampton', 'Ipswich Town', 'Leicester City', 'Nottingham Forest',
+  'Manchester United', 'Liverpool', 'Arsenal', 'Chelsea', 'Manchester City',
+  'Tottenham', 'Real Madrid', 'Barcelona', 'Bayern Munich', 'PSG',
+  'Inter Milan', 'AC Milan', 'Juventus', 'Dortmund', 'Atletico Madrid'
+]
 
 const DEFAULT_SEASON_MATCHES = 21  // Default for Premier League
 
@@ -101,7 +106,8 @@ export default function HeadToHeadDisplay({
   const [stats, setStats] = useState<HeadToHeadStats | null>(initialData || null)
   const [loading, setLoading] = useState(!initialData)
   const [showAllMatches, setShowAllMatches] = useState(false)
-  const [activeView, setActiveView] = useState<'h2h' | 'form'>('h2h')
+  // Default to 'form' view which now includes H2H summary at the top
+  const [activeView, setActiveView] = useState<'h2h' | 'form'>('form')
 
   useEffect(() => {
     if (initialData) {
@@ -424,12 +430,17 @@ export default function HeadToHeadDisplay({
     }
   }
 
-  // Generate team form data
+  /**
+   * Generate team form data with unique opponents per team.
+   * Ensures team doesn't play itself in recent matches.
+   * Uses seeded random for consistent results based on team name.
+   */
   const generateTeamForm = (team: string, isHome: boolean): TeamFormData => {
     const isTopTeam = TOP_TEAMS.some(t => team.toLowerCase().includes(t.toLowerCase()))
     
-    // Seed for consistent results
-    const seed = team.split('').reduce((a, b) => a + b.charCodeAt(0), 0) + (isHome ? 1000 : 2000)
+    // Create unique seed based on team name only (not isHome) for consistent form data
+    // Add offset based on position to differentiate home/away team form
+    const seed = team.split('').reduce((a, b) => a + b.charCodeAt(0), 0)
     const seededRandom = (offset: number) => {
       const x = Math.sin(seed + offset) * 10000
       return x - Math.floor(x)
@@ -440,14 +451,27 @@ export default function HeadToHeadDisplay({
     const drawRate = 0.25
     const recentForm: string[] = []
     for (let i = 0; i < 5; i++) {
-      const rand = seededRandom(i)
+      const rand = seededRandom(i + 100)  // Offset by 100 to avoid collision with other uses
       if (rand < winRate) recentForm.push('W')
       else if (rand < winRate + drawRate) recentForm.push('D')
       else recentForm.push('L')
     }
     
-    // Generate recent matches using default opponents
-    const opponents = isHome ? DEFAULT_OPPONENTS.home : DEFAULT_OPPONENTS.away
+    // Filter out the team itself from possible opponents
+    const teamLower = team.toLowerCase()
+    const availableOpponents = ALL_POSSIBLE_OPPONENTS.filter(
+      opp => !teamLower.includes(opp.toLowerCase()) && !opp.toLowerCase().includes(teamLower)
+    )
+    
+    // Shuffle opponents using seeded random for consistent ordering per team
+    const shuffledOpponents = [...availableOpponents].sort((a, b) => {
+      const seedA = (a + team).split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+      const seedB = (b + team).split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+      return Math.sin(seedA) - Math.sin(seedB)
+    })
+    
+    // Take 5 unique opponents for recent matches
+    const opponents = shuffledOpponents.slice(0, 5)
     
     const recentMatches: TeamRecentMatch[] = opponents.map((opponent, idx) => {
       const result = recentForm[idx] as 'W' | 'D' | 'L'
@@ -471,23 +495,28 @@ export default function HeadToHeadDisplay({
       }
     })
     
-    // Calculate season stats
-    const wins = recentForm.filter(r => r === 'W').length
-    const draws = recentForm.filter(r => r === 'D').length
-    const losses = recentForm.filter(r => r === 'L').length
+    // Calculate season stats based on form (more realistic)
+    const formWins = recentForm.filter(r => r === 'W').length
+    const formDraws = recentForm.filter(r => r === 'D').length
+    const formLosses = recentForm.filter(r => r === 'L').length
+    
+    // Scale up to season level
+    const seasonWinRate = isTopTeam ? 0.55 : 0.35
+    const seasonDrawRate = 0.25
+    const seasonMatches = DEFAULT_SEASON_MATCHES
     
     return {
       team,
       recentForm,
       recentMatches,
       seasonStats: {
-        matches: DEFAULT_SEASON_MATCHES,
-        wins: wins * 3 + Math.floor(seededRandom(60) * 5),
-        draws: draws * 2 + Math.floor(seededRandom(70) * 3),
-        losses: losses * 2 + Math.floor(seededRandom(80) * 3),
-        goalsFor: 35 + Math.floor(seededRandom(90) * 20),
-        goalsAgainst: 20 + Math.floor(seededRandom(100) * 15),
-        cleanSheets: Math.floor(seededRandom(110) * 10) + 3
+        matches: seasonMatches,
+        wins: Math.round(seasonMatches * seasonWinRate * (0.8 + seededRandom(60) * 0.4)),
+        draws: Math.round(seasonMatches * seasonDrawRate * (0.7 + seededRandom(70) * 0.6)),
+        losses: Math.max(0, seasonMatches - Math.round(seasonMatches * seasonWinRate) - Math.round(seasonMatches * seasonDrawRate)),
+        goalsFor: isTopTeam ? 40 + Math.floor(seededRandom(90) * 20) : 25 + Math.floor(seededRandom(90) * 15),
+        goalsAgainst: isTopTeam ? 15 + Math.floor(seededRandom(100) * 10) : 25 + Math.floor(seededRandom(100) * 15),
+        cleanSheets: isTopTeam ? 8 + Math.floor(seededRandom(110) * 5) : 4 + Math.floor(seededRandom(110) * 4)
       }
     }
   }
@@ -550,12 +579,62 @@ export default function HeadToHeadDisplay({
   const team2Percent = stats.totalMatches > 0 ? (stats.team2.wins / stats.totalMatches) * 100 : 0
   const drawPercent = stats.totalMatches > 0 ? (stats.draws / stats.totalMatches) * 100 : 0
 
-  // Render team form section for both teams side by side
+  // Render team form section for both teams side by side WITH H2H summary included
   const renderTeamFormSection = () => {
     if (!stats.team1Form || !stats.team2Form) return null
     
     return (
       <div className="space-y-6">
+        {/* H2H Summary at the top (merged from H2H view) */}
+        <div className="bg-[var(--muted-bg)] rounded-xl p-4">
+          <h4 className="font-semibold text-[var(--text-primary)] mb-4 text-center">Head-to-Head Record ({stats.totalMatches} matches)</h4>
+          
+          {/* H2H Bar */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="font-medium text-blue-500">{stats.team1.wins} wins</span>
+              <span className="text-[var(--text-tertiary)]">{stats.draws} draws</span>
+              <span className="font-medium text-orange-500">{stats.team2.wins} wins</span>
+            </div>
+            
+            <div className="h-4 rounded-full overflow-hidden flex bg-gray-600/30">
+              <div
+                className="bg-blue-500 transition-all duration-500"
+                style={{ width: `${team1Percent}%` }}
+              />
+              <div
+                className="bg-gray-400 transition-all duration-500"
+                style={{ width: `${drawPercent}%` }}
+              />
+              <div
+                className="bg-orange-500 transition-all duration-500"
+                style={{ width: `${team2Percent}%` }}
+              />
+            </div>
+            
+            <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)] mt-2">
+              <span>{team1Percent.toFixed(0)}%</span>
+              <span>{drawPercent.toFixed(0)}%</span>
+              <span>{team2Percent.toFixed(0)}%</span>
+            </div>
+          </div>
+
+          {/* Goals and Clean Sheets */}
+          <div className="grid grid-cols-3 gap-2 text-center text-sm">
+            <div>
+              <span className="font-bold text-blue-500">{stats.team1.goals}</span>
+              <span className="text-[var(--text-tertiary)]"> goals</span>
+            </div>
+            <div className="text-[var(--text-tertiary)]">
+              {stats.avgGoalsPerMatch.toFixed(1)} avg/match
+            </div>
+            <div>
+              <span className="font-bold text-orange-500">{stats.team2.goals}</span>
+              <span className="text-[var(--text-tertiary)]"> goals</span>
+            </div>
+          </div>
+        </div>
+
         {/* Both Teams Recent Form Side by Side */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Team 1 Form */}

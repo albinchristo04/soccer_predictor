@@ -553,6 +553,17 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
+      {/* Back Button */}
+      <Link
+        href="/matches"
+        className="inline-flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] mb-4 transition-colors"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Back to Leagues
+      </Link>
+      
       {/* Header */}
       <div className={`bg-gradient-to-r ${config.gradient} rounded-2xl p-8 mb-6`}>
         <div className="flex items-center gap-4">

@@ -55,10 +55,10 @@ export default function MatchesPage() {
                        selectedLeague?.id === 'uefa.champions' || 
                        selectedLeague?.id === 'uefa.europa';
 
-  // Update URL when league changes
+  // Update URL when league changes - navigate directly to the full league page
   const handleSelectLeague = (league: typeof LEAGUES[0]) => {
-    setSelectedLeague(league);
-    router.push(`/matches?league=${league.id}`);
+    // Navigate directly to the full league/tournament home page
+    router.push(`/leagues/${league.id}`);
   };
 
   const handleBackToLeagues = () => {
@@ -138,7 +138,7 @@ export default function MatchesPage() {
     return (
       <div className="min-h-screen" style={{ backgroundColor: 'var(--background)' }}>
         <div className="max-w-4xl mx-auto px-4 py-12">
-          <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Matches</h1>
+          <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Leagues</h1>
           <p className="mb-8" style={{ color: 'var(--text-secondary)' }}>Select a league to view fixtures, results, and standings</p>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
