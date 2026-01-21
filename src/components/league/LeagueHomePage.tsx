@@ -162,23 +162,37 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
   const leagueLogo = LEAGUE_LOGOS[leagueId]
 
   // Helper to get ESPN league ID
+  // League ID mapping for cleaner code
+  const LEAGUE_ID_MAPPING: Record<string, string> = {
+    'eng': 'premier_league',
+    'esp': 'la_liga',
+    'ger': 'bundesliga',
+    'ita': 'serie_a',
+    'fra': 'ligue_1',
+    'usa': 'mls',
+  }
+  
+  const LEAGUE_TO_ESPN_ID: Record<string, string> = {
+    'premier_league': 'eng.1',
+    'la_liga': 'esp.1',
+    'bundesliga': 'ger.1',
+    'serie_a': 'ita.1',
+    'ligue_1': 'fra.1',
+    'mls': 'usa.1',
+  }
+
   const getEspnLeagueId = () => {
-    const leagueParam = leagueId.includes('.') 
-      ? leagueId.split('.')[0] === 'eng' ? 'premier_league'
-        : leagueId.split('.')[0] === 'esp' ? 'la_liga'
-        : leagueId.split('.')[0] === 'ger' ? 'bundesliga'
-        : leagueId.split('.')[0] === 'ita' ? 'serie_a'
-        : leagueId.split('.')[0] === 'fra' ? 'ligue_1'
-        : leagueId.split('.')[0] === 'usa' ? 'mls'
-        : leagueId
-      : leagueId
-    return leagueId.includes('.') ? leagueId : 
-      leagueParam === 'premier_league' ? 'eng.1' :
-      leagueParam === 'la_liga' ? 'esp.1' :
-      leagueParam === 'bundesliga' ? 'ger.1' :
-      leagueParam === 'serie_a' ? 'ita.1' :
-      leagueParam === 'ligue_1' ? 'fra.1' :
-      leagueParam === 'mls' ? 'usa.1' : leagueId
+    // If already an ESPN-style ID (e.g., 'eng.1'), return it
+    if (leagueId.includes('.')) {
+      return leagueId
+    }
+    
+    // Convert from short form (e.g., 'eng') to internal name
+    const prefix = leagueId.split('.')[0]
+    const leagueParam = LEAGUE_ID_MAPPING[prefix] || leagueId
+    
+    // Return ESPN ID
+    return LEAGUE_TO_ESPN_ID[leagueParam] || leagueId
   }
 
   // Run end of season simulation
@@ -247,7 +261,7 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
           leagueId: parseInt(leagueId) || 0,
           leagueName,
           country,
-          season: '2025-26',
+          season: AVAILABLE_SEASONS.find(s => s.value === selectedSeason)?.label || '2025-26',
           standings: [],
           topScorers: [],
           upcomingMatches: [],

@@ -150,17 +150,19 @@ export default function HeadToHeadDisplay({
         if (showTeamForm) {
           try {
             // Fetch recent team results from ESPN for both teams
-            const leagues = ['eng.1', 'esp.1', 'ita.1', 'ger.1', 'fra.1', 'usa.1', 'uefa.champions']
+            // Using a constant for supported leagues improves maintainability
+            const SUPPORTED_LEAGUES = ['eng.1', 'esp.1', 'ita.1', 'ger.1', 'fra.1', 'usa.1', 'uefa.champions']
             
-            for (const league of leagues) {
+            for (const league of SUPPORTED_LEAGUES) {
               try {
-                const [homeFormRes, awayFormRes] = await Promise.allSettled([
-                  fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/teams`),
-                  fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/teams`)
-                ])
+                // Single API call to get all teams, then find both home and away
+                const teamsRes = await fetch(
+                  `https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/teams`,
+                  { next: { revalidate: 3600 } } // Cache for 1 hour
+                )
                 
-                if (homeFormRes.status === 'fulfilled' && homeFormRes.value.ok) {
-                  const teamsData = await homeFormRes.value.json()
+                if (teamsRes.ok) {
+                  const teamsData = await teamsRes.json()
                   const teams = teamsData.sports?.[0]?.leagues?.[0]?.teams || []
                   
                   // Find home team
