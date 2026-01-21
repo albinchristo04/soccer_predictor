@@ -252,16 +252,38 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
     }
   }
 
+  // Normalize team name for comparison (handles variations like "Man City" vs "Manchester City")
+  const normalizeTeamName = (name: string): string => {
+    return name.toLowerCase()
+      .replace(/fc$|cf$|sc$/i, '')
+      .replace(/united/i, 'utd')
+      .replace(/city/i, 'city')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  // Match team names with fuzzy matching
+  const teamsMatch = (name1: string, name2: string): boolean => {
+    const n1 = normalizeTeamName(name1)
+    const n2 = normalizeTeamName(name2)
+    // Exact match after normalization
+    if (n1 === n2) return true
+    // Check if one name is a significant substring of the other (at least 60% of the longer name)
+    const shorter = n1.length < n2.length ? n1 : n2
+    const longer = n1.length >= n2.length ? n1 : n2
+    return longer.includes(shorter) && shorter.length >= longer.length * 0.6
+  }
+
+  // Animation offset for visual effect
+  const ANIMATION_OFFSET_PX = 2
+
   // Animate teams moving to their predicted positions
   const startSimulationAnimation = (predictedStandings: { team: string; points: number; position: number }[]) => {
     if (!data?.standings) return
     
     // Create initial animated standings from current data
     const initial: AnimatedStanding[] = data.standings.map((s, idx) => {
-      const predicted = predictedStandings.find(p => 
-        p.team.toLowerCase().includes(s.teamName.toLowerCase()) || 
-        s.teamName.toLowerCase().includes(p.team.toLowerCase())
-      )
+      const predicted = predictedStandings.find(p => teamsMatch(p.team, s.teamName))
       return {
         position: idx + 1,
         teamName: s.teamName,
@@ -751,7 +773,7 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
                             className={`border-b transition-all duration-300 ${zoneClass}`}
                             style={{ 
                               borderColor: 'var(--border-color)',
-                              transform: team.isAnimating ? `translateY(${(team.position - idx - 1) * 2}px)` : 'none',
+                              transform: team.isAnimating ? `translateY(${(team.position - idx - 1) * ANIMATION_OFFSET_PX}px)` : 'none',
                             }}
                           >
                             <td className="py-2 px-3 text-[var(--text-secondary)]">{Math.round(team.position)}</td>

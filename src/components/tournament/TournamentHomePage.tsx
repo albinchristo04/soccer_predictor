@@ -149,14 +149,25 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
   // Get available seasons based on tournament type
   const availableSeasons = tournamentId === 'world_cup' ? WORLD_CUP_SEASONS : TOURNAMENT_SEASONS
 
+  // Minimum number of teams required for tournament simulation
+  const MIN_TEAMS_FOR_SIMULATION = 8
+
   // Run tournament simulation
   const runTournamentSimulation = async () => {
     setRunningSimulation(true)
     try {
-      // Get teams from standings
-      const teams = data.groups.flatMap(g => g.standings.map(s => s.team)).filter(Boolean)
-      if (teams.length < 8) {
-        console.error('Not enough teams for simulation')
+      // Safely get teams from standings with null checks
+      if (!data.groups || data.groups.length === 0) {
+        console.error(`Tournament simulation requires group data. Please ensure tournament data is loaded.`)
+        return
+      }
+
+      const teams = data.groups.flatMap(g => 
+        (g.standings || []).map(s => s.team)
+      ).filter(Boolean)
+
+      if (teams.length < MIN_TEAMS_FOR_SIMULATION) {
+        console.error(`Tournament simulation requires at least ${MIN_TEAMS_FOR_SIMULATION} teams, found ${teams.length}. Please ensure tournament data is loaded.`)
         return
       }
 
