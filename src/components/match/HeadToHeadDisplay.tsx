@@ -128,6 +128,8 @@ export default function HeadToHeadDisplay({
       try {
         // Try to fetch from multiple sources for accurate H2H data
         let h2hData: HeadToHeadStats | null = null
+        let team1FormData: TeamFormData | null = null
+        let team2FormData: TeamFormData | null = null
         
         // Try ESPN API first for H2H (more reliable for major leagues)
         try {
@@ -142,6 +144,53 @@ export default function HeadToHeadDisplay({
           }
         } catch (e) {
           console.log('ESPN H2H not available, trying alternatives')
+        }
+
+        // Try to fetch real team form from ESPN schedule API
+        if (showTeamForm) {
+          try {
+            // Fetch recent team results from ESPN for both teams
+            const leagues = ['eng.1', 'esp.1', 'ita.1', 'ger.1', 'fra.1', 'usa.1', 'uefa.champions']
+            
+            for (const league of leagues) {
+              try {
+                const [homeFormRes, awayFormRes] = await Promise.allSettled([
+                  fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/teams`),
+                  fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/teams`)
+                ])
+                
+                if (homeFormRes.status === 'fulfilled' && homeFormRes.value.ok) {
+                  const teamsData = await homeFormRes.value.json()
+                  const teams = teamsData.sports?.[0]?.leagues?.[0]?.teams || []
+                  
+                  // Find home team
+                  const homeTeamData = teams.find((t: any) => 
+                    t.team?.displayName?.toLowerCase().includes(homeTeam.toLowerCase()) ||
+                    homeTeam.toLowerCase().includes(t.team?.displayName?.toLowerCase() || '')
+                  )
+                  
+                  // Find away team  
+                  const awayTeamData = teams.find((t: any) => 
+                    t.team?.displayName?.toLowerCase().includes(awayTeam.toLowerCase()) ||
+                    awayTeam.toLowerCase().includes(t.team?.displayName?.toLowerCase() || '')
+                  )
+                  
+                  if (homeTeamData) {
+                    team1FormData = parseESPNTeamForm(homeTeamData, homeTeam)
+                  }
+                  if (awayTeamData) {
+                    team2FormData = parseESPNTeamForm(awayTeamData, awayTeam)
+                  }
+                  
+                  if (team1FormData && team2FormData) break
+                }
+              } catch (e) {
+                continue
+              }
+            }
+          } catch (e) {
+            console.log('ESPN form data not available')
+          }
         }
 
         // Fallback to internal API
@@ -164,10 +213,10 @@ export default function HeadToHeadDisplay({
           h2hData = generateRealisticH2H(homeTeam, awayTeam)
         }
 
-        // Add team form data
+        // Add team form data - use ESPN data if available, otherwise generate
         if (showTeamForm) {
-          h2hData.team1Form = generateTeamForm(homeTeam, true)
-          h2hData.team2Form = generateTeamForm(awayTeam, false)
+          h2hData.team1Form = team1FormData || generateTeamForm(homeTeam, true, awayTeam)
+          h2hData.team2Form = team2FormData || generateTeamForm(awayTeam, false, homeTeam)
         }
 
         setStats(h2hData)
@@ -176,8 +225,8 @@ export default function HeadToHeadDisplay({
         // Set realistic mock data as fallback
         const mockData = generateRealisticH2H(homeTeam, awayTeam)
         if (showTeamForm) {
-          mockData.team1Form = generateTeamForm(homeTeam, true)
-          mockData.team2Form = generateTeamForm(awayTeam, false)
+          mockData.team1Form = generateTeamForm(homeTeam, true, awayTeam)
+          mockData.team2Form = generateTeamForm(awayTeam, false, homeTeam)
         }
         setStats(mockData)
       } finally {
@@ -187,6 +236,58 @@ export default function HeadToHeadDisplay({
 
     fetchH2H()
   }, [homeTeam, awayTeam, matchId, initialData, showTeamForm])
+
+  // Parse ESPN team data into form format
+  const parseESPNTeamForm = (teamData: any, teamName: string): TeamFormData | null => {
+    try {
+      const record = teamData.team?.record?.items?.[0]
+      const stats = record?.stats || []
+      
+      const getStatValue = (name: string) => {
+        const stat = stats.find((s: any) => s.name === name)
+        return parseInt(stat?.value || '0')
+      }
+      
+      const wins = getStatValue('wins')
+      const losses = getStatValue('losses')
+      const ties = getStatValue('ties')
+      const matches = getStatValue('gamesPlayed')
+      const goalsFor = getStatValue('pointsFor')
+      const goalsAgainst = getStatValue('pointsAgainst')
+      
+      // Generate form string from record
+      const recentForm: string[] = []
+      const totalResults = wins + ties + losses
+      if (totalResults > 0) {
+        // Approximate recent form based on win/draw/loss ratios
+        const winRate = wins / totalResults
+        const drawRate = ties / totalResults
+        for (let i = 0; i < 5; i++) {
+          const rand = Math.random()
+          if (rand < winRate) recentForm.push('W')
+          else if (rand < winRate + drawRate) recentForm.push('D')
+          else recentForm.push('L')
+        }
+      }
+      
+      return {
+        team: teamName,
+        recentForm,
+        recentMatches: [], // Will be populated if we have more detailed data
+        seasonStats: {
+          matches,
+          wins,
+          draws: ties,
+          losses,
+          goalsFor,
+          goalsAgainst,
+          cleanSheets: Math.floor(wins * 0.4) // Estimate
+        }
+      }
+    } catch (e) {
+      return null
+    }
+  }
 
   const parseH2HData = (data: any, team1: string, team2: string): HeadToHeadStats => {
     const matches = data.matches || data.recentMatches || data.h2h?.matches || []
@@ -432,10 +533,10 @@ export default function HeadToHeadDisplay({
 
   /**
    * Generate team form data with unique opponents per team.
-   * Ensures team doesn't play itself in recent matches.
+   * Ensures team doesn't play itself or the current opponent in recent matches.
    * Uses seeded random for consistent results based on team name.
    */
-  const generateTeamForm = (team: string, isHome: boolean): TeamFormData => {
+  const generateTeamForm = (team: string, isHome: boolean, currentOpponent?: string): TeamFormData => {
     const isTopTeam = TOP_TEAMS.some(t => team.toLowerCase().includes(t.toLowerCase()))
     
     // Create unique seed based on team name only (not isHome) for consistent form data
@@ -457,10 +558,19 @@ export default function HeadToHeadDisplay({
       else recentForm.push('L')
     }
     
-    // Filter out the team itself from possible opponents
+    // Filter out the team itself AND the current opponent from possible opponents
+    // This ensures we show form against OTHER teams, not the upcoming match opponent
     const teamLower = team.toLowerCase()
+    const opponentLower = currentOpponent?.toLowerCase() || ''
     const availableOpponents = ALL_POSSIBLE_OPPONENTS.filter(
-      opp => !teamLower.includes(opp.toLowerCase()) && !opp.toLowerCase().includes(teamLower)
+      opp => {
+        const oppLower = opp.toLowerCase()
+        // Exclude the team itself
+        if (teamLower.includes(oppLower) || oppLower.includes(teamLower)) return false
+        // Exclude the current opponent (we show H2H separately)
+        if (currentOpponent && (opponentLower.includes(oppLower) || oppLower.includes(opponentLower))) return false
+        return true
+      }
     )
     
     // Shuffle opponents using seeded random for consistent ordering per team
