@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
 import { KnockoutSimulator, KnockoutBracket, type BracketRound, type KnockoutMatch as BracketMatch } from '@/components/knockout'
+import MatchCalendar from '@/components/match/MatchCalendar'
 
 interface TournamentHomePageProps {
   tournamentId: 'champions_league' | 'europa_league' | 'world_cup'
@@ -68,6 +69,8 @@ const TOURNAMENT_CONFIG = {
     knockoutType: 'champions_league' as const,
     groupCount: 8,
     leagueId: 'uefa.champions',
+    espnId: 'uefa.champions',
+    logo: 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/2.png',
   },
   europa_league: {
     name: 'UEFA Europa League',
@@ -77,6 +80,8 @@ const TOURNAMENT_CONFIG = {
     knockoutType: 'europa_league' as const,
     groupCount: 8,
     leagueId: 'uefa.europa',
+    espnId: 'uefa.europa',
+    logo: 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/2310.png',
   },
   world_cup: {
     name: 'FIFA World Cup',
@@ -86,6 +91,8 @@ const TOURNAMENT_CONFIG = {
     knockoutType: 'world_cup' as const,
     groupCount: 8,
     leagueId: 'fifa.world',
+    espnId: 'fifa.world',
+    logo: 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/4.png',
   },
 }
 
@@ -116,13 +123,6 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
     const fetchData = async () => {
       setLoading(true)
       try {
-        // Fetch standings (groups), matches, and news in parallel
-        const [standingsRes, matchesRes, newsRes] = await Promise.allSettled([
-          fetch(`/api/v1/leagues/${config.leagueId}/standings`),
-          fetch(`/api/v1/leagues/${config.leagueId}/matches`),
-          fetch(`/api/v1/leagues/${config.leagueId}/news`),
-        ])
-
         const newData: TournamentData = {
           groups: [],
           knockoutMatches: [],
@@ -131,109 +131,147 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
           news: [],
         }
 
-        // Process groups from standings
-        if (standingsRes.status === 'fulfilled' && standingsRes.value.ok) {
-          const standingsJson = await standingsRes.value.json()
-          const groups = standingsJson.groups || standingsJson.standings || []
-          
-          newData.groups = groups.map((g: any) => ({
-            name: g.group || g.name || 'Group',
-            standings: (g.standings || g.teams || []).map((t: any, idx: number) => ({
-              position: idx + 1,
-              team: t.team || t.name || 'Unknown',
-              teamId: t.team_id || t.id,
-              played: t.played || t.matches || 0,
-              won: t.won || t.wins || 0,
-              drawn: t.drawn || t.draws || 0,
-              lost: t.lost || t.losses || 0,
-              goalsFor: t.goals_for || t.goalsFor || 0,
-              goalsAgainst: t.goals_against || t.goalsAgainst || 0,
-              goalDifference: t.goal_difference || t.goalDifference || 0,
-              points: t.points || 0,
+        // Fetch from ESPN APIs for real tournament data
+        const espnLeagueId = config.espnId
+        
+        // Fetch standings (groups), matches, and news in parallel from ESPN
+        const espnResults = await Promise.allSettled([
+          fetch(`https://site.api.espn.com/apis/v2/sports/soccer/${espnLeagueId}/standings`),
+          fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnLeagueId}/scoreboard`),
+          fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnLeagueId}/news`),
+        ])
+
+        // Process standings/groups from ESPN
+        if (espnResults[0].status === 'fulfilled') {
+          const standingsRes = espnResults[0] as PromiseFulfilledResult<Response>
+          if (standingsRes.value.ok) {
+            const standingsData = await standingsRes.value.json()
+            const children = standingsData.children || []
+            
+            // Process groups
+            for (const child of children) {
+              const groupName = child.name || child.abbreviation || 'Group'
+              const entries = child.standings?.entries || []
+              
+              if (entries.length > 0) {
+                const groupTeams: GroupStanding[] = entries.map((entry: any, idx: number) => {
+                  const getStatVal = (name: string) => {
+                    const stat = entry.stats?.find((s: any) => s.name === name)
+                    return parseInt(stat?.value || '0', 10)
+                  }
+                  return {
+                    position: idx + 1,
+                    team: entry.team?.displayName || 'Unknown',
+                    teamId: entry.team?.id,
+                    played: getStatVal('gamesPlayed'),
+                    won: getStatVal('wins'),
+                    drawn: getStatVal('ties'),
+                    lost: getStatVal('losses'),
+                    goalsFor: getStatVal('pointsFor'),
+                    goalsAgainst: getStatVal('pointsAgainst'),
+                    goalDifference: getStatVal('pointDifferential'),
+                    points: getStatVal('points'),
+                  }
+                })
+                newData.groups.push({ name: groupName, standings: groupTeams })
+              }
+            }
+          }
+        }
+
+        // Process matches from ESPN
+        if (espnResults[1].status === 'fulfilled') {
+          const matchesRes = espnResults[1] as PromiseFulfilledResult<Response>
+          if (matchesRes.value.ok) {
+            const matchesData = await matchesRes.value.json()
+            const events = matchesData.events || []
+            const now = new Date()
+            
+            for (const event of events) {
+              const competition = event.competitions?.[0]
+              if (!competition) continue
+              
+              const homeTeam = competition.competitors?.find((c: any) => c.homeAway === 'home')
+              const awayTeam = competition.competitors?.find((c: any) => c.homeAway === 'away')
+              const matchDate = new Date(event.date)
+              const statusType = competition.status?.type?.name || ''
+              
+              const isFinished = statusType.includes('FINAL') || statusType.includes('FULL_TIME')
+              const isLive = statusType.includes('IN_PROGRESS') || statusType.includes('HALFTIME')
+              const roundName = event.competitions?.[0]?.type?.text || event.shortName || ''
+              const isKnockout = roundName.toLowerCase().includes('final') || 
+                                roundName.toLowerCase().includes('round of') ||
+                                roundName.toLowerCase().includes('knockout')
+              
+              const matchObj: Match = {
+                id: String(event.id),
+                homeTeam: homeTeam?.team?.displayName || 'Home',
+                awayTeam: awayTeam?.team?.displayName || 'Away',
+                homeScore: isFinished || isLive ? parseInt(homeTeam?.score || '0') : undefined,
+                awayScore: isFinished || isLive ? parseInt(awayTeam?.score || '0') : undefined,
+                date: matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                time: matchDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+                round: roundName,
+                venue: competition.venue?.fullName,
+                status: isFinished ? 'finished' : isLive ? 'live' : 'upcoming',
+              }
+              
+              if (isKnockout && isFinished) {
+                newData.knockoutMatches.push(matchObj)
+              } else if (isFinished) {
+                newData.recentResults.push(matchObj)
+              } else {
+                newData.upcomingMatches.push(matchObj)
+              }
+            }
+            
+            // Build bracket rounds from knockout matches
+            const roundsMap: Record<string, BracketMatch[]> = {}
+            for (const match of newData.knockoutMatches) {
+              const round = match.round || 'Unknown'
+              if (!roundsMap[round]) {
+                roundsMap[round] = []
+              }
+              roundsMap[round].push({
+                id: match.id,
+                homeTeam: match.homeTeam,
+                awayTeam: match.awayTeam,
+                homeScore: match.homeScore,
+                awayScore: match.awayScore,
+                date: match.date,
+                time: match.time,
+                status: match.status as 'scheduled' | 'live' | 'finished',
+                round: round,
+                winner: match.homeScore !== undefined && match.awayScore !== undefined
+                  ? match.homeScore > match.awayScore ? 'home' 
+                  : match.awayScore > match.homeScore ? 'away' 
+                  : null
+                  : null,
+              })
+            }
+            
+            // Convert to bracket rounds array
+            const bracketData: BracketRound[] = Object.entries(roundsMap).map(([name, matches]) => ({
+              name,
+              matches,
             }))
-          }))
+            setBracketRounds(bracketData)
+          }
         }
 
-        // Process matches
-        if (matchesRes.status === 'fulfilled' && matchesRes.value.ok) {
-          const matchesJson = await matchesRes.value.json()
-          const allMatches = matchesJson.matches || []
-          const now = new Date()
-
-          for (const match of allMatches) {
-            const matchDate = new Date(match.utcTime || match.date || '')
-            const isPlayed = match.status === 'played' || match.status === 'finished'
-            const isKnockout = match.round?.toLowerCase().includes('final') || 
-                              match.round?.toLowerCase().includes('round of')
-
-            const matchObj: Match = {
-              id: String(match.id || ''),
-              homeTeam: match.home?.name || match.home_team || 'Home',
-              awayTeam: match.away?.name || match.away_team || 'Away',
-              homeScore: isPlayed ? (match.home?.score ?? match.home_goals) : undefined,
-              awayScore: isPlayed ? (match.away?.score ?? match.away_goals) : undefined,
-              date: matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-              time: matchDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-              round: match.round || match.stage,
-              venue: match.venue?.name,
-              status: isPlayed ? 'finished' : match.status === 'live' ? 'live' : 'upcoming',
-            }
-
-            if (isKnockout && isPlayed) {
-              newData.knockoutMatches.push(matchObj)
-            } else if (isPlayed) {
-              newData.recentResults.push(matchObj)
-            } else {
-              newData.upcomingMatches.push(matchObj)
-            }
+        // Process news from ESPN (tournament-specific)
+        if (espnResults[2].status === 'fulfilled') {
+          const newsRes = espnResults[2] as PromiseFulfilledResult<Response>
+          if (newsRes.value.ok) {
+            const newsData = await newsRes.value.json()
+            newData.news = (newsData.articles || []).slice(0, 8).map((n: any) => ({
+              headline: n.headline || '',
+              description: n.description || '',
+              link: n.links?.web?.href || '',
+              image: n.images?.[0]?.url || '',
+              published: n.published || '',
+            }))
           }
-
-          newData.recentResults = newData.recentResults.slice(0, 10)
-          newData.upcomingMatches = newData.upcomingMatches.slice(0, 10)
-          
-          // Build bracket rounds from knockout matches
-          const roundsMap: Record<string, BracketMatch[]> = {}
-          for (const match of newData.knockoutMatches) {
-            const round = match.round || 'Unknown'
-            if (!roundsMap[round]) {
-              roundsMap[round] = []
-            }
-            roundsMap[round].push({
-              id: match.id,
-              homeTeam: match.homeTeam,
-              awayTeam: match.awayTeam,
-              homeScore: match.homeScore,
-              awayScore: match.awayScore,
-              date: match.date,
-              time: match.time,
-              status: match.status as 'scheduled' | 'live' | 'finished',
-              round: round,
-              winner: match.homeScore !== undefined && match.awayScore !== undefined
-                ? match.homeScore > match.awayScore ? 'home' 
-                : match.awayScore > match.homeScore ? 'away' 
-                : null
-                : null,
-            })
-          }
-          
-          // Convert to bracket rounds array
-          const bracketData: BracketRound[] = Object.entries(roundsMap).map(([name, matches]) => ({
-            name,
-            matches,
-          }))
-          setBracketRounds(bracketData)
-        }
-
-        // Process news
-        if (newsRes.status === 'fulfilled' && newsRes.value.ok) {
-          const newsJson = await newsRes.value.json()
-          newData.news = (newsJson.news || []).slice(0, 8).map((n: any) => ({
-            headline: n.headline || n.title || '',
-            description: n.description || n.summary || '',
-            link: n.links?.web?.href || n.url || '',
-            image: n.images?.[0]?.url || '',
-            published: n.published || '',
-          }))
         }
 
         setData(newData)
@@ -245,7 +283,7 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
     }
 
     fetchData()
-  }, [config.leagueId])
+  }, [config.espnId])
   
   // Fetch simulation probabilities for the tournament
   useEffect(() => {
@@ -567,11 +605,19 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
       {/* Header */}
       <div className={`bg-gradient-to-r ${config.gradient} rounded-2xl p-8 mb-6`}>
         <div className="flex items-center gap-4">
-          <span className="text-5xl">{config.emoji}</span>
+          {config.logo ? (
+            <img 
+              src={config.logo} 
+              alt={tournamentName}
+              className="w-16 h-16 object-contain bg-white rounded-xl p-1"
+            />
+          ) : (
+            <span className="text-5xl">{config.emoji}</span>
+          )}
           <div>
             <h1 className="text-3xl font-bold text-white">{tournamentName}</h1>
             <p className="text-white/80">
-              {tournamentId === 'world_cup' ? 'International Tournament' : 'European Club Competition'}
+              {tournamentId === 'world_cup' ? 'International Tournament • 2026' : 'European Club Competition • 2025-26'}
             </p>
           </div>
         </div>
@@ -622,28 +668,7 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
           {activeTab === 'Knockout' && renderKnockoutBracket()}
           
           {activeTab === 'Fixtures' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-[var(--card-bg)] rounded-xl border p-6" style={{ borderColor: 'var(--border-color)' }}>
-                <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Upcoming Fixtures</h2>
-                {data.upcomingMatches.length > 0 ? (
-                  <div className="space-y-3">
-                    {data.upcomingMatches.map(match => renderMatchCard(match))}
-                  </div>
-                ) : (
-                  <p className="text-[var(--text-tertiary)]">No upcoming fixtures</p>
-                )}
-              </div>
-              <div className="bg-[var(--card-bg)] rounded-xl border p-6" style={{ borderColor: 'var(--border-color)' }}>
-                <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Recent Results</h2>
-                {data.recentResults.length > 0 ? (
-                  <div className="space-y-3">
-                    {data.recentResults.map(match => renderMatchCard(match, true))}
-                  </div>
-                ) : (
-                  <p className="text-[var(--text-tertiary)]">No recent results</p>
-                )}
-              </div>
-            </div>
+            <MatchCalendar leagueId={config.espnId} leagueName={tournamentName} />
           )}
           
           {activeTab === 'Simulator' && (
