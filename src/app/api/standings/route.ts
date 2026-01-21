@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
     
     const result: LeagueStandings = {
       league: league.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      season: '2024-2025',
+      season: '2025-2026',
       standings: simulatedStandings,
       remainingMatches,
       simulationsRun: simulations,

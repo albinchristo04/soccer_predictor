@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import MatchCalendar from '@/components/match/MatchCalendar'
 
 interface Standing {
   position: number
@@ -77,6 +78,36 @@ interface LeagueHomePageProps {
   country: string
 }
 
+// Official league logo URLs (similar to FotMob style)
+const LEAGUE_LOGOS: Record<string, string> = {
+  'premier_league': 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/23.png',
+  'la_liga': 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/15.png',
+  'bundesliga': 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/10.png',
+  'serie_a': 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/12.png',
+  'ligue_1': 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/9.png',
+  'mls': 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/19.png',
+  'eredivisie': 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/11.png',
+  'primeira_liga': 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/14.png',
+  // ESPN-style IDs
+  'eng.1': 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/23.png',
+  'esp.1': 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/15.png',
+  'ger.1': 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/10.png',
+  'ita.1': 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/12.png',
+  'fra.1': 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/9.png',
+  'usa.1': 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/19.png',
+  'ned.1': 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/11.png',
+  'por.1': 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/14.png',
+}
+
+// Available seasons for dropdown
+const AVAILABLE_SEASONS = [
+  { value: '2025', label: '2025-26' },
+  { value: '2024', label: '2024-25' },
+  { value: '2023', label: '2023-24' },
+  { value: '2022', label: '2022-23' },
+  { value: '2021', label: '2021-22' },
+]
+
 const LEAGUE_CONFIGS: Record<string, { color: string; gradient: string; flag: string }> = {
   // Main leagues
   'premier_league': { color: '#3D195B', gradient: 'from-purple-900 to-purple-700', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
@@ -118,8 +149,68 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
   const [data, setData] = useState<LeagueHomeData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'standings' | 'scorers' | 'fixtures' | 'news'>('standings')
+  const [selectedSeason, setSelectedSeason] = useState('2025')
+  const [runningSimulation, setRunningSimulation] = useState(false)
+  const [simulationResults, setSimulationResults] = useState<{
+    mostLikelyChampion: string
+    championProbability: number
+    topFourTeams: string[]
+    relegationCandidates: string[]
+  } | null>(null)
 
   const config = LEAGUE_CONFIGS[leagueId] || LEAGUE_CONFIGS['premier_league']
+  const leagueLogo = LEAGUE_LOGOS[leagueId]
+
+  // Helper to get ESPN league ID
+  const getEspnLeagueId = () => {
+    const leagueParam = leagueId.includes('.') 
+      ? leagueId.split('.')[0] === 'eng' ? 'premier_league'
+        : leagueId.split('.')[0] === 'esp' ? 'la_liga'
+        : leagueId.split('.')[0] === 'ger' ? 'bundesliga'
+        : leagueId.split('.')[0] === 'ita' ? 'serie_a'
+        : leagueId.split('.')[0] === 'fra' ? 'ligue_1'
+        : leagueId.split('.')[0] === 'usa' ? 'mls'
+        : leagueId
+      : leagueId
+    return leagueId.includes('.') ? leagueId : 
+      leagueParam === 'premier_league' ? 'eng.1' :
+      leagueParam === 'la_liga' ? 'esp.1' :
+      leagueParam === 'bundesliga' ? 'ger.1' :
+      leagueParam === 'serie_a' ? 'ita.1' :
+      leagueParam === 'ligue_1' ? 'fra.1' :
+      leagueParam === 'mls' ? 'usa.1' : leagueId
+  }
+
+  // Run end of season simulation
+  const runSeasonSimulation = async () => {
+    setRunningSimulation(true)
+    try {
+      // Map leagueId to numeric ID for simulation endpoint
+      const leagueIdMap: Record<string, number> = {
+        'eng.1': 47, 'premier_league': 47,
+        'esp.1': 87, 'la_liga': 87,
+        'ger.1': 54, 'bundesliga': 54,
+        'ita.1': 55, 'serie_a': 55,
+        'fra.1': 53, 'ligue_1': 53,
+      }
+      const numericLeagueId = leagueIdMap[leagueId] || 47
+      
+      const res = await fetch(`/api/simulation/${numericLeagueId}?n_simulations=10000`)
+      if (res.ok) {
+        const simData = await res.json()
+        setSimulationResults({
+          mostLikelyChampion: simData.most_likely_champion || simData.standings?.[0]?.team_name || 'Unknown',
+          championProbability: simData.champion_probability || simData.standings?.[0]?.title_probability || 0,
+          topFourTeams: simData.likely_top_4 || simData.standings?.slice(0, 4).map((s: any) => s.team_name) || [],
+          relegationCandidates: simData.relegation_candidates || simData.standings?.slice(-3).map((s: any) => s.team_name) || [],
+        })
+      }
+    } catch (error) {
+      console.error('Simulation error:', error)
+    } finally {
+      setRunningSimulation(false)
+    }
+  }
 
   useEffect(() => {
     const fetchLeagueData = async () => {
@@ -143,25 +234,20 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
           fetch(`/api/news?league=${leagueParam}`),
         ])
         
-        // Also fetch from ESPN for real-time data
-        const espnLeagueId = leagueId.includes('.') ? leagueId : 
-          leagueParam === 'premier_league' ? 'eng.1' :
-          leagueParam === 'la_liga' ? 'esp.1' :
-          leagueParam === 'bundesliga' ? 'ger.1' :
-          leagueParam === 'serie_a' ? 'ita.1' :
-          leagueParam === 'ligue_1' ? 'fra.1' :
-          leagueParam === 'mls' ? 'usa.1' : leagueId
+        // Also fetch from ESPN for real-time data including top scorers
+        const espnLeagueId = getEspnLeagueId()
 
         const espnResults = await Promise.allSettled([
           fetch(`https://site.api.espn.com/apis/v2/sports/soccer/${espnLeagueId}/standings`),
           fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnLeagueId}/scoreboard`),
+          fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnLeagueId}/leaders`),
         ])
 
         const leagueData: LeagueHomeData = {
           leagueId: parseInt(leagueId) || 0,
           leagueName,
           country,
-          season: '2024-25',
+          season: '2025-26',
           standings: [],
           topScorers: [],
           upcomingMatches: [],
@@ -259,16 +345,57 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
           }
         }
 
-        // Process news
-        if (newsRes.status === 'fulfilled' && newsRes.value.ok) {
-          const newsJson = await newsRes.value.json()
-          leagueData.news = (newsJson.articles || newsJson.news || []).slice(0, 5).map((n: any) => ({
-            headline: n.headline || n.title || '',
-            description: n.description || n.summary || '',
-            link: n.links?.web?.href || n.url || '',
-            image: n.images?.[0]?.url || n.image || '',
-            published: n.published || '',
-          }))
+        // Process top scorers from ESPN
+        if (espnResults[2].status === 'fulfilled') {
+          const espnLeaders = espnResults[2] as PromiseFulfilledResult<Response>
+          if (espnLeaders.value.ok) {
+            const leadersData = await espnLeaders.value.json()
+            const leaders = leadersData.leaders || []
+            // Find goals category
+            const goalsCategory = leaders.find((cat: any) => 
+              cat.name?.toLowerCase() === 'goals' || cat.displayName?.toLowerCase() === 'goals'
+            )
+            if (goalsCategory?.leaders) {
+              leagueData.topScorers = goalsCategory.leaders.slice(0, 10).map((leader: any, idx: number) => ({
+                rank: idx + 1,
+                name: leader.athlete?.displayName || leader.athlete?.fullName || 'Unknown',
+                team: leader.athlete?.team?.displayName || leader.team?.displayName || '',
+                goals: parseInt(leader.value || leader.stats || '0'),
+                assists: 0, // ESPN doesn't always provide this
+                matches: leader.athlete?.statistics?.gamesPlayed || 0,
+              }))
+            }
+          }
+        }
+
+        // Process league-specific news from ESPN
+        try {
+          const espnNewsRes = await fetch(
+            `https://site.api.espn.com/apis/site/v2/sports/soccer/${espnLeagueId}/news`,
+            { next: { revalidate: 300 } }
+          )
+          if (espnNewsRes.ok) {
+            const espnNewsData = await espnNewsRes.json()
+            leagueData.news = (espnNewsData.articles || []).slice(0, 8).map((n: any) => ({
+              headline: n.headline || '',
+              description: n.description || '',
+              link: n.links?.web?.href || '',
+              image: n.images?.[0]?.url || '',
+              published: n.published || '',
+            }))
+          }
+        } catch (e) {
+          // Fallback to general news
+          if (newsRes.status === 'fulfilled' && newsRes.value.ok) {
+            const newsJson = await newsRes.value.json()
+            leagueData.news = (newsJson.articles || newsJson.news || []).slice(0, 5).map((n: any) => ({
+              headline: n.headline || n.title || '',
+              description: n.description || n.summary || '',
+              link: n.links?.web?.href || n.url || '',
+              image: n.images?.[0]?.url || n.image || '',
+              published: n.published || '',
+            }))
+          }
         }
 
         setData(leagueData)
@@ -280,7 +407,7 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
     }
 
     fetchLeagueData()
-  }, [leagueId, leagueName, country])
+  }, [leagueId, leagueName, country, selectedSeason])
 
   if (loading) {
     return (
@@ -306,11 +433,57 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
             Back to Leagues
           </Link>
           
-          <div className="flex items-center gap-4 mb-4">
-            <span className="text-4xl">{config.flag}</span>
-            <div>
-              <h1 className="text-3xl font-bold text-white">{leagueName}</h1>
-              <p className="text-white/80">{data?.season} Season • {country}</p>
+          <div className="flex items-center justify-between flex-wrap gap-4 mb-4">
+            <div className="flex items-center gap-4">
+              {/* League Logo */}
+              {leagueLogo ? (
+                <img 
+                  src={leagueLogo} 
+                  alt={leagueName}
+                  className="w-16 h-16 object-contain bg-white rounded-xl p-1"
+                />
+              ) : (
+                <span className="text-4xl">{config.flag}</span>
+              )}
+              <div>
+                <h1 className="text-3xl font-bold text-white">{leagueName}</h1>
+                <p className="text-white/80">{AVAILABLE_SEASONS.find(s => s.value === selectedSeason)?.label || '2025-26'} Season • {country}</p>
+              </div>
+            </div>
+            
+            {/* Season Dropdown & Simulation Button */}
+            <div className="flex items-center gap-3">
+              <select
+                value={selectedSeason}
+                onChange={(e) => setSelectedSeason(e.target.value)}
+                className="px-4 py-2 rounded-lg bg-white/20 text-white border border-white/30 backdrop-blur-sm cursor-pointer hover:bg-white/30 transition-colors"
+              >
+                {AVAILABLE_SEASONS.map(season => (
+                  <option key={season.value} value={season.value} className="text-gray-900">
+                    {season.label}
+                  </option>
+                ))}
+              </select>
+              
+              <button
+                onClick={runSeasonSimulation}
+                disabled={runningSimulation}
+                className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-semibold transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {runningSimulation ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Simulating...
+                  </>
+                ) : (
+                  <>
+                    🎲 Run Season Simulation
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
@@ -355,8 +528,32 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
               <p className="text-white/80 text-sm">fixtures scheduled</p>
             </div>
             
-            {/* Show prediction if available */}
-            {data?.simulation && (
+            {/* Show simulation results if available */}
+            {simulationResults && (
+              <div className="bg-amber-500/20 backdrop-blur-sm rounded-xl p-4 col-span-2 md:col-span-4 border border-amber-500/30">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div>
+                    <p className="text-amber-300 text-sm font-medium">🏆 AI Season Prediction</p>
+                    <p className="text-white font-bold text-lg">{simulationResults.mostLikelyChampion} predicted to win the title</p>
+                    <p className="text-white/70 text-sm mt-1">
+                      Top 4: {simulationResults.topFourTeams.join(', ')}
+                    </p>
+                    <p className="text-red-300 text-xs mt-1">
+                      ⚠️ Relegation risk: {simulationResults.relegationCandidates.join(', ')}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-amber-400">
+                      {(simulationResults.championProbability * 100).toFixed(0)}%
+                    </p>
+                    <p className="text-white/60 text-xs">title probability</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Show prediction from data if available */}
+            {data?.simulation && !simulationResults && (
               <div className="bg-amber-500/20 backdrop-blur-sm rounded-xl p-4 col-span-2 md:col-span-4 border border-amber-500/30">
                 <div className="flex items-center justify-between">
                   <div>
@@ -466,119 +663,47 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
           </div>
         )}
 
-        {activeTab === 'scorers' && data?.topScorers && (
+        {activeTab === 'scorers' && (
           <div className="bg-[var(--card-bg)] border rounded-2xl overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
             <div className="p-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
               <h2 className="text-lg font-semibold text-[var(--text-primary)]">Top Scorers</h2>
             </div>
-            <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
-              {data.topScorers.map((scorer) => (
-                <div key={scorer.name} className="flex items-center justify-between p-4 hover:bg-[var(--muted-bg)]">
-                  <div className="flex items-center gap-4">
-                    <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                      scorer.rank <= 3 ? 'bg-amber-500 text-white' : 'bg-[var(--muted-bg)] text-[var(--text-secondary)]'
-                    }`}>
-                      {scorer.rank}
-                    </span>
-                    <div>
-                      <p className="font-medium text-[var(--text-primary)]">{scorer.name}</p>
-                      <p className="text-sm text-[var(--text-tertiary)]">{scorer.team}</p>
+            {data?.topScorers && data.topScorers.length > 0 ? (
+              <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+                {data.topScorers.map((scorer) => (
+                  <div key={scorer.name} className="flex items-center justify-between p-4 hover:bg-[var(--muted-bg)]">
+                    <div className="flex items-center gap-4">
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                        scorer.rank <= 3 ? 'bg-amber-500 text-white' : 'bg-[var(--muted-bg)] text-[var(--text-secondary)]'
+                      }`}>
+                        {scorer.rank}
+                      </span>
+                      <div>
+                        <p className="font-medium text-[var(--text-primary)]">{scorer.name}</p>
+                        <p className="text-sm text-[var(--text-tertiary)]">{scorer.team}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xl font-bold text-[var(--accent-primary)]">{scorer.goals}</p>
+                      <p className="text-xs text-[var(--text-tertiary)]">{scorer.assists} assists</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xl font-bold text-[var(--accent-primary)]">{scorer.goals}</p>
-                    <p className="text-xs text-[var(--text-tertiary)]">{scorer.assists} assists</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center">
+                <span className="text-3xl mb-2 block">⚽</span>
+                <p className="text-[var(--text-tertiary)]">Top scorers data is being loaded...</p>
+                <p className="text-sm text-[var(--text-tertiary)] mt-1">Check back later for the latest statistics</p>
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'fixtures' && (
           <div className="space-y-6">
-            {/* Upcoming Matches */}
-            <div className="bg-[var(--card-bg)] border rounded-2xl" style={{ borderColor: 'var(--border-color)' }}>
-              <div className="p-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
-                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Upcoming Fixtures</h2>
-              </div>
-              <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
-                {data?.upcomingMatches && data.upcomingMatches.length > 0 ? (
-                  data.upcomingMatches.map((match) => (
-                    <Link
-                      key={match.id}
-                      href={`/matches/${match.id}?league=${leagueId}`}
-                      className="flex items-center justify-between p-4 hover:bg-[var(--muted-bg)] transition-colors"
-                    >
-                      <div className="flex-1">
-                        <p className="text-xs text-[var(--text-tertiary)] mb-1">{match.date} • {match.time}</p>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-[var(--text-primary)]">{match.homeTeam}</span>
-                          <span className="text-[var(--text-tertiary)]">vs</span>
-                          <span className="font-medium text-[var(--text-primary)]">{match.awayTeam}</span>
-                        </div>
-                        {match.venue && (
-                          <p className="text-xs text-[var(--text-tertiary)] mt-1">📍 {match.venue}</p>
-                        )}
-                      </div>
-                      <svg className="w-5 h-5 text-[var(--text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </Link>
-                  ))
-                ) : (
-                  <div className="p-8 text-center">
-                    <span className="text-3xl mb-2 block">📅</span>
-                    <p className="text-[var(--text-tertiary)]">No upcoming fixtures scheduled</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Recent Results */}
-            <div className="bg-[var(--card-bg)] border rounded-2xl" style={{ borderColor: 'var(--border-color)' }}>
-              <div className="p-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
-                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Recent Results</h2>
-              </div>
-              <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
-                {data?.recentResults && data.recentResults.length > 0 ? (
-                  data.recentResults.map((match) => (
-                    <Link
-                      key={match.id}
-                      href={`/matches/${match.id}?league=${leagueId}`}
-                      className="flex items-center justify-between p-4 hover:bg-[var(--muted-bg)] transition-colors"
-                    >
-                      <div className="flex-1">
-                        <p className="text-xs text-[var(--text-tertiary)] mb-1">{match.date}</p>
-                        <div className="flex items-center gap-3">
-                          <span className={`font-medium ${match.homeScore > match.awayScore ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
-                            {match.homeTeam}
-                          </span>
-                          <span className={`px-2 py-0.5 rounded font-bold text-sm ${
-                            match.homeScore > match.awayScore ? 'bg-green-500/20 text-green-500' :
-                            match.awayScore > match.homeScore ? 'bg-red-500/20 text-red-500' :
-                            'bg-gray-500/20 text-gray-500'
-                          }`}>
-                            {match.homeScore} - {match.awayScore}
-                          </span>
-                          <span className={`font-medium ${match.awayScore > match.homeScore ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
-                            {match.awayTeam}
-                          </span>
-                        </div>
-                      </div>
-                      <svg className="w-5 h-5 text-[var(--text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </Link>
-                  ))
-                ) : (
-                  <div className="p-8 text-center">
-                    <span className="text-3xl mb-2 block">⚽</span>
-                    <p className="text-[var(--text-tertiary)]">No recent results available</p>
-                  </div>
-                )}
-              </div>
-            </div>
+            {/* Calendar View */}
+            <MatchCalendar leagueId={getEspnLeagueId()} leagueName={leagueName} />
           </div>
         )}
 
