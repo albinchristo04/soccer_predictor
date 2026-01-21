@@ -165,6 +165,10 @@ const MLS_CONFERENCES = {
   western: ['LAFC', 'LA Galaxy', 'Seattle', 'Houston', 'Real Salt Lake', 'Minnesota', 'Colorado', 'Portland', 'Vancouver', 'St. Louis', 'Austin', 'Sporting KC', 'FC Dallas', 'San Jose'],
 }
 
+// Pre-compute lowercased conference team names for efficient matching
+const MLS_EASTERN_LOWER = MLS_CONFERENCES.eastern.map(t => t.toLowerCase())
+const MLS_WESTERN_LOWER = MLS_CONFERENCES.western.map(t => t.toLowerCase())
+
 export default function LeagueHomePage({ leagueId, leagueName, country }: LeagueHomePageProps) {
   const [data, setData] = useState<LeagueHomeData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -319,14 +323,16 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
     const totalSteps = 60
     let step = 0
     
+    // Easing function for smooth animation (ease-in-out cubic)
+    const easeInOutCubic = (t: number): number => {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+    }
+    
     const animateInterval = setInterval(() => {
       step++
       setAnimationStep(step)
       const progress = step / totalSteps
-      // Smooth ease-in-out for more natural movement
-      const easeProgress = progress < 0.5 
-        ? 4 * progress * progress * progress 
-        : 1 - Math.pow(-2 * progress + 2, 3) / 2
+      const easeProgress = easeInOutCubic(progress)
       
       setAnimatedStandings(prev => {
         const updated = prev.map(s => {
@@ -897,11 +903,9 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
                   const isEastern = conference.includes('Eastern')
                   const conferenceTeams = data.standings.filter(team => {
                     const teamNameLower = team.teamName.toLowerCase()
-                    const eastTeams = MLS_CONFERENCES.eastern.map(t => t.toLowerCase())
-                    const westTeams = MLS_CONFERENCES.western.map(t => t.toLowerCase())
                     return isEastern 
-                      ? eastTeams.some(et => teamNameLower.includes(et) || et.includes(teamNameLower))
-                      : westTeams.some(wt => teamNameLower.includes(wt) || wt.includes(teamNameLower))
+                      ? MLS_EASTERN_LOWER.some(et => teamNameLower.includes(et) || et.includes(teamNameLower))
+                      : MLS_WESTERN_LOWER.some(wt => teamNameLower.includes(wt) || wt.includes(teamNameLower))
                   })
                   
                   return (
