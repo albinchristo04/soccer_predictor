@@ -153,6 +153,16 @@ interface AnimatedStanding {
   points: number
   finalPoints: number
   isAnimating: boolean
+  currentY: number  // For smooth visual animation
+}
+
+// Simulation count options (like in Predict tab)
+const SIMULATION_OPTIONS = [1000, 5000, 10000, 25000, 50000]
+
+// MLS Conference configuration
+const MLS_CONFERENCES = {
+  eastern: ['Inter Miami', 'Cincinnati', 'Columbus', 'Orlando City', 'Charlotte', 'New York Red Bulls', 'New York City FC', 'Philadelphia', 'Atlanta United', 'D.C. United', 'Chicago', 'CF Montréal', 'New England', 'Nashville', 'Toronto FC'],
+  western: ['LAFC', 'LA Galaxy', 'Seattle', 'Houston', 'Real Salt Lake', 'Minnesota', 'Colorado', 'Portland', 'Vancouver', 'St. Louis', 'Austin', 'Sporting KC', 'FC Dallas', 'San Jose'],
 }
 
 export default function LeagueHomePage({ leagueId, leagueName, country }: LeagueHomePageProps) {
@@ -163,6 +173,8 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
   const [runningSimulation, setRunningSimulation] = useState(false)
   const [showSimulationAnimation, setShowSimulationAnimation] = useState(false)
   const [animatedStandings, setAnimatedStandings] = useState<AnimatedStanding[]>([])
+  const [numSimulations, setNumSimulations] = useState(10000)
+  const [animationStep, setAnimationStep] = useState(0)
   const [simulationResults, setSimulationResults] = useState<{
     mostLikelyChampion: string
     championProbability: number
@@ -170,6 +182,9 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
     relegationCandidates: string[]
     predictedStandings: { team: string; points: number; position: number }[]
   } | null>(null)
+
+  // Check if this is MLS to show conferences
+  const isMLS = leagueId === 'usa.1' || leagueId === 'mls'
 
   const config = LEAGUE_CONFIGS[leagueId] || LEAGUE_CONFIGS['premier_league']
   const leagueLogo = LEAGUE_LOGOS[leagueId]
@@ -212,6 +227,7 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
   const runSeasonSimulation = async () => {
     setRunningSimulation(true)
     setShowSimulationAnimation(false)
+    setAnimationStep(0)
     try {
       // Map leagueId to numeric ID for simulation endpoint
       const leagueIdMap: Record<string, number> = {
@@ -220,10 +236,11 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
         'ger.1': 54, 'bundesliga': 54,
         'ita.1': 55, 'serie_a': 55,
         'fra.1': 53, 'ligue_1': 53,
+        'usa.1': 29, 'mls': 29,
       }
       const numericLeagueId = leagueIdMap[leagueId] || 47
       
-      const res = await fetch(`/api/simulation/${numericLeagueId}?n_simulations=10000`)
+      const res = await fetch(`/api/simulation/${numericLeagueId}?n_simulations=${numSimulations}`)
       if (res.ok) {
         const simData = await res.json()
         const predictedStandings = (simData.standings || []).map((s: any, idx: number) => ({
@@ -240,9 +257,9 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
           predictedStandings,
         })
         
-        // Start animation if we have current standings
+        // Start live animation if we have current standings
         if (data?.standings && predictedStandings.length > 0) {
-          startSimulationAnimation(predictedStandings)
+          startLiveSimulationAnimation(predictedStandings)
         }
       }
     } catch (error) {
@@ -274,14 +291,14 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
     return longer.includes(shorter) && shorter.length >= longer.length * 0.6
   }
 
-  // Animation offset for visual effect
-  const ANIMATION_OFFSET_PX = 2
+  // Row height for animation calculation
+  const ROW_HEIGHT_PX = 44
 
-  // Animate teams moving to their predicted positions
-  const startSimulationAnimation = (predictedStandings: { team: string; points: number; position: number }[]) => {
+  // Live animation: Teams visually swap positions in real-time
+  const startLiveSimulationAnimation = (predictedStandings: { team: string; points: number; position: number }[]) => {
     if (!data?.standings) return
     
-    // Create initial animated standings from current data
+    // Create initial animated standings from current data with Y position
     const initial: AnimatedStanding[] = data.standings.map((s, idx) => {
       const predicted = predictedStandings.find(p => teamsMatch(p.team, s.teamName))
       return {
@@ -291,28 +308,47 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
         points: s.points,
         finalPoints: predicted?.points || s.points,
         isAnimating: true,
+        currentY: 0,
       }
     })
     
     setAnimatedStandings(initial)
     setShowSimulationAnimation(true)
     
-    // Animate over 3 seconds
-    const totalSteps = 30
+    // Animate over 4 seconds with smooth transitions
+    const totalSteps = 60
     let step = 0
     
     const animateInterval = setInterval(() => {
       step++
+      setAnimationStep(step)
       const progress = step / totalSteps
-      const easeProgress = 1 - Math.pow(1 - progress, 3) // Ease-out cubic
+      // Smooth ease-in-out for more natural movement
+      const easeProgress = progress < 0.5 
+        ? 4 * progress * progress * progress 
+        : 1 - Math.pow(-2 * progress + 2, 3) / 2
       
-      setAnimatedStandings(prev => 
-        prev.map(s => ({
-          ...s,
-          position: s.position + (s.finalPosition - s.position) * easeProgress,
-          points: Math.round(s.points + (s.finalPoints - s.points) * easeProgress),
-        })).sort((a, b) => a.position - b.position)
-      )
+      setAnimatedStandings(prev => {
+        const updated = prev.map(s => {
+          // Calculate target Y position based on where the team needs to move
+          const currentIdx = prev.findIndex(p => p.teamName === s.teamName)
+          const targetIdx = s.finalPosition - 1
+          const targetY = (targetIdx - currentIdx) * ROW_HEIGHT_PX * easeProgress
+          
+          return {
+            ...s,
+            points: Math.round(s.points + (s.finalPoints - s.points) * easeProgress),
+            currentY: targetY,
+            isAnimating: step < totalSteps,
+          }
+        })
+        
+        // Sort by final position at the end
+        if (step >= totalSteps) {
+          return updated.sort((a, b) => a.finalPosition - b.finalPosition)
+        }
+        return updated
+      })
       
       if (step >= totalSteps) {
         clearInterval(animateInterval)
@@ -606,6 +642,19 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
                 ))}
               </select>
               
+              {/* Simulation Count Selector */}
+              <select
+                value={numSimulations}
+                onChange={(e) => setNumSimulations(parseInt(e.target.value))}
+                className="px-3 py-2 rounded-lg bg-white/20 text-white border border-white/30 backdrop-blur-sm cursor-pointer hover:bg-white/30 transition-colors text-sm"
+              >
+                {SIMULATION_OPTIONS.map(num => (
+                  <option key={num} value={num} className="text-gray-900">
+                    {num.toLocaleString()} sims
+                  </option>
+                ))}
+              </select>
+              
               <button
                 onClick={runSeasonSimulation}
                 disabled={runningSimulation}
@@ -621,7 +670,7 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
                   </>
                 ) : (
                   <>
-                    🎲 Run Season Simulation
+                    🎲 Run Simulation
                   </>
                 )}
               </button>
@@ -674,7 +723,7 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
               <div className="bg-amber-500/20 backdrop-blur-sm rounded-xl p-4 col-span-2 md:col-span-4 border border-amber-500/30">
                 <div className="flex items-center justify-between flex-wrap gap-4">
                   <div>
-                    <p className="text-amber-300 text-sm font-medium">🏆 AI Season Prediction</p>
+                    <p className="text-amber-300 text-sm font-medium">🏆 AI Season Prediction ({numSimulations.toLocaleString()} simulations)</p>
                     <p className="text-white font-bold text-lg">{simulationResults.mostLikelyChampion} predicted to win the title</p>
                     <p className="text-white/70 text-sm mt-1">
                       Top 4: {simulationResults.topFourTeams.join(', ')}
@@ -739,60 +788,91 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
       <div className="max-w-6xl mx-auto px-4 py-6">
         {activeTab === 'standings' && data?.standings && (
           <div className="space-y-4">
-            {/* Animated Simulation Results */}
+            {/* Live Animated Simulation Results */}
             {showSimulationAnimation && animatedStandings.length > 0 && (
-              <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-2xl p-4 mb-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xl">🎲</span>
-                  <h3 className="text-lg font-semibold text-amber-400">Season Simulation - Predicted Final Standings</h3>
-                  <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">
-                    {animatedStandings.some(s => s.isAnimating) ? 'Simulating...' : 'Complete'}
-                  </span>
+              <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-2 border-amber-500/50 rounded-2xl p-4 mb-4">
+                <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">🎲</span>
+                    <h3 className="text-lg font-semibold text-amber-400">Season Simulation - Live Preview</h3>
+                    <span className={`text-xs px-2 py-0.5 rounded ${
+                      animatedStandings.some(s => s.isAnimating) 
+                        ? 'bg-amber-500/40 text-amber-200 animate-pulse' 
+                        : 'bg-green-500/40 text-green-200'
+                    }`}>
+                      {animatedStandings.some(s => s.isAnimating) 
+                        ? `Simulating... ${Math.round((animationStep / 60) * 100)}%` 
+                        : '✓ Complete'}
+                    </span>
+                  </div>
+                  <div className="text-sm text-[var(--text-tertiary)]">
+                    {numSimulations.toLocaleString()} simulations
+                  </div>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-hidden rounded-lg border border-amber-500/30">
                   <table className="w-full">
                     <thead className="bg-[var(--muted-bg)]">
                       <tr className="text-xs text-[var(--text-tertiary)]">
-                        <th className="text-left py-2 px-3 font-medium">#</th>
+                        <th className="text-left py-2 px-3 font-medium w-12">#</th>
                         <th className="text-left py-2 px-3 font-medium">Team</th>
-                        <th className="text-center py-2 px-3 font-medium">Predicted Pts</th>
+                        <th className="text-center py-2 px-3 font-medium">Final Pts</th>
+                        <th className="text-center py-2 px-3 font-medium">Change</th>
                         <th className="text-center py-2 px-3 font-medium">Status</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="relative">
                       {animatedStandings.map((team, idx) => {
-                        const posChange = (data.standings.findIndex(s => s.teamName === team.teamName) + 1) - Math.round(team.position)
+                        const originalIdx = data.standings.findIndex(s => s.teamName === team.teamName)
+                        const posChange = (originalIdx + 1) - team.finalPosition
+                        const finalIdx = team.finalPosition - 1
+                        
+                        // Zone colors with better visibility
                         let zoneClass = ''
-                        if (idx < 4) zoneClass = 'border-l-4 border-l-green-500 bg-green-500/10'
-                        else if (idx >= animatedStandings.length - 3) zoneClass = 'border-l-4 border-l-red-500 bg-red-500/10'
-                        else if (idx < 6) zoneClass = 'border-l-4 border-l-blue-500 bg-blue-500/10'
+                        let zoneBorder = ''
+                        if (finalIdx < 4) {
+                          zoneClass = 'bg-green-500/25'
+                          zoneBorder = 'border-l-4 border-l-green-400'
+                        } else if (finalIdx >= animatedStandings.length - 3) {
+                          zoneClass = 'bg-red-500/25'
+                          zoneBorder = 'border-l-4 border-l-red-400'
+                        } else if (finalIdx < 6) {
+                          zoneClass = 'bg-blue-500/25'
+                          zoneBorder = 'border-l-4 border-l-blue-400'
+                        }
 
                         return (
                           <tr
                             key={team.teamName}
-                            className={`border-b transition-all duration-300 ${zoneClass}`}
+                            className={`border-b transition-transform duration-100 ease-out ${zoneClass} ${zoneBorder}`}
                             style={{ 
                               borderColor: 'var(--border-color)',
-                              transform: team.isAnimating ? `translateY(${(team.position - idx - 1) * ANIMATION_OFFSET_PX}px)` : 'none',
+                              transform: `translateY(${team.currentY}px)`,
                             }}
                           >
-                            <td className="py-2 px-3 text-[var(--text-secondary)]">{Math.round(team.position)}</td>
-                            <td className="py-2 px-3 font-medium text-[var(--text-primary)]">
+                            <td className="py-2.5 px-3 text-[var(--text-secondary)] font-medium">
+                              {team.isAnimating ? originalIdx + 1 : team.finalPosition}
+                            </td>
+                            <td className="py-2.5 px-3 font-medium text-[var(--text-primary)]">
                               <div className="flex items-center gap-2">
-                                {team.teamName}
-                                {!team.isAnimating && posChange !== 0 && (
-                                  <span className={`text-xs ${posChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                    {posChange > 0 ? `↑${posChange}` : `↓${Math.abs(posChange)}`}
-                                  </span>
-                                )}
+                                <span className={team.isAnimating ? 'animate-pulse' : ''}>{team.teamName}</span>
                               </div>
                             </td>
-                            <td className="py-2 px-3 text-center font-bold text-amber-400">{team.points}</td>
-                            <td className="py-2 px-3 text-center text-xs">
-                              {idx === 0 && <span className="bg-amber-500 text-black px-2 py-0.5 rounded">🏆 Champion</span>}
-                              {idx > 0 && idx < 4 && <span className="bg-green-500/30 text-green-400 px-2 py-0.5 rounded">UCL</span>}
-                              {idx >= 4 && idx < 6 && <span className="bg-blue-500/30 text-blue-400 px-2 py-0.5 rounded">UEL</span>}
-                              {idx >= animatedStandings.length - 3 && <span className="bg-red-500/30 text-red-400 px-2 py-0.5 rounded">Relegated</span>}
+                            <td className="py-2.5 px-3 text-center font-bold text-amber-400">{team.points}</td>
+                            <td className="py-2.5 px-3 text-center">
+                              {!team.isAnimating && posChange !== 0 && (
+                                <span className={`text-sm font-semibold ${posChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                  {posChange > 0 ? `▲ ${posChange}` : `▼ ${Math.abs(posChange)}`}
+                                </span>
+                              )}
+                              {!team.isAnimating && posChange === 0 && (
+                                <span className="text-sm text-[var(--text-tertiary)]">—</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-center text-xs">
+                              {finalIdx === 0 && <span className="bg-amber-500 text-black px-2 py-0.5 rounded font-semibold">🏆 Champion</span>}
+                              {finalIdx > 0 && finalIdx < 4 && <span className="bg-green-600 text-white px-2 py-0.5 rounded font-medium">UCL</span>}
+                              {finalIdx >= 4 && finalIdx < 6 && <span className="bg-blue-600 text-white px-2 py-0.5 rounded font-medium">UEL</span>}
+                              {finalIdx >= animatedStandings.length - 3 && <span className="bg-red-600 text-white px-2 py-0.5 rounded font-medium">Relegated</span>}
                             </td>
                           </tr>
                         )
@@ -802,80 +882,140 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
                 </div>
                 <button
                   onClick={() => setShowSimulationAnimation(false)}
-                  className="mt-3 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+                  className="mt-3 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] flex items-center gap-1"
                 >
                   ← Back to Current Standings
                 </button>
               </div>
             )}
 
-            {/* Current Standings */}
-            <div className="bg-[var(--card-bg)] border rounded-2xl overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
-              <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-color)' }}>
-                <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                  {showSimulationAnimation ? 'Current Standings (Before Simulation)' : 'League Standings'}
-                </h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-[var(--muted-bg)]">
-                    <tr className="text-xs text-[var(--text-tertiary)]">
-                      <th className="text-left py-3 px-4 font-medium">#</th>
-                      <th className="text-left py-3 px-4 font-medium">Team</th>
-                      <th className="text-center py-3 px-2 font-medium">P</th>
-                      <th className="text-center py-3 px-2 font-medium">W</th>
-                      <th className="text-center py-3 px-2 font-medium">D</th>
-                      <th className="text-center py-3 px-2 font-medium">L</th>
-                      <th className="text-center py-3 px-2 font-medium">GD</th>
-                      <th className="text-center py-3 px-4 font-medium">Pts</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.standings.map((team, idx) => {
-                      // Determine zone coloring
-                      let zoneClass = ''
-                      if (idx < 4) zoneClass = 'border-l-4 border-l-green-500 bg-green-500/5'
-                      else if (idx >= data.standings.length - 3) zoneClass = 'border-l-4 border-l-red-500 bg-red-500/5'
-                      else if (idx < 6) zoneClass = 'border-l-4 border-l-blue-500 bg-blue-500/5'
+            {/* Current Standings - with MLS Conference Support */}
+            {isMLS ? (
+              // MLS: Show Eastern and Western Conferences
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {['Eastern Conference', 'Western Conference'].map((conference) => {
+                  const isEastern = conference.includes('Eastern')
+                  const conferenceTeams = data.standings.filter(team => {
+                    const teamNameLower = team.teamName.toLowerCase()
+                    const eastTeams = MLS_CONFERENCES.eastern.map(t => t.toLowerCase())
+                    const westTeams = MLS_CONFERENCES.western.map(t => t.toLowerCase())
+                    return isEastern 
+                      ? eastTeams.some(et => teamNameLower.includes(et) || et.includes(teamNameLower))
+                      : westTeams.some(wt => teamNameLower.includes(wt) || wt.includes(teamNameLower))
+                  })
+                  
+                  return (
+                    <div key={conference} className="bg-[var(--card-bg)] border rounded-2xl overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
+                      <div className={`p-4 border-b bg-gradient-to-r ${isEastern ? 'from-blue-600/20 to-indigo-600/20' : 'from-orange-600/20 to-red-600/20'}`} style={{ borderColor: 'var(--border-color)' }}>
+                        <h2 className="text-lg font-semibold text-[var(--text-primary)]">{conference}</h2>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-[var(--muted-bg)]">
+                            <tr className="text-xs text-[var(--text-tertiary)]">
+                              <th className="text-left py-3 px-3 font-medium">#</th>
+                              <th className="text-left py-3 px-3 font-medium">Team</th>
+                              <th className="text-center py-3 px-2 font-medium">P</th>
+                              <th className="text-center py-3 px-2 font-medium">Pts</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {conferenceTeams.length > 0 ? conferenceTeams.map((team, idx) => {
+                              let zoneClass = ''
+                              if (idx < 7) zoneClass = 'border-l-4 border-l-green-400 bg-green-500/20'  // Playoff spots
+                              else if (idx < 9) zoneClass = 'border-l-4 border-l-amber-400 bg-amber-500/20'  // Wild card
 
-                      return (
-                        <tr
-                          key={team.teamName}
-                          className={`border-b hover:bg-[var(--muted-bg)] transition-colors ${zoneClass}`}
-                          style={{ borderColor: 'var(--border-color)' }}
-                        >
-                          <td className="py-3 px-4 text-[var(--text-secondary)]">{team.position}</td>
-                          <td className="py-3 px-4 font-medium text-[var(--text-primary)]">{team.teamName}</td>
-                          <td className="py-3 px-2 text-center text-[var(--text-secondary)]">{team.played}</td>
-                          <td className="py-3 px-2 text-center text-green-500">{team.won}</td>
-                          <td className="py-3 px-2 text-center text-[var(--text-tertiary)]">{team.drawn}</td>
-                          <td className="py-3 px-2 text-center text-red-400">{team.lost}</td>
-                          <td className="py-3 px-2 text-center text-[var(--text-secondary)]">
-                            {team.goalDiff > 0 ? `+${team.goalDiff}` : team.goalDiff}
-                          </td>
-                          <td className="py-3 px-4 text-center font-bold text-[var(--text-primary)]">{team.points}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                              return (
+                                <tr key={team.teamName} className={`border-b hover:bg-[var(--muted-bg)] ${zoneClass}`} style={{ borderColor: 'var(--border-color)' }}>
+                                  <td className="py-2.5 px-3 text-[var(--text-secondary)]">{idx + 1}</td>
+                                  <td className="py-2.5 px-3 font-medium text-[var(--text-primary)]">{team.teamName}</td>
+                                  <td className="py-2.5 px-2 text-center text-[var(--text-secondary)]">{team.played}</td>
+                                  <td className="py-2.5 px-2 text-center font-bold text-[var(--text-primary)]">{team.points}</td>
+                                </tr>
+                              )
+                            }) : (
+                              <tr><td colSpan={4} className="py-4 text-center text-[var(--text-tertiary)]">No teams found</td></tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="p-3 border-t text-xs text-[var(--text-tertiary)] flex gap-3" style={{ borderColor: 'var(--border-color)' }}>
+                        <span><span className="inline-block w-2 h-2 rounded-sm bg-green-400 mr-1"></span> Playoff</span>
+                        <span><span className="inline-block w-2 h-2 rounded-sm bg-amber-400 mr-1"></span> Wild Card</span>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-              {/* Legend */}
-              <div className="p-4 border-t flex flex-wrap gap-4 text-xs" style={{ borderColor: 'var(--border-color)' }}>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-green-500 rounded" />
-                  <span className="text-[var(--text-tertiary)]">Champions League</span>
+            ) : (
+              // Regular league standings
+              <div className="bg-[var(--card-bg)] border rounded-2xl overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
+                <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-color)' }}>
+                  <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                    {showSimulationAnimation ? 'Current Standings (Before Simulation)' : 'League Standings'}
+                  </h2>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-blue-500 rounded" />
-                  <span className="text-[var(--text-tertiary)]">Europa League</span>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-[var(--muted-bg)]">
+                      <tr className="text-xs text-[var(--text-tertiary)]">
+                        <th className="text-left py-3 px-4 font-medium">#</th>
+                        <th className="text-left py-3 px-4 font-medium">Team</th>
+                        <th className="text-center py-3 px-2 font-medium">P</th>
+                        <th className="text-center py-3 px-2 font-medium">W</th>
+                        <th className="text-center py-3 px-2 font-medium">D</th>
+                        <th className="text-center py-3 px-2 font-medium">L</th>
+                        <th className="text-center py-3 px-2 font-medium">GD</th>
+                        <th className="text-center py-3 px-4 font-medium">Pts</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.standings.map((team, idx) => {
+                        // Determine zone coloring with improved visibility
+                        let zoneClass = ''
+                        if (idx < 4) zoneClass = 'border-l-4 border-l-green-400 bg-green-500/20'
+                        else if (idx >= data.standings.length - 3) zoneClass = 'border-l-4 border-l-red-400 bg-red-500/20'
+                        else if (idx < 6) zoneClass = 'border-l-4 border-l-blue-400 bg-blue-500/20'
+
+                        return (
+                          <tr
+                            key={team.teamName}
+                            className={`border-b hover:bg-[var(--muted-bg)] transition-colors ${zoneClass}`}
+                            style={{ borderColor: 'var(--border-color)' }}
+                          >
+                            <td className="py-3 px-4 text-[var(--text-secondary)]">{team.position}</td>
+                            <td className="py-3 px-4 font-medium text-[var(--text-primary)]">{team.teamName}</td>
+                            <td className="py-3 px-2 text-center text-[var(--text-secondary)]">{team.played}</td>
+                            <td className="py-3 px-2 text-center text-green-500">{team.won}</td>
+                            <td className="py-3 px-2 text-center text-[var(--text-tertiary)]">{team.drawn}</td>
+                            <td className="py-3 px-2 text-center text-red-400">{team.lost}</td>
+                            <td className="py-3 px-2 text-center text-[var(--text-secondary)]">
+                              {team.goalDiff > 0 ? `+${team.goalDiff}` : team.goalDiff}
+                            </td>
+                            <td className="py-3 px-4 text-center font-bold text-[var(--text-primary)]">{team.points}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-red-500 rounded" />
-                  <span className="text-[var(--text-tertiary)]">Relegation</span>
+                {/* Legend */}
+                <div className="p-4 border-t flex flex-wrap gap-4 text-xs" style={{ borderColor: 'var(--border-color)' }}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-green-400 rounded" />
+                    <span className="text-[var(--text-tertiary)]">Champions League</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-blue-400 rounded" />
+                    <span className="text-[var(--text-tertiary)]">Europa League</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-red-400 rounded" />
+                    <span className="text-[var(--text-tertiary)]">Relegation</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -924,21 +1064,40 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
         )}
 
         {activeTab === 'news' && (
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {data?.news && data.news.length > 0 ? (
               data.news.map((item, idx) => (
-                <div key={idx} className="bg-[var(--card-bg)] border rounded-2xl p-4 hover:bg-[var(--muted-bg)] transition-colors" style={{ borderColor: 'var(--border-color)' }}>
-                  <h3 className="font-semibold text-[var(--text-primary)] mb-2">{item.headline}</h3>
-                  <p className="text-sm text-[var(--text-secondary)] line-clamp-2">{item.description}</p>
-                  {item.link && (
-                    <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--accent-primary)] mt-2 inline-block">
-                      Read more →
-                    </a>
+                <a 
+                  key={idx} 
+                  href={item.link || '#'} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="bg-[var(--card-bg)] border rounded-2xl overflow-hidden hover:bg-[var(--muted-bg)] transition-colors group" 
+                  style={{ borderColor: 'var(--border-color)' }}
+                >
+                  {/* Cover Photo */}
+                  {item.image && (
+                    <div className="aspect-video w-full overflow-hidden">
+                      <img 
+                        src={item.image} 
+                        alt={item.headline} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
                   )}
-                </div>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-[var(--text-primary)] mb-2 group-hover:text-[var(--accent-primary)] transition-colors line-clamp-2">
+                      {item.headline}
+                    </h3>
+                    <p className="text-sm text-[var(--text-secondary)] line-clamp-2">{item.description}</p>
+                    {item.published && (
+                      <p className="text-xs text-[var(--text-tertiary)] mt-2">{item.published}</p>
+                    )}
+                  </div>
+                </a>
               ))
             ) : (
-              <div className="bg-[var(--card-bg)] border rounded-2xl p-8 text-center" style={{ borderColor: 'var(--border-color)' }}>
+              <div className="bg-[var(--card-bg)] border rounded-2xl p-8 text-center col-span-2" style={{ borderColor: 'var(--border-color)' }}>
                 <p className="text-[var(--text-tertiary)]">No news available</p>
               </div>
             )}

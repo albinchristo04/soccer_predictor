@@ -287,6 +287,8 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
               
               if (isKnockout && isFinished) {
                 newData.knockoutMatches.push(matchObj)
+                // Also add to recent results so they show on overview
+                newData.recentResults.push(matchObj)
               } else if (isFinished) {
                 newData.recentResults.push(matchObj)
               } else {
@@ -403,29 +405,36 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
             </tr>
           </thead>
           <tbody>
-            {group.standings.map((team) => {
-              // Determine qualification status based on tournament and position
+            {group.standings.map((team, teamIdx) => {
+              // Determine qualification status based on tournament and OVERALL position
+              // For UCL/UEL new league format: Top 8 = R16, 9-24 = R16 Playoff
+              // Calculate overall position across all groups
+              const groupIdx = data.groups.findIndex(g => g.name === group.name)
+              const teamsPerGroup = group.standings.length
+              const overallPosition = groupIdx * teamsPerGroup + team.position
+              
               let statusBadge = null
               let bgClass = ''
               
               if (tournamentId === 'world_cup') {
                 // World Cup: Top 2 qualify, 3rd has possible qualification
                 if (team.position <= 2) {
-                  statusBadge = <span className="text-xs bg-green-500/30 text-green-400 px-2 py-0.5 rounded whitespace-nowrap">Qualified</span>
-                  bgClass = 'bg-green-500/10'
+                  statusBadge = <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded whitespace-nowrap font-medium">Qualified</span>
+                  bgClass = 'bg-green-500/20 border-l-4 border-l-green-400'
                 } else if (team.position === 3) {
-                  statusBadge = <span className="text-xs bg-amber-500/30 text-amber-400 px-2 py-0.5 rounded whitespace-nowrap">Possible</span>
-                  bgClass = 'bg-amber-500/10'
+                  statusBadge = <span className="text-xs bg-amber-600 text-white px-2 py-0.5 rounded whitespace-nowrap font-medium">Possible</span>
+                  bgClass = 'bg-amber-500/20 border-l-4 border-l-amber-400'
                 }
               } else {
-                // Champions League / Europa League: Based on new format
-                // Positions 1-8 go to Round of 16, 9-24 go to Round of 16 Playoff
+                // Champions League / Europa League: Based on new league format
+                // Top 8 overall = Round of 16, 9-24 = R16 Playoff
+                // In group context: top 2 of group = R16, positions 3-4 = R16 Playoff
                 if (team.position <= 2) {
-                  statusBadge = <span className="text-xs bg-green-500/30 text-green-400 px-2 py-0.5 rounded whitespace-nowrap">R16</span>
-                  bgClass = 'bg-green-500/10'
+                  statusBadge = <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded whitespace-nowrap font-medium">R16</span>
+                  bgClass = 'bg-green-500/20 border-l-4 border-l-green-400'
                 } else if (team.position <= 4) {
-                  statusBadge = <span className="text-xs bg-blue-500/30 text-blue-400 px-2 py-0.5 rounded whitespace-nowrap">R16 Playoff</span>
-                  bgClass = 'bg-blue-500/10'
+                  statusBadge = <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded whitespace-nowrap font-medium">R16 Playoff</span>
+                  bgClass = 'bg-blue-500/20 border-l-4 border-l-blue-400'
                 }
               }
               
@@ -461,13 +470,13 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
       <div className="px-4 py-2 text-xs text-[var(--text-tertiary)] border-t flex flex-wrap gap-3" style={{ borderColor: 'var(--border-color)' }}>
         {tournamentId === 'world_cup' ? (
           <>
-            <span><span className="inline-block w-3 h-3 rounded-sm bg-green-500/30 mr-1"></span> Qualified for knockout</span>
-            <span><span className="inline-block w-3 h-3 rounded-sm bg-amber-500/30 mr-1"></span> Possible qualification</span>
+            <span><span className="inline-block w-3 h-3 rounded-sm bg-green-400 mr-1"></span> Qualified for knockout</span>
+            <span><span className="inline-block w-3 h-3 rounded-sm bg-amber-400 mr-1"></span> Possible qualification</span>
           </>
         ) : (
           <>
-            <span><span className="inline-block w-3 h-3 rounded-sm bg-green-500/30 mr-1"></span> Round of 16</span>
-            <span><span className="inline-block w-3 h-3 rounded-sm bg-blue-500/30 mr-1"></span> R16 Playoff</span>
+            <span><span className="inline-block w-3 h-3 rounded-sm bg-green-400 mr-1"></span> Round of 16</span>
+            <span><span className="inline-block w-3 h-3 rounded-sm bg-blue-400 mr-1"></span> R16 Playoff</span>
           </>
         )}
       </div>
@@ -835,7 +844,91 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
           )}
           
           {activeTab === 'Simulator' && (
-            <KnockoutSimulator tournament={config.knockoutType} />
+            <div className="space-y-6">
+              {/* Quick Tournament Simulator - Same as header button */}
+              <div className="bg-[var(--card-bg)] rounded-xl border p-6" style={{ borderColor: 'var(--border-color)' }}>
+                <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">🎲</span>
+                    <div>
+                      <h2 className="text-xl font-bold text-[var(--text-primary)]">Tournament Simulator</h2>
+                      <p className="text-sm text-[var(--text-tertiary)]">Predict the tournament winner using Monte Carlo simulation</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={runTournamentSimulation}
+                    disabled={runningSimulation || data.groups.length === 0}
+                    className={`px-6 py-3 rounded-lg bg-gradient-to-r ${config.gradient} text-white font-semibold transition-all hover:opacity-90 disabled:opacity-50 flex items-center gap-2`}
+                  >
+                    {runningSimulation ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Running Simulation...
+                      </>
+                    ) : (
+                      <>🎲 Run Simulation</>
+                    )}
+                  </button>
+                </div>
+
+                {/* Simulation Results */}
+                {simulationResults && (
+                  <div className={`bg-gradient-to-r ${config.gradient} rounded-xl p-6 text-white`}>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="text-center md:text-left">
+                        <p className="text-white/70 text-sm mb-1">Predicted Winner</p>
+                        <p className="text-2xl font-bold">🏆 {simulationResults.winner}</p>
+                        <p className="text-white/80 text-sm mt-1">
+                          {(simulationResults.winnerProbability * 100).toFixed(1)}% probability
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-white/70 text-sm mb-1">Predicted Final</p>
+                        <p className="text-lg font-semibold">
+                          {simulationResults.finalists[0]} vs {simulationResults.finalists[1]}
+                        </p>
+                      </div>
+                      <div className="text-center md:text-right">
+                        <p className="text-white/70 text-sm mb-1">Semi-Finalists</p>
+                        <div className="flex flex-wrap gap-1 justify-center md:justify-end">
+                          {simulationResults.semifinals.map((team, idx) => (
+                            <span key={idx} className="text-xs bg-white/20 px-2 py-0.5 rounded">
+                              {team}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Teams available info */}
+                {data.groups.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-[var(--text-tertiary)]">Tournament data is loading...</p>
+                    <p className="text-sm text-[var(--text-tertiary)] mt-1">Simulation will be available once team data is loaded</p>
+                  </div>
+                )}
+
+                {data.groups.length > 0 && !simulationResults && (
+                  <div className="text-center py-8">
+                    <p className="text-[var(--text-secondary)]">Click "Run Simulation" to predict the tournament winner</p>
+                    <p className="text-sm text-[var(--text-tertiary)] mt-1">
+                      Based on {data.groups.flatMap(g => g.standings).length} teams from the group stage
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Also show the advanced knockout simulator */}
+              <div className="border-t pt-6" style={{ borderColor: 'var(--border-color)' }}>
+                <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Advanced Knockout Simulator</h3>
+                <KnockoutSimulator tournament={config.knockoutType} />
+              </div>
+            </div>
           )}
           
           {activeTab === 'News' && (
