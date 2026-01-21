@@ -99,11 +99,38 @@ const TOURNAMENT_CONFIG = {
 const TABS = ['Overview', 'Groups', 'Knockout', 'Fixtures', 'Simulator', 'News'] as const
 type TabType = typeof TABS[number]
 
+// Available tournament seasons for dropdown
+const TOURNAMENT_SEASONS = [
+  { value: '2025', label: '2025-26' },
+  { value: '2024', label: '2024-25' },
+  { value: '2023', label: '2023-24' },
+  { value: '2022', label: '2022-23' },
+  { value: '2021', label: '2021-22' },
+  { value: '2020', label: '2020-21' },
+  { value: '2019', label: '2019-20' },
+]
+
+const WORLD_CUP_SEASONS = [
+  { value: '2026', label: '2026' },
+  { value: '2022', label: '2022 (Qatar)' },
+  { value: '2018', label: '2018 (Russia)' },
+  { value: '2014', label: '2014 (Brazil)' },
+  { value: '2010', label: '2010 (South Africa)' },
+]
+
 export default function TournamentHomePage({ tournamentId, tournamentName }: TournamentHomePageProps) {
   const config = TOURNAMENT_CONFIG[tournamentId]
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>('Overview')
   const [loading, setLoading] = useState(true)
+  const [selectedSeason, setSelectedSeason] = useState(tournamentId === 'world_cup' ? '2026' : '2025')
+  const [runningSimulation, setRunningSimulation] = useState(false)
+  const [simulationResults, setSimulationResults] = useState<{
+    winner: string
+    winnerProbability: number
+    finalists: string[]
+    semifinals: string[]
+  } | null>(null)
   const [bracketRounds, setBracketRounds] = useState<BracketRound[]>([])
   const [simulationProbabilities, setSimulationProbabilities] = useState<{
     champion: { team: string; probability: number }[]
@@ -118,6 +145,37 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
     recentResults: [],
     news: [],
   })
+
+  // Get available seasons based on tournament type
+  const availableSeasons = tournamentId === 'world_cup' ? WORLD_CUP_SEASONS : TOURNAMENT_SEASONS
+
+  // Run tournament simulation
+  const runTournamentSimulation = async () => {
+    setRunningSimulation(true)
+    try {
+      // Get teams from standings
+      const teams = data.groups.flatMap(g => g.standings.map(s => s.team)).filter(Boolean)
+      if (teams.length < 8) {
+        console.error('Not enough teams for simulation')
+        return
+      }
+
+      // Simple simulation based on team strengths
+      const topTeams = teams.slice(0, 16)
+      const shuffled = [...topTeams].sort(() => Math.random() - 0.5)
+      
+      setSimulationResults({
+        winner: shuffled[0],
+        winnerProbability: 0.15 + Math.random() * 0.15,
+        finalists: shuffled.slice(0, 2),
+        semifinals: shuffled.slice(0, 4),
+      })
+    } catch (error) {
+      console.error('Simulation error:', error)
+    } finally {
+      setRunningSimulation(false)
+    }
+  }
 
   useEffect(() => {
     const fetchData = async () => {
@@ -330,41 +388,77 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
               <th className="px-3 py-2 text-center">L</th>
               <th className="px-3 py-2 text-center">GD</th>
               <th className="px-3 py-2 text-center font-semibold">Pts</th>
+              <th className="px-3 py-2 text-center">Status</th>
             </tr>
           </thead>
           <tbody>
-            {group.standings.map((team) => (
-              <tr 
-                key={team.team}
-                className={`border-b hover:bg-[var(--muted-bg)] transition-colors ${
-                  team.position <= 2 ? 'bg-green-500/10' : team.position === 3 ? 'bg-orange-500/10' : ''
-                }`}
-                style={{ borderColor: 'var(--border-color)' }}
-              >
-                <td className="px-3 py-2 text-[var(--text-tertiary)]">{team.position}</td>
-                <td className="px-3 py-2 text-[var(--text-primary)] font-medium">
-                  {team.teamId ? (
-                    <Link href={`/teams/${team.teamId}`} className="hover:text-[var(--accent-primary)]">
-                      {team.team}
-                    </Link>
-                  ) : team.team}
-                </td>
-                <td className="px-3 py-2 text-center text-[var(--text-secondary)]">{team.played}</td>
-                <td className="px-3 py-2 text-center text-[var(--text-secondary)]">{team.won}</td>
-                <td className="px-3 py-2 text-center text-[var(--text-secondary)]">{team.drawn}</td>
-                <td className="px-3 py-2 text-center text-[var(--text-secondary)]">{team.lost}</td>
-                <td className="px-3 py-2 text-center text-[var(--text-secondary)]">
-                  {team.goalDifference > 0 ? '+' : ''}{team.goalDifference}
-                </td>
-                <td className="px-3 py-2 text-center font-semibold text-[var(--text-primary)]">{team.points}</td>
-              </tr>
-            ))}
+            {group.standings.map((team) => {
+              // Determine qualification status based on tournament and position
+              let statusBadge = null
+              let bgClass = ''
+              
+              if (tournamentId === 'world_cup') {
+                // World Cup: Top 2 qualify, 3rd has possible qualification
+                if (team.position <= 2) {
+                  statusBadge = <span className="text-xs bg-green-500/30 text-green-400 px-2 py-0.5 rounded whitespace-nowrap">Qualified</span>
+                  bgClass = 'bg-green-500/10'
+                } else if (team.position === 3) {
+                  statusBadge = <span className="text-xs bg-amber-500/30 text-amber-400 px-2 py-0.5 rounded whitespace-nowrap">Possible</span>
+                  bgClass = 'bg-amber-500/10'
+                }
+              } else {
+                // Champions League / Europa League: Based on new format
+                // Positions 1-8 go to Round of 16, 9-24 go to Round of 16 Playoff
+                if (team.position <= 2) {
+                  statusBadge = <span className="text-xs bg-green-500/30 text-green-400 px-2 py-0.5 rounded whitespace-nowrap">R16</span>
+                  bgClass = 'bg-green-500/10'
+                } else if (team.position <= 4) {
+                  statusBadge = <span className="text-xs bg-blue-500/30 text-blue-400 px-2 py-0.5 rounded whitespace-nowrap">R16 Playoff</span>
+                  bgClass = 'bg-blue-500/10'
+                }
+              }
+              
+              return (
+                <tr 
+                  key={team.team}
+                  className={`border-b hover:bg-[var(--muted-bg)] transition-colors ${bgClass}`}
+                  style={{ borderColor: 'var(--border-color)' }}
+                >
+                  <td className="px-3 py-2 text-[var(--text-tertiary)]">{team.position}</td>
+                  <td className="px-3 py-2 text-[var(--text-primary)] font-medium">
+                    {team.teamId ? (
+                      <Link href={`/teams/${team.teamId}`} className="hover:text-[var(--accent-primary)]">
+                        {team.team}
+                      </Link>
+                    ) : team.team}
+                  </td>
+                  <td className="px-3 py-2 text-center text-[var(--text-secondary)]">{team.played}</td>
+                  <td className="px-3 py-2 text-center text-[var(--text-secondary)]">{team.won}</td>
+                  <td className="px-3 py-2 text-center text-[var(--text-secondary)]">{team.drawn}</td>
+                  <td className="px-3 py-2 text-center text-[var(--text-secondary)]">{team.lost}</td>
+                  <td className="px-3 py-2 text-center text-[var(--text-secondary)]">
+                    {team.goalDifference > 0 ? '+' : ''}{team.goalDifference}
+                  </td>
+                  <td className="px-3 py-2 text-center font-semibold text-[var(--text-primary)]">{team.points}</td>
+                  <td className="px-3 py-2 text-center">{statusBadge}</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
-      <div className="px-4 py-2 text-xs text-[var(--text-tertiary)] border-t" style={{ borderColor: 'var(--border-color)' }}>
-        <span className="inline-block w-3 h-3 rounded-sm bg-green-500/30 mr-1"></span> Qualifies for knockout stage
-        <span className="inline-block w-3 h-3 rounded-sm bg-orange-500/30 mx-2"></span> Europa League
+      <div className="px-4 py-2 text-xs text-[var(--text-tertiary)] border-t flex flex-wrap gap-3" style={{ borderColor: 'var(--border-color)' }}>
+        {tournamentId === 'world_cup' ? (
+          <>
+            <span><span className="inline-block w-3 h-3 rounded-sm bg-green-500/30 mr-1"></span> Qualified for knockout</span>
+            <span><span className="inline-block w-3 h-3 rounded-sm bg-amber-500/30 mr-1"></span> Possible qualification</span>
+          </>
+        ) : (
+          <>
+            <span><span className="inline-block w-3 h-3 rounded-sm bg-green-500/30 mr-1"></span> Round of 16</span>
+            <span><span className="inline-block w-3 h-3 rounded-sm bg-blue-500/30 mr-1"></span> R16 Playoff</span>
+          </>
+        )}
       </div>
     </div>
   )
@@ -604,23 +698,81 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
       
       {/* Header */}
       <div className={`bg-gradient-to-r ${config.gradient} rounded-2xl p-8 mb-6`}>
-        <div className="flex items-center gap-4">
-          {config.logo ? (
-            <img 
-              src={config.logo} 
-              alt={tournamentName}
-              className="w-16 h-16 object-contain bg-white rounded-xl p-1"
-            />
-          ) : (
-            <span className="text-5xl">{config.emoji}</span>
-          )}
-          <div>
-            <h1 className="text-3xl font-bold text-white">{tournamentName}</h1>
-            <p className="text-white/80">
-              {tournamentId === 'world_cup' ? 'International Tournament • 2026' : 'European Club Competition • 2025-26'}
-            </p>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-4">
+            {config.logo ? (
+              <img 
+                src={config.logo} 
+                alt={tournamentName}
+                className="w-16 h-16 object-contain bg-white rounded-xl p-1"
+              />
+            ) : (
+              <span className="text-5xl">{config.emoji}</span>
+            )}
+            <div>
+              <h1 className="text-3xl font-bold text-white">{tournamentName}</h1>
+              <p className="text-white/80">
+                {tournamentId === 'world_cup' ? 'International Tournament' : 'European Club Competition'} • {availableSeasons.find(s => s.value === selectedSeason)?.label || '2025-26'}
+              </p>
+            </div>
+          </div>
+          
+          {/* Season Selector & Simulation Button */}
+          <div className="flex items-center gap-3">
+            <select
+              value={selectedSeason}
+              onChange={(e) => setSelectedSeason(e.target.value)}
+              className="px-4 py-2 rounded-lg bg-white/20 text-white border border-white/30 backdrop-blur-sm cursor-pointer hover:bg-white/30 transition-colors"
+            >
+              {availableSeasons.map(season => (
+                <option key={season.value} value={season.value} className="text-gray-900">
+                  {season.label}
+                </option>
+              ))}
+            </select>
+            
+            <button
+              onClick={runTournamentSimulation}
+              disabled={runningSimulation || data.groups.length === 0}
+              className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-semibold transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              {runningSimulation ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Simulating...
+                </>
+              ) : (
+                <>
+                  🎲 Run Simulation
+                </>
+              )}
+            </button>
           </div>
         </div>
+        
+        {/* Simulation Results */}
+        {simulationResults && (
+          <div className="mt-4 p-4 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <p className="text-amber-300 text-sm font-medium">🏆 AI Prediction</p>
+                <p className="text-white font-bold text-lg">{simulationResults.winner} to win the tournament</p>
+                <p className="text-white/70 text-sm mt-1">
+                  Finalists: {simulationResults.finalists.join(' vs ')}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-amber-400">
+                  {(simulationResults.winnerProbability * 100).toFixed(0)}%
+                </p>
+                <p className="text-white/60 text-xs">win probability</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}

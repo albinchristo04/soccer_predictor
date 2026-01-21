@@ -145,17 +145,30 @@ const LEAGUE_CONFIGS: Record<string, { color: string; gradient: string; flag: st
   '53': { color: '#091C3E', gradient: 'from-blue-900 to-blue-700', flag: '🇫🇷' },
 }
 
+// Animated standing interface for simulation
+interface AnimatedStanding {
+  position: number
+  teamName: string
+  finalPosition: number
+  points: number
+  finalPoints: number
+  isAnimating: boolean
+}
+
 export default function LeagueHomePage({ leagueId, leagueName, country }: LeagueHomePageProps) {
   const [data, setData] = useState<LeagueHomeData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'standings' | 'scorers' | 'fixtures' | 'news'>('standings')
   const [selectedSeason, setSelectedSeason] = useState('2025')
   const [runningSimulation, setRunningSimulation] = useState(false)
+  const [showSimulationAnimation, setShowSimulationAnimation] = useState(false)
+  const [animatedStandings, setAnimatedStandings] = useState<AnimatedStanding[]>([])
   const [simulationResults, setSimulationResults] = useState<{
     mostLikelyChampion: string
     championProbability: number
     topFourTeams: string[]
     relegationCandidates: string[]
+    predictedStandings: { team: string; points: number; position: number }[]
   } | null>(null)
 
   const config = LEAGUE_CONFIGS[leagueId] || LEAGUE_CONFIGS['premier_league']
@@ -195,9 +208,10 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
     return LEAGUE_TO_ESPN_ID[leagueParam] || leagueId
   }
 
-  // Run end of season simulation
+  // Run end of season simulation with animation
   const runSeasonSimulation = async () => {
     setRunningSimulation(true)
+    setShowSimulationAnimation(false)
     try {
       // Map leagueId to numeric ID for simulation endpoint
       const leagueIdMap: Record<string, number> = {
@@ -212,18 +226,77 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
       const res = await fetch(`/api/simulation/${numericLeagueId}?n_simulations=10000`)
       if (res.ok) {
         const simData = await res.json()
+        const predictedStandings = (simData.standings || []).map((s: any, idx: number) => ({
+          team: s.team_name || s.team || 'Unknown',
+          points: Math.round(s.predicted_points || s.points || 0),
+          position: idx + 1,
+        }))
+        
         setSimulationResults({
           mostLikelyChampion: simData.most_likely_champion || simData.standings?.[0]?.team_name || 'Unknown',
           championProbability: simData.champion_probability || simData.standings?.[0]?.title_probability || 0,
           topFourTeams: simData.likely_top_4 || simData.standings?.slice(0, 4).map((s: any) => s.team_name) || [],
           relegationCandidates: simData.relegation_candidates || simData.standings?.slice(-3).map((s: any) => s.team_name) || [],
+          predictedStandings,
         })
+        
+        // Start animation if we have current standings
+        if (data?.standings && predictedStandings.length > 0) {
+          startSimulationAnimation(predictedStandings)
+        }
       }
     } catch (error) {
       console.error('Simulation error:', error)
     } finally {
       setRunningSimulation(false)
     }
+  }
+
+  // Animate teams moving to their predicted positions
+  const startSimulationAnimation = (predictedStandings: { team: string; points: number; position: number }[]) => {
+    if (!data?.standings) return
+    
+    // Create initial animated standings from current data
+    const initial: AnimatedStanding[] = data.standings.map((s, idx) => {
+      const predicted = predictedStandings.find(p => 
+        p.team.toLowerCase().includes(s.teamName.toLowerCase()) || 
+        s.teamName.toLowerCase().includes(p.team.toLowerCase())
+      )
+      return {
+        position: idx + 1,
+        teamName: s.teamName,
+        finalPosition: predicted?.position || idx + 1,
+        points: s.points,
+        finalPoints: predicted?.points || s.points,
+        isAnimating: true,
+      }
+    })
+    
+    setAnimatedStandings(initial)
+    setShowSimulationAnimation(true)
+    
+    // Animate over 3 seconds
+    const totalSteps = 30
+    let step = 0
+    
+    const animateInterval = setInterval(() => {
+      step++
+      const progress = step / totalSteps
+      const easeProgress = 1 - Math.pow(1 - progress, 3) // Ease-out cubic
+      
+      setAnimatedStandings(prev => 
+        prev.map(s => ({
+          ...s,
+          position: s.position + (s.finalPosition - s.position) * easeProgress,
+          points: Math.round(s.points + (s.finalPoints - s.points) * easeProgress),
+        })).sort((a, b) => a.position - b.position)
+      )
+      
+      if (step >= totalSteps) {
+        clearInterval(animateInterval)
+        setAnimatedStandings(prev => prev.map(s => ({ ...s, isAnimating: false })))
+      }
+    }, 100)
   }
 
   useEffect(() => {
@@ -269,8 +342,42 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
           news: [],
         }
 
-        // Process local standings or ESPN standings
-        if (standingsRes.status === 'fulfilled' && standingsRes.value.ok) {
+        // PRIORITIZE ESPN data for accurate real-time standings
+        // ESPN provides the most up-to-date standings data
+        let espnStandingsLoaded = false
+        if (espnResults[0].status === 'fulfilled') {
+          const espnStandings = espnResults[0] as PromiseFulfilledResult<Response>
+          if (espnStandings.value.ok) {
+            const espnData = await espnStandings.value.json()
+            const entries = espnData.children?.[0]?.standings?.entries || []
+            if (entries.length > 0) {
+              leagueData.standings = entries.map((entry: any, idx: number) => {
+                const getStatVal = (name: string) => {
+                  const stat = entry.stats?.find((s: any) => s.name === name)
+                  return parseInt(stat?.value || '0', 10)
+                }
+                return {
+                  position: idx + 1,
+                  teamName: entry.team?.displayName || 'Unknown',
+                  teamId: entry.team?.id,
+                  played: getStatVal('gamesPlayed'),
+                  won: getStatVal('wins'),
+                  drawn: getStatVal('ties'),
+                  lost: getStatVal('losses'),
+                  goalsFor: getStatVal('pointsFor'),
+                  goalsAgainst: getStatVal('pointsAgainst'),
+                  goalDiff: getStatVal('pointDifferential'),
+                  points: getStatVal('points'),
+                  form: [],
+                }
+              })
+              espnStandingsLoaded = true
+            }
+          }
+        }
+        
+        // Fallback to local standings if ESPN fails
+        if (!espnStandingsLoaded && standingsRes.status === 'fulfilled' && standingsRes.value.ok) {
           const standingsJson = await standingsRes.value.json()
           leagueData.standings = (standingsJson.standings || []).map((s: any, idx: number) => ({
             position: s.position || idx + 1,
@@ -286,35 +393,6 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
             points: s.points || s.pts || 0,
             form: s.form || [],
           }))
-        }
-        
-        // If no local standings, try ESPN
-        if (leagueData.standings.length === 0 && espnResults[0].status === 'fulfilled') {
-          const espnStandings = espnResults[0] as PromiseFulfilledResult<Response>
-          if (espnStandings.value.ok) {
-            const espnData = await espnStandings.value.json()
-            const entries = espnData.children?.[0]?.standings?.entries || []
-            leagueData.standings = entries.map((entry: any, idx: number) => {
-              const getStatVal = (name: string) => {
-                const stat = entry.stats?.find((s: any) => s.name === name)
-                return parseInt(stat?.value || '0', 10)
-              }
-              return {
-                position: idx + 1,
-                teamName: entry.team?.displayName || 'Unknown',
-                teamId: entry.team?.id,
-                played: getStatVal('gamesPlayed'),
-                won: getStatVal('wins'),
-                drawn: getStatVal('ties'),
-                lost: getStatVal('losses'),
-                goalsFor: getStatVal('pointsFor'),
-                goalsAgainst: getStatVal('pointsAgainst'),
-                goalDiff: getStatVal('pointDifferential'),
-                points: getStatVal('points'),
-                form: [],
-              }
-            })
-          }
         }
 
         // Process upcoming matches from ESPN
@@ -359,24 +437,51 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
           }
         }
 
-        // Process top scorers from ESPN
+        // Process top scorers from ESPN with better parsing
         if (espnResults[2].status === 'fulfilled') {
           const espnLeaders = espnResults[2] as PromiseFulfilledResult<Response>
           if (espnLeaders.value.ok) {
             const leadersData = await espnLeaders.value.json()
-            const leaders = leadersData.leaders || []
-            // Find goals category
-            const goalsCategory = leaders.find((cat: any) => 
-              cat.name?.toLowerCase() === 'goals' || cat.displayName?.toLowerCase() === 'goals'
-            )
-            if (goalsCategory?.leaders) {
-              leagueData.topScorers = goalsCategory.leaders.slice(0, 10).map((leader: any, idx: number) => ({
+            
+            // Try different paths to find leaders data
+            let scorers: any[] = []
+            
+            // Path 1: leaders array with categories
+            if (leadersData.leaders && Array.isArray(leadersData.leaders)) {
+              const goalsCategory = leadersData.leaders.find((cat: any) => 
+                cat.name?.toLowerCase().includes('goal') || 
+                cat.displayName?.toLowerCase().includes('goal') ||
+                cat.abbreviation?.toLowerCase() === 'g'
+              )
+              if (goalsCategory?.leaders) {
+                scorers = goalsCategory.leaders
+              }
+            }
+            
+            // Path 2: categories within leaders
+            if (scorers.length === 0 && leadersData.categories) {
+              const goalsCategory = leadersData.categories.find((cat: any) =>
+                cat.name?.toLowerCase().includes('goal') ||
+                cat.displayName?.toLowerCase().includes('goal')
+              )
+              if (goalsCategory?.leaders) {
+                scorers = goalsCategory.leaders
+              }
+            }
+            
+            // Path 3: direct leaders array
+            if (scorers.length === 0 && leadersData.athletes) {
+              scorers = leadersData.athletes
+            }
+            
+            if (scorers.length > 0) {
+              leagueData.topScorers = scorers.slice(0, 10).map((leader: any, idx: number) => ({
                 rank: idx + 1,
-                name: leader.athlete?.displayName || leader.athlete?.fullName || 'Unknown',
-                team: leader.athlete?.team?.displayName || leader.team?.displayName || '',
-                goals: parseInt(leader.value || leader.stats || '0'),
-                assists: 0, // ESPN doesn't always provide this
-                matches: leader.athlete?.statistics?.gamesPlayed || 0,
+                name: leader.athlete?.displayName || leader.athlete?.fullName || leader.displayName || leader.name || 'Unknown',
+                team: leader.athlete?.team?.displayName || leader.team?.displayName || leader.teamName || '',
+                goals: parseInt(leader.value || leader.stat || leader.goals || '0'),
+                assists: parseInt(leader.assists || '0'),
+                matches: leader.athlete?.statistics?.gamesPlayed || leader.gamesPlayed || 0,
               }))
             }
           }
@@ -611,67 +716,142 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
       {/* Content */}
       <div className="max-w-6xl mx-auto px-4 py-6">
         {activeTab === 'standings' && data?.standings && (
-          <div className="bg-[var(--card-bg)] border rounded-2xl overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
-            <div className="p-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)]">League Standings</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-[var(--muted-bg)]">
-                  <tr className="text-xs text-[var(--text-tertiary)]">
-                    <th className="text-left py-3 px-4 font-medium">#</th>
-                    <th className="text-left py-3 px-4 font-medium">Team</th>
-                    <th className="text-center py-3 px-2 font-medium">P</th>
-                    <th className="text-center py-3 px-2 font-medium">W</th>
-                    <th className="text-center py-3 px-2 font-medium">D</th>
-                    <th className="text-center py-3 px-2 font-medium">L</th>
-                    <th className="text-center py-3 px-2 font-medium">GD</th>
-                    <th className="text-center py-3 px-4 font-medium">Pts</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.standings.map((team, idx) => {
-                    // Determine zone coloring
-                    let zoneClass = ''
-                    if (idx < 4) zoneClass = 'border-l-4 border-l-green-500 bg-green-500/5'
-                    else if (idx >= data.standings.length - 3) zoneClass = 'border-l-4 border-l-red-500 bg-red-500/5'
-                    else if (idx < 6) zoneClass = 'border-l-4 border-l-blue-500 bg-blue-500/5'
-
-                    return (
-                      <tr
-                        key={team.teamName}
-                        className={`border-b hover:bg-[var(--muted-bg)] transition-colors ${zoneClass}`}
-                        style={{ borderColor: 'var(--border-color)' }}
-                      >
-                        <td className="py-3 px-4 text-[var(--text-secondary)]">{team.position}</td>
-                        <td className="py-3 px-4 font-medium text-[var(--text-primary)]">{team.teamName}</td>
-                        <td className="py-3 px-2 text-center text-[var(--text-secondary)]">{team.played}</td>
-                        <td className="py-3 px-2 text-center text-green-500">{team.won}</td>
-                        <td className="py-3 px-2 text-center text-[var(--text-tertiary)]">{team.drawn}</td>
-                        <td className="py-3 px-2 text-center text-red-400">{team.lost}</td>
-                        <td className="py-3 px-2 text-center text-[var(--text-secondary)]">
-                          {team.goalDiff > 0 ? `+${team.goalDiff}` : team.goalDiff}
-                        </td>
-                        <td className="py-3 px-4 text-center font-bold text-[var(--text-primary)]">{team.points}</td>
+          <div className="space-y-4">
+            {/* Animated Simulation Results */}
+            {showSimulationAnimation && animatedStandings.length > 0 && (
+              <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-2xl p-4 mb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xl">🎲</span>
+                  <h3 className="text-lg font-semibold text-amber-400">Season Simulation - Predicted Final Standings</h3>
+                  <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">
+                    {animatedStandings.some(s => s.isAnimating) ? 'Simulating...' : 'Complete'}
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-[var(--muted-bg)]">
+                      <tr className="text-xs text-[var(--text-tertiary)]">
+                        <th className="text-left py-2 px-3 font-medium">#</th>
+                        <th className="text-left py-2 px-3 font-medium">Team</th>
+                        <th className="text-center py-2 px-3 font-medium">Predicted Pts</th>
+                        <th className="text-center py-2 px-3 font-medium">Status</th>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-            {/* Legend */}
-            <div className="p-4 border-t flex flex-wrap gap-4 text-xs" style={{ borderColor: 'var(--border-color)' }}>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-500 rounded" />
-                <span className="text-[var(--text-tertiary)]">Champions League</span>
+                    </thead>
+                    <tbody>
+                      {animatedStandings.map((team, idx) => {
+                        const posChange = (data.standings.findIndex(s => s.teamName === team.teamName) + 1) - Math.round(team.position)
+                        let zoneClass = ''
+                        if (idx < 4) zoneClass = 'border-l-4 border-l-green-500 bg-green-500/10'
+                        else if (idx >= animatedStandings.length - 3) zoneClass = 'border-l-4 border-l-red-500 bg-red-500/10'
+                        else if (idx < 6) zoneClass = 'border-l-4 border-l-blue-500 bg-blue-500/10'
+
+                        return (
+                          <tr
+                            key={team.teamName}
+                            className={`border-b transition-all duration-300 ${zoneClass}`}
+                            style={{ 
+                              borderColor: 'var(--border-color)',
+                              transform: team.isAnimating ? `translateY(${(team.position - idx - 1) * 2}px)` : 'none',
+                            }}
+                          >
+                            <td className="py-2 px-3 text-[var(--text-secondary)]">{Math.round(team.position)}</td>
+                            <td className="py-2 px-3 font-medium text-[var(--text-primary)]">
+                              <div className="flex items-center gap-2">
+                                {team.teamName}
+                                {!team.isAnimating && posChange !== 0 && (
+                                  <span className={`text-xs ${posChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    {posChange > 0 ? `↑${posChange}` : `↓${Math.abs(posChange)}`}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-2 px-3 text-center font-bold text-amber-400">{team.points}</td>
+                            <td className="py-2 px-3 text-center text-xs">
+                              {idx === 0 && <span className="bg-amber-500 text-black px-2 py-0.5 rounded">🏆 Champion</span>}
+                              {idx > 0 && idx < 4 && <span className="bg-green-500/30 text-green-400 px-2 py-0.5 rounded">UCL</span>}
+                              {idx >= 4 && idx < 6 && <span className="bg-blue-500/30 text-blue-400 px-2 py-0.5 rounded">UEL</span>}
+                              {idx >= animatedStandings.length - 3 && <span className="bg-red-500/30 text-red-400 px-2 py-0.5 rounded">Relegated</span>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <button
+                  onClick={() => setShowSimulationAnimation(false)}
+                  className="mt-3 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+                >
+                  ← Back to Current Standings
+                </button>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-blue-500 rounded" />
-                <span className="text-[var(--text-tertiary)]">Europa League</span>
+            )}
+
+            {/* Current Standings */}
+            <div className="bg-[var(--card-bg)] border rounded-2xl overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
+              <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-color)' }}>
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                  {showSimulationAnimation ? 'Current Standings (Before Simulation)' : 'League Standings'}
+                </h2>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-red-500 rounded" />
-                <span className="text-[var(--text-tertiary)]">Relegation</span>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-[var(--muted-bg)]">
+                    <tr className="text-xs text-[var(--text-tertiary)]">
+                      <th className="text-left py-3 px-4 font-medium">#</th>
+                      <th className="text-left py-3 px-4 font-medium">Team</th>
+                      <th className="text-center py-3 px-2 font-medium">P</th>
+                      <th className="text-center py-3 px-2 font-medium">W</th>
+                      <th className="text-center py-3 px-2 font-medium">D</th>
+                      <th className="text-center py-3 px-2 font-medium">L</th>
+                      <th className="text-center py-3 px-2 font-medium">GD</th>
+                      <th className="text-center py-3 px-4 font-medium">Pts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.standings.map((team, idx) => {
+                      // Determine zone coloring
+                      let zoneClass = ''
+                      if (idx < 4) zoneClass = 'border-l-4 border-l-green-500 bg-green-500/5'
+                      else if (idx >= data.standings.length - 3) zoneClass = 'border-l-4 border-l-red-500 bg-red-500/5'
+                      else if (idx < 6) zoneClass = 'border-l-4 border-l-blue-500 bg-blue-500/5'
+
+                      return (
+                        <tr
+                          key={team.teamName}
+                          className={`border-b hover:bg-[var(--muted-bg)] transition-colors ${zoneClass}`}
+                          style={{ borderColor: 'var(--border-color)' }}
+                        >
+                          <td className="py-3 px-4 text-[var(--text-secondary)]">{team.position}</td>
+                          <td className="py-3 px-4 font-medium text-[var(--text-primary)]">{team.teamName}</td>
+                          <td className="py-3 px-2 text-center text-[var(--text-secondary)]">{team.played}</td>
+                          <td className="py-3 px-2 text-center text-green-500">{team.won}</td>
+                          <td className="py-3 px-2 text-center text-[var(--text-tertiary)]">{team.drawn}</td>
+                          <td className="py-3 px-2 text-center text-red-400">{team.lost}</td>
+                          <td className="py-3 px-2 text-center text-[var(--text-secondary)]">
+                            {team.goalDiff > 0 ? `+${team.goalDiff}` : team.goalDiff}
+                          </td>
+                          <td className="py-3 px-4 text-center font-bold text-[var(--text-primary)]">{team.points}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {/* Legend */}
+              <div className="p-4 border-t flex flex-wrap gap-4 text-xs" style={{ borderColor: 'var(--border-color)' }}>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-green-500 rounded" />
+                  <span className="text-[var(--text-tertiary)]">Champions League</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded" />
+                  <span className="text-[var(--text-tertiary)]">Europa League</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-red-500 rounded" />
+                  <span className="text-[var(--text-tertiary)]">Relegation</span>
+                </div>
               </div>
             </div>
           </div>
