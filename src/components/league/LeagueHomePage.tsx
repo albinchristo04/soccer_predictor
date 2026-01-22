@@ -148,6 +148,22 @@ const LEAGUE_CONFIGS: Record<string, { color: string; gradient: string; flag: st
 // Simulation count options (like in Predict tab)
 const SIMULATION_OPTIONS = [1000, 5000, 10000, 25000, 50000]
 
+// League ID to numeric ID mapping (shared across component)
+const LEAGUE_NUMERIC_ID_MAP: Record<string, number> = {
+  'eng.1': 47, 'premier_league': 47,
+  'esp.1': 87, 'la_liga': 87,
+  'ger.1': 54, 'bundesliga': 54,
+  'ita.1': 55, 'serie_a': 55,
+  'fra.1': 53, 'ligue_1': 53,
+  'usa.1': 29, 'mls': 29,
+}
+
+// Tab label mapping for display
+const TAB_LABELS: Record<string, string> = {
+  'scorers': 'Top Scorers',
+  'simulator': 'Simulator',
+}
+
 // MLS Conference configuration - Updated with full team names for better matching
 const MLS_CONFERENCES = {
   eastern: ['Inter Miami', 'FC Cincinnati', 'Cincinnati', 'Columbus Crew', 'Columbus', 'Orlando City', 'Charlotte FC', 'Charlotte', 'New York Red Bulls', 'Red Bulls', 'New York City FC', 'NYCFC', 'Philadelphia Union', 'Philadelphia', 'Atlanta United', 'D.C. United', 'DC United', 'Chicago Fire', 'Chicago', 'CF Montréal', 'Montreal', 'New England Revolution', 'New England', 'Nashville SC', 'Nashville', 'Toronto FC', 'Toronto'],
@@ -227,16 +243,7 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
   const runSeasonSimulation = async () => {
     setRunningSimulation(true)
     try {
-      // Map leagueId to numeric ID for simulation endpoint
-      const leagueIdMap: Record<string, number> = {
-        'eng.1': 47, 'premier_league': 47,
-        'esp.1': 87, 'la_liga': 87,
-        'ger.1': 54, 'bundesliga': 54,
-        'ita.1': 55, 'serie_a': 55,
-        'fra.1': 53, 'ligue_1': 53,
-        'usa.1': 29, 'mls': 29,
-      }
-      const numericLeagueId = leagueIdMap[leagueId] || 47
+      const numericLeagueId = LEAGUE_NUMERIC_ID_MAP[leagueId] || 47
       
       const res = await fetch(`/api/simulation/${numericLeagueId}?n_simulations=${numSimulations}`)
       if (res.ok) {
@@ -612,7 +619,7 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
                     : 'text-[var(--text-secondary)] border-transparent hover:text-[var(--text-primary)]'
                 }`}
               >
-                {tab === 'scorers' ? 'Top Scorers' : tab === 'simulator' ? 'Simulator' : tab}
+                {TAB_LABELS[tab] || tab}
               </button>
             ))}
           </div>
