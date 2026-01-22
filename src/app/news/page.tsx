@@ -105,15 +105,15 @@ export default function NewsPage() {
               href={articles[0].url || '#'}
               target="_blank"
               rel="noopener noreferrer"
-              className="group block rounded-3xl overflow-hidden border transition-all hover:border-indigo-500/50 fm-card"
+              className="group block rounded-3xl overflow-hidden border transition-all duration-300 hover:border-indigo-500/50 hover:scale-[1.01] hover:shadow-xl fm-card"
             >
               <div className="grid grid-cols-1 lg:grid-cols-2">
-                <div className="aspect-video lg:aspect-auto relative">
+                <div className="aspect-video lg:aspect-auto relative overflow-hidden">
                   {articles[0].image ? (
                     <img
                       src={articles[0].image}
                       alt={articles[0].title}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: 'var(--border-color)' }}>
@@ -153,14 +153,14 @@ export default function NewsPage() {
               href={article.url || '#'}
               target="_blank"
               rel="noopener noreferrer"
-              className="group rounded-2xl overflow-hidden border transition-all hover:shadow-lg hover:shadow-indigo-500/10 fm-card"
+              className="group rounded-2xl overflow-hidden border transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/10 hover:scale-[1.02] hover:border-indigo-500/50 fm-card"
             >
-              <div className="aspect-video relative">
+              <div className="aspect-video relative overflow-hidden">
                 {article.image ? (
                   <img
                     src={article.image}
                     alt={article.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: 'var(--border-color)' }}>

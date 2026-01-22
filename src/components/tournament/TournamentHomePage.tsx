@@ -406,12 +406,19 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
           </thead>
           <tbody>
             {group.standings.map((team, teamIdx) => {
-              // Determine qualification status based on tournament and OVERALL position
-              // For UCL/UEL new league format: Top 8 = R16, 9-24 = R16 Playoff
-              // Calculate overall position across all groups
-              const groupIdx = data.groups.findIndex(g => g.name === group.name)
-              const teamsPerGroup = group.standings.length
-              const overallPosition = groupIdx * teamsPerGroup + team.position
+              // Determine qualification status based on tournament type
+              // For UCL/UEL new league format (36 teams in single league):
+              // - Positions 1-8 = Direct to Round of 16
+              // - Positions 9-24 = R16 Playoff
+              // - Positions 25-36 = Eliminated
+              // Calculate overall position across all entries for the league table format
+              let overallPos = team.position
+              // If there are multiple groups, calculate overall position
+              if (data.groups.length > 1) {
+                const groupIdx = data.groups.findIndex(g => g.name === group.name)
+                const teamsPerGroup = group.standings.length
+                overallPos = groupIdx * teamsPerGroup + team.position
+              }
               
               let statusBadge = null
               let bgClass = ''
@@ -426,15 +433,17 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
                   bgClass = 'bg-amber-500/20 border-l-4 border-l-amber-400'
                 }
               } else {
-                // Champions League / Europa League: Based on new league format
-                // Top 8 overall = Round of 16, 9-24 = R16 Playoff
-                // In group context: top 2 of group = R16, positions 3-4 = R16 Playoff
-                if (team.position <= 2) {
+                // Champions League / Europa League: New league format
+                // Top 8 overall = Direct R16, 9-24 = R16 Playoff, 25+ = Eliminated
+                if (overallPos <= 8) {
                   statusBadge = <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded whitespace-nowrap font-medium">R16</span>
                   bgClass = 'bg-green-500/20 border-l-4 border-l-green-400'
-                } else if (team.position <= 4) {
+                } else if (overallPos <= 24) {
                   statusBadge = <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded whitespace-nowrap font-medium">R16 Playoff</span>
                   bgClass = 'bg-blue-500/20 border-l-4 border-l-blue-400'
+                } else {
+                  statusBadge = <span className="text-xs bg-red-500/80 text-white px-2 py-0.5 rounded whitespace-nowrap font-medium">Eliminated</span>
+                  bgClass = 'bg-red-500/10 border-l-4 border-l-red-400'
                 }
               }
               
@@ -475,8 +484,9 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
           </>
         ) : (
           <>
-            <span><span className="inline-block w-3 h-3 rounded-sm bg-green-400 mr-1"></span> Round of 16</span>
-            <span><span className="inline-block w-3 h-3 rounded-sm bg-blue-400 mr-1"></span> R16 Playoff</span>
+            <span><span className="inline-block w-3 h-3 rounded-sm bg-green-400 mr-1"></span> Round of 16 (Top 8)</span>
+            <span><span className="inline-block w-3 h-3 rounded-sm bg-blue-400 mr-1"></span> R16 Playoff (9-24)</span>
+            <span><span className="inline-block w-3 h-3 rounded-sm bg-red-400 mr-1"></span> Eliminated (25+)</span>
           </>
         )}
       </div>
@@ -942,14 +952,16 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
                       href={item.link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block group bg-[var(--muted-bg)] rounded-xl overflow-hidden hover:shadow-lg transition-shadow"
+                      className="block group bg-[var(--muted-bg)] rounded-xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:border hover:border-[var(--accent-primary)]"
                     >
                       {item.image && (
-                        <img
-                          src={item.image}
-                          alt={item.headline}
-                          className="w-full h-40 object-cover"
-                        />
+                        <div className="overflow-hidden">
+                          <img
+                            src={item.image}
+                            alt={item.headline}
+                            className="w-full h-40 object-cover group-hover:scale-110 transition-transform duration-300"
+                          />
+                        </div>
                       )}
                       <div className="p-4">
                         <p className="font-medium text-[var(--text-primary)] group-hover:text-[var(--accent-primary)] line-clamp-2">
