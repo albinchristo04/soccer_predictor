@@ -119,7 +119,19 @@ const WORLD_CUP_SEASONS = [
 ]
 
 // Simulation count options (like in Predict tab)
-const SIMULATION_OPTIONS = [1000, 5000, 10000, 25000, 50000]
+const SIMULATION_OPTIONS = [
+  { value: 500, label: '500 (Fast)' },
+  { value: 1000, label: '1,000' },
+  { value: 5000, label: '5,000' },
+  { value: 10000, label: '10,000 (Accurate)' },
+  { value: 25000, label: '25,000' },
+  { value: 50000, label: '50,000' },
+]
+
+// Simulation constants
+const GOAL_DIFF_NORMALIZATION = 10  // Factor to normalize goal difference impact
+const RANDOM_VARIANCE = 5  // Random variance added to team strength
+const ROUND_VARIANCE = 3   // Random variance for knockout round outcomes
 
 export default function TournamentHomePage({ tournamentId, tournamentName }: TournamentHomePageProps) {
   const config = TOURNAMENT_CONFIG[tournamentId]
@@ -199,10 +211,10 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
       // Run simulations
       for (let sim = 0; sim < numSimulations; sim++) {
         // Create tournament bracket simulation
-        // Weight teams by their points + goal difference
+        // Weight teams by their points + goal difference using named constants
         const weightedTeams = teams.map(t => ({
           ...t,
-          strength: t.points + (t.goalDifference / 10) + Math.random() * 5,
+          strength: t.points + (t.goalDifference / GOAL_DIFF_NORMALIZATION) + Math.random() * RANDOM_VARIANCE,
         })).sort((a, b) => b.strength - a.strength)
 
         // Simulate knockout rounds
@@ -211,20 +223,23 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
 
         // Semi-finals (top 4 based on weighted random)
         const semiFinalists = quarterFinalists
-          .map(t => ({ ...t, roundStrength: t.strength + Math.random() * 3 }))
+          .map(t => ({ ...t, roundStrength: t.strength + Math.random() * ROUND_VARIANCE }))
           .sort((a, b) => b.roundStrength - a.roundStrength)
           .slice(0, 4)
         semiFinalists.forEach(t => teamResults[t.team].semis++)
 
         // Finals (top 2)
         const finalists = semiFinalists
-          .map(t => ({ ...t, roundStrength: t.strength + Math.random() * 3 }))
+          .map(t => ({ ...t, roundStrength: t.strength + Math.random() * ROUND_VARIANCE }))
           .sort((a, b) => b.roundStrength - a.roundStrength)
           .slice(0, 2)
         finalists.forEach(t => teamResults[t.team].finals++)
 
-        // Winner
-        const winner = finalists[Math.random() > 0.5 ? 0 : 1]
+        // Winner - Use weighted probability based on team strength instead of coin flip
+        // Calculate probability based on relative strength of finalists
+        const totalStrength = finalists[0].roundStrength + finalists[1].roundStrength
+        const team1WinProb = finalists[0].roundStrength / totalStrength
+        const winner = Math.random() < team1WinProb ? finalists[0] : finalists[1]
         if (winner) teamResults[winner.team].wins++
       }
 
@@ -941,12 +956,9 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
                       onChange={(e) => setNumSimulations(parseInt(e.target.value))}
                       className="px-4 py-2 rounded-lg bg-[var(--background-secondary)] border border-[var(--border-color)] text-[var(--text-primary)]"
                     >
-                      <option value={500}>500 (Fast)</option>
-                      <option value={1000}>1,000</option>
-                      <option value={5000}>5,000</option>
-                      <option value={10000}>10,000 (Accurate)</option>
-                      <option value={25000}>25,000</option>
-                      <option value={50000}>50,000</option>
+                      {SIMULATION_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
                     </select>
                     <button
                       onClick={runTournamentSimulation}
