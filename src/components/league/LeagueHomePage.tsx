@@ -164,15 +164,66 @@ const TAB_LABELS: Record<string, string> = {
   'simulator': 'Simulator',
 }
 
-// MLS Conference configuration - Updated with full team names for better matching
+// MLS Conference configuration - Updated with ESPN team names for accurate matching
+// ESPN typically uses full official team names like "LA Galaxy", "Inter Miami CF", etc.
 const MLS_CONFERENCES = {
-  eastern: ['Inter Miami', 'FC Cincinnati', 'Cincinnati', 'Columbus Crew', 'Columbus', 'Orlando City', 'Charlotte FC', 'Charlotte', 'New York Red Bulls', 'Red Bulls', 'New York City FC', 'NYCFC', 'Philadelphia Union', 'Philadelphia', 'Atlanta United', 'D.C. United', 'DC United', 'Chicago Fire', 'Chicago', 'CF Montréal', 'Montreal', 'New England Revolution', 'New England', 'Nashville SC', 'Nashville', 'Toronto FC', 'Toronto'],
-  western: ['Los Angeles FC', 'LAFC', 'LA Galaxy', 'Los Angeles Galaxy', 'Seattle Sounders', 'Seattle', 'Houston Dynamo', 'Houston', 'Real Salt Lake', 'RSL', 'Minnesota United', 'Minnesota', 'Colorado Rapids', 'Colorado', 'Portland Timbers', 'Portland', 'Vancouver Whitecaps', 'Vancouver', 'St. Louis City', 'St. Louis', 'Austin FC', 'Austin', 'Sporting Kansas City', 'Sporting KC', 'FC Dallas', 'Dallas', 'San Jose Earthquakes', 'San Jose'],
+  eastern: [
+    // Full ESPN names
+    'Inter Miami CF', 'Inter Miami', 'Miami',
+    'FC Cincinnati', 'Cincinnati',
+    'Columbus Crew', 'Columbus',
+    'Orlando City SC', 'Orlando City', 'Orlando',
+    'Charlotte FC', 'Charlotte',
+    'New York Red Bulls', 'Red Bulls', 'NY Red Bulls',
+    'New York City FC', 'NYCFC', 'NYC FC',
+    'Philadelphia Union', 'Philadelphia',
+    'Atlanta United FC', 'Atlanta United', 'Atlanta',
+    'D.C. United', 'DC United', 'D.C.',
+    'Chicago Fire FC', 'Chicago Fire', 'Chicago',
+    'CF Montréal', 'CF Montreal', 'Montreal',
+    'New England Revolution', 'New England',
+    'Nashville SC', 'Nashville',
+    'Toronto FC', 'Toronto',
+  ],
+  western: [
+    // Full ESPN names
+    'Los Angeles FC', 'LAFC', 'LA FC',
+    'LA Galaxy', 'Los Angeles Galaxy', 'Galaxy',
+    'Seattle Sounders FC', 'Seattle Sounders', 'Seattle',
+    'Houston Dynamo FC', 'Houston Dynamo', 'Houston',
+    'Real Salt Lake', 'RSL', 'Salt Lake',
+    'Minnesota United FC', 'Minnesota United', 'Minnesota',
+    'Colorado Rapids', 'Colorado',
+    'Portland Timbers', 'Portland',
+    'Vancouver Whitecaps FC', 'Vancouver Whitecaps', 'Vancouver',
+    'St. Louis City SC', 'St. Louis City', 'St. Louis', 'Saint Louis',
+    'Austin FC', 'Austin',
+    'Sporting Kansas City', 'Sporting KC', 'Kansas City',
+    'FC Dallas', 'Dallas',
+    'San Jose Earthquakes', 'San Jose',
+  ],
 }
 
 // Pre-compute lowercased conference team names for efficient matching
 const MLS_EASTERN_LOWER = MLS_CONFERENCES.eastern.map(t => t.toLowerCase())
 const MLS_WESTERN_LOWER = MLS_CONFERENCES.western.map(t => t.toLowerCase())
+
+// Helper function for more accurate MLS conference matching
+const isInConference = (teamName: string, conferenceTeams: string[]): boolean => {
+  const teamLower = teamName.toLowerCase().trim()
+  
+  // Check if any conference team name matches
+  for (const confTeam of conferenceTeams) {
+    const confLower = confTeam.toLowerCase()
+    // Exact match
+    if (teamLower === confLower) return true
+    // Team contains conference entry
+    if (teamLower.includes(confLower)) return true
+    // Conference entry contains team
+    if (confLower.includes(teamLower) && teamLower.length > 3) return true
+  }
+  return false
+}
 
 export default function LeagueHomePage({ leagueId, leagueName, country }: LeagueHomePageProps) {
   const [data, setData] = useState<LeagueHomeData | null>(null)
@@ -412,13 +463,13 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
           }
         }
 
-        // Process top scorers from ESPN with better parsing
+        // Process top scorers from ESPN with comprehensive parsing
         if (espnResults[2].status === 'fulfilled') {
           const espnLeaders = espnResults[2] as PromiseFulfilledResult<Response>
           if (espnLeaders.value.ok) {
             const leadersData = await espnLeaders.value.json()
             
-            // Try different paths to find leaders data
+            // Try different paths to find leaders data (ESPN API format varies by league)
             let scorers: any[] = []
             
             // Path 1: leaders array with categories
@@ -426,10 +477,15 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
               const goalsCategory = leadersData.leaders.find((cat: any) => 
                 cat.name?.toLowerCase().includes('goal') || 
                 cat.displayName?.toLowerCase().includes('goal') ||
-                cat.abbreviation?.toLowerCase() === 'g'
+                cat.abbreviation?.toLowerCase() === 'g' ||
+                cat.name?.toLowerCase() === 'goals'
               )
               if (goalsCategory?.leaders) {
                 scorers = goalsCategory.leaders
+              }
+              // Fallback: take first category if no goals found
+              if (scorers.length === 0 && leadersData.leaders[0]?.leaders) {
+                scorers = leadersData.leaders[0].leaders
               }
             }
             
@@ -437,10 +493,15 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
             if (scorers.length === 0 && leadersData.categories) {
               const goalsCategory = leadersData.categories.find((cat: any) =>
                 cat.name?.toLowerCase().includes('goal') ||
-                cat.displayName?.toLowerCase().includes('goal')
+                cat.displayName?.toLowerCase().includes('goal') ||
+                cat.abbreviation?.toLowerCase() === 'g'
               )
               if (goalsCategory?.leaders) {
                 scorers = goalsCategory.leaders
+              }
+              // Fallback: take first category
+              if (scorers.length === 0 && leadersData.categories[0]?.leaders) {
+                scorers = leadersData.categories[0].leaders
               }
             }
             
@@ -449,16 +510,52 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
               scorers = leadersData.athletes
             }
             
+            // Path 4: root-level array
+            if (scorers.length === 0 && Array.isArray(leadersData)) {
+              scorers = leadersData
+            }
+            
+            // Path 5: nested in sports structure (common for some ESPN endpoints)
+            if (scorers.length === 0 && leadersData.sports?.[0]?.leagues?.[0]?.athletes) {
+              scorers = leadersData.sports[0].leagues[0].athletes
+            }
+            
             if (scorers.length > 0) {
               leagueData.topScorers = scorers.slice(0, 10).map((leader: any, idx: number) => ({
                 rank: idx + 1,
-                name: leader.athlete?.displayName || leader.athlete?.fullName || leader.displayName || leader.name || 'Unknown',
-                team: leader.athlete?.team?.displayName || leader.team?.displayName || leader.teamName || '',
-                goals: parseInt(leader.value || leader.stat || leader.goals || '0'),
-                assists: parseInt(leader.assists || '0'),
-                matches: leader.athlete?.statistics?.gamesPlayed || leader.gamesPlayed || 0,
+                name: leader.athlete?.displayName || leader.athlete?.fullName || leader.displayName || leader.name || leader.fullName || 'Unknown',
+                team: leader.athlete?.team?.displayName || leader.team?.displayName || leader.team?.name || leader.teamName || '',
+                goals: parseInt(leader.value || leader.stat || leader.goals || leader.statistics?.goals || '0'),
+                assists: parseInt(leader.assists || leader.statistics?.assists || '0'),
+                matches: leader.athlete?.statistics?.gamesPlayed || leader.gamesPlayed || leader.statistics?.gamesPlayed || 0,
               }))
             }
+          }
+        }
+        
+        // Fallback: Try alternative ESPN endpoint for leaders if still empty
+        if (leagueData.topScorers.length === 0) {
+          try {
+            const altLeadersRes = await fetch(
+              `https://site.api.espn.com/apis/site/v2/sports/soccer/${espnLeagueId}/statistics`,
+              { next: { revalidate: 3600 } }
+            )
+            if (altLeadersRes.ok) {
+              const statsData = await altLeadersRes.json()
+              const leaders = statsData.leaders?.categories?.[0]?.leaders || statsData.categories?.[0]?.leaders || []
+              if (leaders.length > 0) {
+                leagueData.topScorers = leaders.slice(0, 10).map((leader: any, idx: number) => ({
+                  rank: idx + 1,
+                  name: leader.athlete?.displayName || leader.name || 'Unknown',
+                  team: leader.athlete?.team?.displayName || leader.team || '',
+                  goals: parseInt(leader.value || '0'),
+                  assists: 0,
+                  matches: 0,
+                }))
+              }
+            }
+          } catch (e) {
+            // Silently fail on alternative endpoint
           }
         }
 
@@ -505,14 +602,14 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--background)' }}>
+      <div className="flex-1 flex items-center justify-center py-20" style={{ backgroundColor: 'var(--background)' }}>
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--background)' }}>
+    <div className="flex-1" style={{ backgroundColor: 'var(--background)' }}>
       {/* Hero Header - FotMob Style */}
       <div className={`bg-gradient-to-r ${config.gradient} py-8 px-4`}>
         <div className="max-w-6xl mx-auto">
@@ -747,12 +844,10 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {['Eastern Conference', 'Western Conference'].map((conference) => {
                   const isEastern = conference.includes('Eastern')
-                  const conferenceTeams = data.standings.filter(team => {
-                    const teamNameLower = team.teamName.toLowerCase()
-                    return isEastern 
-                      ? MLS_EASTERN_LOWER.some(et => teamNameLower.includes(et) || et.includes(teamNameLower))
-                      : MLS_WESTERN_LOWER.some(wt => teamNameLower.includes(wt) || wt.includes(teamNameLower))
-                  })
+                  const conferenceTeamsList = isEastern ? MLS_EASTERN_LOWER : MLS_WESTERN_LOWER
+                  const conferenceTeams = data.standings.filter(team => 
+                    isInConference(team.teamName, conferenceTeamsList)
+                  )
                   
                   return (
                     <div key={conference} className="bg-[var(--card-bg)] border rounded-2xl overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>

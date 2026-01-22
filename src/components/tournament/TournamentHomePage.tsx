@@ -118,6 +118,9 @@ const WORLD_CUP_SEASONS = [
   { value: '2010', label: '2010 (South Africa)' },
 ]
 
+// Simulation count options (like in Predict tab)
+const SIMULATION_OPTIONS = [1000, 5000, 10000, 25000, 50000]
+
 export default function TournamentHomePage({ tournamentId, tournamentName }: TournamentHomePageProps) {
   const config = TOURNAMENT_CONFIG[tournamentId]
   const router = useRouter()
@@ -125,11 +128,21 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
   const [loading, setLoading] = useState(true)
   const [selectedSeason, setSelectedSeason] = useState(tournamentId === 'world_cup' ? '2026' : '2025')
   const [runningSimulation, setRunningSimulation] = useState(false)
+  const [numSimulations, setNumSimulations] = useState(10000)
+  // New: Probability-based simulation results (like LeagueHomePage)
   const [simulationResults, setSimulationResults] = useState<{
-    winner: string
-    winnerProbability: number
-    finalists: string[]
-    semifinals: string[]
+    tournament_name: string
+    n_simulations: number
+    teams: Array<{
+      team_name: string
+      current_points: number
+      win_probability: number
+      final_probability: number
+      semi_final_probability: number
+      quarter_final_probability: number
+    }>
+    most_likely_winner: string
+    winner_probability: number
   } | null>(null)
   const [bracketRounds, setBracketRounds] = useState<BracketRound[]>([])
   const [simulationProbabilities, setSimulationProbabilities] = useState<{
@@ -152,34 +165,89 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
   // Minimum number of teams required for tournament simulation
   const MIN_TEAMS_FOR_SIMULATION = 8
 
-  // Run tournament simulation
+  // Run tournament simulation with probability-based output (like LeagueHomePage)
   const runTournamentSimulation = async () => {
     setRunningSimulation(true)
     try {
       // Safely get teams from standings with null checks
       if (!data.groups || data.groups.length === 0) {
         console.error(`Tournament simulation requires group data. Please ensure tournament data is loaded.`)
+        setRunningSimulation(false)
         return
       }
 
       const teams = data.groups.flatMap(g => 
-        (g.standings || []).map(s => s.team)
-      ).filter(Boolean)
+        (g.standings || []).map(s => ({
+          team: s.team,
+          points: s.points,
+          goalDifference: s.goalDifference,
+        }))
+      ).filter(t => t.team)
 
       if (teams.length < MIN_TEAMS_FOR_SIMULATION) {
         console.error(`Tournament simulation requires at least ${MIN_TEAMS_FOR_SIMULATION} teams, found ${teams.length}. Please ensure tournament data is loaded.`)
+        setRunningSimulation(false)
         return
       }
 
-      // Simple simulation based on team strengths
-      const topTeams = teams.slice(0, 16)
-      const shuffled = [...topTeams].sort(() => Math.random() - 0.5)
-      
+      // Monte Carlo simulation based on team strength (points + GD)
+      const teamResults: Record<string, { wins: number; finals: number; semis: number; quarters: number }> = {}
+      teams.forEach(t => {
+        teamResults[t.team] = { wins: 0, finals: 0, semis: 0, quarters: 0 }
+      })
+
+      // Run simulations
+      for (let sim = 0; sim < numSimulations; sim++) {
+        // Create tournament bracket simulation
+        // Weight teams by their points + goal difference
+        const weightedTeams = teams.map(t => ({
+          ...t,
+          strength: t.points + (t.goalDifference / 10) + Math.random() * 5,
+        })).sort((a, b) => b.strength - a.strength)
+
+        // Simulate knockout rounds
+        const quarterFinalists = weightedTeams.slice(0, 8)
+        quarterFinalists.forEach(t => teamResults[t.team].quarters++)
+
+        // Semi-finals (top 4 based on weighted random)
+        const semiFinalists = quarterFinalists
+          .map(t => ({ ...t, roundStrength: t.strength + Math.random() * 3 }))
+          .sort((a, b) => b.roundStrength - a.roundStrength)
+          .slice(0, 4)
+        semiFinalists.forEach(t => teamResults[t.team].semis++)
+
+        // Finals (top 2)
+        const finalists = semiFinalists
+          .map(t => ({ ...t, roundStrength: t.strength + Math.random() * 3 }))
+          .sort((a, b) => b.roundStrength - a.roundStrength)
+          .slice(0, 2)
+        finalists.forEach(t => teamResults[t.team].finals++)
+
+        // Winner
+        const winner = finalists[Math.random() > 0.5 ? 0 : 1]
+        if (winner) teamResults[winner.team].wins++
+      }
+
+      // Calculate probabilities
+      const teamProbabilities = Object.entries(teamResults)
+        .map(([team_name, results]) => ({
+          team_name,
+          current_points: teams.find(t => t.team === team_name)?.points || 0,
+          win_probability: results.wins / numSimulations,
+          final_probability: results.finals / numSimulations,
+          semi_final_probability: results.semis / numSimulations,
+          quarter_final_probability: results.quarters / numSimulations,
+        }))
+        .sort((a, b) => b.win_probability - a.win_probability)
+
+      const mostLikelyWinner = teamProbabilities[0]
+
       setSimulationResults({
-        winner: shuffled[0],
-        winnerProbability: 0.15 + Math.random() * 0.15,
-        finalists: shuffled.slice(0, 2),
-        semifinals: shuffled.slice(0, 4),
+        tournament_name: tournamentName,
+        n_simulations: numSimulations,
+        teams: teamProbabilities,
+        most_likely_winner: mostLikelyWinner?.team_name || 'Unknown',
+        winner_probability: mostLikelyWinner?.win_probability || 0,
       })
     } catch (error) {
       console.error('Simulation error:', error)
@@ -783,20 +851,20 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
           </div>
         </div>
         
-        {/* Simulation Results */}
+        {/* Simulation Results - Updated to show probability-based output */}
         {simulationResults && (
           <div className="mt-4 p-4 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
-                <p className="text-amber-300 text-sm font-medium">🏆 AI Prediction</p>
-                <p className="text-white font-bold text-lg">{simulationResults.winner} to win the tournament</p>
+                <p className="text-amber-300 text-sm font-medium">🏆 Monte Carlo Simulation ({simulationResults.n_simulations.toLocaleString()} runs)</p>
+                <p className="text-white font-bold text-lg">{simulationResults.most_likely_winner} to win the tournament</p>
                 <p className="text-white/70 text-sm mt-1">
-                  Finalists: {simulationResults.finalists.join(' vs ')}
+                  Top contenders: {simulationResults.teams.slice(0, 3).map(t => `${t.team_name} (${(t.win_probability * 100).toFixed(1)}%)`).join(', ')}
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-2xl font-bold text-amber-400">
-                  {(simulationResults.winnerProbability * 100).toFixed(0)}%
+                  {(simulationResults.winner_probability * 100).toFixed(1)}%
                 </p>
                 <p className="text-white/60 text-xs">win probability</p>
               </div>
@@ -855,65 +923,50 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
           
           {activeTab === 'Simulator' && (
             <div className="space-y-6">
-              {/* Quick Tournament Simulator - Same as header button */}
-              <div className="bg-[var(--card-bg)] rounded-xl border p-6" style={{ borderColor: 'var(--border-color)' }}>
-                <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+              {/* Tournament Simulator - Same style as LeagueHomePage */}
+              <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-3xl border border-[var(--border-color)] p-6">
+                <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+                      <span>🎲</span>
+                      Tournament Simulation
+                    </h3>
+                    <p className="text-sm text-[var(--text-secondary)]">
+                      Monte Carlo simulation using team standings and knockout bracket predictions
+                    </p>
+                  </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-3xl">🎲</span>
-                    <div>
-                      <h2 className="text-xl font-bold text-[var(--text-primary)]">Tournament Simulator</h2>
-                      <p className="text-sm text-[var(--text-tertiary)]">Predict the tournament winner using Monte Carlo simulation</p>
-                    </div>
+                    <select
+                      value={numSimulations}
+                      onChange={(e) => setNumSimulations(parseInt(e.target.value))}
+                      className="px-4 py-2 rounded-lg bg-[var(--background-secondary)] border border-[var(--border-color)] text-[var(--text-primary)]"
+                    >
+                      <option value={500}>500 (Fast)</option>
+                      <option value={1000}>1,000</option>
+                      <option value={5000}>5,000</option>
+                      <option value={10000}>10,000 (Accurate)</option>
+                      <option value={25000}>25,000</option>
+                      <option value={50000}>50,000</option>
+                    </select>
+                    <button
+                      onClick={runTournamentSimulation}
+                      disabled={runningSimulation || data.groups.length === 0}
+                      className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r ${config.gradient} hover:opacity-90 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-300 shadow-lg flex items-center gap-2`}
+                    >
+                      {runningSimulation ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Simulating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🎲</span>
+                          <span>Run Simulation</span>
+                        </>
+                      )}
+                    </button>
                   </div>
-                  <button
-                    onClick={runTournamentSimulation}
-                    disabled={runningSimulation || data.groups.length === 0}
-                    className={`px-6 py-3 rounded-lg bg-gradient-to-r ${config.gradient} text-white font-semibold transition-all hover:opacity-90 disabled:opacity-50 flex items-center gap-2`}
-                  >
-                    {runningSimulation ? (
-                      <>
-                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        Running Simulation...
-                      </>
-                    ) : (
-                      <>🎲 Run Simulation</>
-                    )}
-                  </button>
                 </div>
-
-                {/* Simulation Results */}
-                {simulationResults && (
-                  <div className={`bg-gradient-to-r ${config.gradient} rounded-xl p-6 text-white`}>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="text-center md:text-left">
-                        <p className="text-white/70 text-sm mb-1">Predicted Winner</p>
-                        <p className="text-2xl font-bold">🏆 {simulationResults.winner}</p>
-                        <p className="text-white/80 text-sm mt-1">
-                          {(simulationResults.winnerProbability * 100).toFixed(1)}% probability
-                        </p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-white/70 text-sm mb-1">Predicted Final</p>
-                        <p className="text-lg font-semibold">
-                          {simulationResults.finalists[0]} vs {simulationResults.finalists[1]}
-                        </p>
-                      </div>
-                      <div className="text-center md:text-right">
-                        <p className="text-white/70 text-sm mb-1">Semi-Finalists</p>
-                        <div className="flex flex-wrap gap-1 justify-center md:justify-end">
-                          {simulationResults.semifinals.map((team, idx) => (
-                            <span key={idx} className="text-xs bg-white/20 px-2 py-0.5 rounded">
-                              {team}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Teams available info */}
                 {data.groups.length === 0 && (
@@ -932,6 +985,159 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
                   </div>
                 )}
               </div>
+
+              {/* Simulation Results - Full probability table like LeagueHomePage */}
+              {simulationResults && (
+                <div className="space-y-6 animate-fade-in">
+                  {/* Summary Card */}
+                  <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-3xl border border-[var(--border-color)] overflow-hidden">
+                    <div className={`p-6 bg-gradient-to-r ${config.gradient}/20 border-b border-[var(--border-color)]`}>
+                      <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div>
+                          <h3 className="text-2xl font-bold text-[var(--text-primary)]">{simulationResults.tournament_name}</h3>
+                          <p className="text-[var(--text-secondary)]">
+                            {simulationResults.n_simulations.toLocaleString()} simulations completed
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-[var(--text-secondary)]">Most Likely Winner</p>
+                          <p className="text-xl font-bold text-amber-400">{simulationResults.most_likely_winner}</p>
+                          <p className="text-sm text-amber-400/80">{(simulationResults.winner_probability * 100).toFixed(1)}% probability</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Key Insights */}
+                    <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="p-4 rounded-xl bg-[var(--background-secondary)]">
+                        <p className="text-sm text-[var(--text-secondary)] mb-2">🏆 Title Contenders</p>
+                        <div className="space-y-1">
+                          {simulationResults.teams
+                            .filter(t => t.win_probability > 0.01)
+                            .slice(0, 4)
+                            .map((team) => (
+                              <div key={team.team_name} className="flex justify-between text-sm">
+                                <span className="text-[var(--text-primary)]">{team.team_name}</span>
+                                <span className="text-amber-400">{(team.win_probability * 100).toFixed(1)}%</span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-[var(--background-secondary)]">
+                        <p className="text-sm text-[var(--text-secondary)] mb-2">🥈 Finalists</p>
+                        <div className="space-y-1">
+                          {simulationResults.teams
+                            .sort((a, b) => b.final_probability - a.final_probability)
+                            .slice(0, 4)
+                            .map((team) => (
+                              <div key={team.team_name} className="flex justify-between text-sm">
+                                <span className="text-[var(--text-primary)]">{team.team_name}</span>
+                                <span className="text-blue-400">{(team.final_probability * 100).toFixed(0)}%</span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-[var(--background-secondary)]">
+                        <p className="text-sm text-[var(--text-secondary)] mb-2">🥉 Semi-Finalists</p>
+                        <div className="space-y-1">
+                          {simulationResults.teams
+                            .sort((a, b) => b.semi_final_probability - a.semi_final_probability)
+                            .slice(0, 4)
+                            .map((team) => (
+                              <div key={team.team_name} className="flex justify-between text-sm">
+                                <span className="text-[var(--text-primary)]">{team.team_name}</span>
+                                <span className="text-emerald-400">{(team.semi_final_probability * 100).toFixed(0)}%</span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Full Standings Table */}
+                  <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-3xl border border-[var(--border-color)] overflow-hidden">
+                    <div className="p-4 border-b border-[var(--border-color)] flex items-center justify-between">
+                      <h3 className="font-semibold text-[var(--text-primary)]">Team Probabilities</h3>
+                      <span className="text-sm text-[var(--text-secondary)]">
+                        📊 {simulationResults.teams.length} teams analyzed
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="text-xs text-[var(--text-tertiary)] border-b border-[var(--border-color)]">
+                            <th className="text-left py-3 px-4">Rank</th>
+                            <th className="text-left py-3 px-4">Team</th>
+                            <th className="text-center py-3 px-4">Current Pts</th>
+                            <th className="text-center py-3 px-4">Win %</th>
+                            <th className="text-center py-3 px-4">Final %</th>
+                            <th className="text-center py-3 px-4">Semi %</th>
+                            <th className="text-center py-3 px-4">Quarter %</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {simulationResults.teams.map((team, idx) => (
+                            <tr
+                              key={team.team_name}
+                              className={`border-b border-[var(--border-color)] hover:bg-[var(--background-secondary)] transition-colors ${
+                                idx < 1 ? 'border-l-2 border-l-amber-500' : 
+                                idx < 4 ? 'border-l-2 border-l-emerald-500' : ''
+                              }`}
+                            >
+                              <td className="py-3 px-4 text-[var(--text-secondary)]">{idx + 1}</td>
+                              <td className="py-3 px-4 text-[var(--text-primary)] font-medium">{team.team_name}</td>
+                              <td className="py-3 px-4 text-center text-[var(--text-secondary)]">{team.current_points}</td>
+                              <td className="py-3 px-4 text-center">
+                                {team.win_probability > 0.001 ? (
+                                  <span className="text-amber-400 font-semibold">{(team.win_probability * 100).toFixed(1)}%</span>
+                                ) : (
+                                  <span className="text-[var(--text-tertiary)]">-</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                {team.final_probability > 0.01 ? (
+                                  <span className="text-blue-400">{(team.final_probability * 100).toFixed(0)}%</span>
+                                ) : (
+                                  <span className="text-[var(--text-tertiary)]">-</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                {team.semi_final_probability > 0.01 ? (
+                                  <span className="text-emerald-400">{(team.semi_final_probability * 100).toFixed(0)}%</span>
+                                ) : (
+                                  <span className="text-[var(--text-tertiary)]">-</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                {team.quarter_final_probability > 0.01 ? (
+                                  <span className="text-purple-400">{(team.quarter_final_probability * 100).toFixed(0)}%</span>
+                                ) : (
+                                  <span className="text-[var(--text-tertiary)]">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Legend */}
+                    <div className="p-4 flex gap-6 text-xs text-[var(--text-tertiary)] border-t border-[var(--border-color)]">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-amber-500 rounded" />
+                        <span>Winner</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-emerald-500 rounded" />
+                        <span>Top Contenders</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Also show the advanced knockout simulator */}
               <div className="border-t pt-6" style={{ borderColor: 'var(--border-color)' }}>
