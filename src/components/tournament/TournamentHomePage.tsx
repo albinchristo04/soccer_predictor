@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
 import { KnockoutSimulator, KnockoutBracket, type BracketRound, type KnockoutMatch as BracketMatch } from '@/components/knockout'
+import MatchCalendar from '@/components/match/MatchCalendar'
 
 interface TournamentHomePageProps {
   tournamentId: 'champions_league' | 'europa_league' | 'world_cup'
@@ -68,6 +69,8 @@ const TOURNAMENT_CONFIG = {
     knockoutType: 'champions_league' as const,
     groupCount: 8,
     leagueId: 'uefa.champions',
+    espnId: 'uefa.champions',
+    logo: 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/2.png',
   },
   europa_league: {
     name: 'UEFA Europa League',
@@ -77,6 +80,8 @@ const TOURNAMENT_CONFIG = {
     knockoutType: 'europa_league' as const,
     groupCount: 8,
     leagueId: 'uefa.europa',
+    espnId: 'uefa.europa',
+    logo: 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/2310.png',
   },
   world_cup: {
     name: 'FIFA World Cup',
@@ -86,17 +91,71 @@ const TOURNAMENT_CONFIG = {
     knockoutType: 'world_cup' as const,
     groupCount: 8,
     leagueId: 'fifa.world',
+    espnId: 'fifa.world',
+    logo: 'https://a.espncdn.com/combiner/i?img=/i/leaguelogos/soccer/500/4.png',
   },
 }
 
 const TABS = ['Overview', 'Groups', 'Knockout', 'Fixtures', 'Simulator', 'News'] as const
 type TabType = typeof TABS[number]
 
+// Available tournament seasons for dropdown
+const TOURNAMENT_SEASONS = [
+  { value: '2025', label: '2025-26' },
+  { value: '2024', label: '2024-25' },
+  { value: '2023', label: '2023-24' },
+  { value: '2022', label: '2022-23' },
+  { value: '2021', label: '2021-22' },
+  { value: '2020', label: '2020-21' },
+  { value: '2019', label: '2019-20' },
+]
+
+const WORLD_CUP_SEASONS = [
+  { value: '2026', label: '2026' },
+  { value: '2022', label: '2022 (Qatar)' },
+  { value: '2018', label: '2018 (Russia)' },
+  { value: '2014', label: '2014 (Brazil)' },
+  { value: '2010', label: '2010 (South Africa)' },
+]
+
+// Simulation count options (like in Predict tab)
+const SIMULATION_OPTIONS = [
+  { value: 500, label: '500 (Fast)' },
+  { value: 1000, label: '1,000' },
+  { value: 5000, label: '5,000' },
+  { value: 10000, label: '10,000 (Accurate)' },
+  { value: 25000, label: '25,000' },
+  { value: 50000, label: '50,000' },
+]
+
+// Simulation constants
+const GOAL_DIFF_NORMALIZATION = 10  // Factor to normalize goal difference impact
+const RANDOM_VARIANCE = 5  // Random variance added to team strength
+const ROUND_VARIANCE = 3   // Random variance for knockout round outcomes
+
 export default function TournamentHomePage({ tournamentId, tournamentName }: TournamentHomePageProps) {
   const config = TOURNAMENT_CONFIG[tournamentId]
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>('Overview')
   const [loading, setLoading] = useState(true)
+  const [selectedSeason, setSelectedSeason] = useState(tournamentId === 'world_cup' ? '2026' : '2025')
+  const [runningSimulation, setRunningSimulation] = useState(false)
+  const [numSimulations, setNumSimulations] = useState(10000)
+  // New: Probability-based simulation results (like LeagueHomePage)
+  const [simulationResults, setSimulationResults] = useState<{
+    tournament_name: string
+    n_simulations: number
+    teams: Array<{
+      team_name: string
+      current_points: number
+      win_probability: number
+      final_probability: number
+      semi_final_probability: number
+      quarter_final_probability: number
+    }>
+    most_likely_winner: string
+    winner_probability: number
+  } | null>(null)
   const [bracketRounds, setBracketRounds] = useState<BracketRound[]>([])
   const [simulationProbabilities, setSimulationProbabilities] = useState<{
     champion: { team: string; probability: number }[]
@@ -112,17 +171,110 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
     news: [],
   })
 
+  // Get available seasons based on tournament type
+  const availableSeasons = tournamentId === 'world_cup' ? WORLD_CUP_SEASONS : TOURNAMENT_SEASONS
+
+  // Minimum number of teams required for tournament simulation
+  const MIN_TEAMS_FOR_SIMULATION = 8
+
+  // Run tournament simulation with probability-based output (like LeagueHomePage)
+  const runTournamentSimulation = async () => {
+    setRunningSimulation(true)
+    try {
+      // Safely get teams from standings with null checks
+      if (!data.groups || data.groups.length === 0) {
+        console.error(`Tournament simulation requires group data. Please ensure tournament data is loaded.`)
+        setRunningSimulation(false)
+        return
+      }
+
+      const teams = data.groups.flatMap(g => 
+        (g.standings || []).map(s => ({
+          team: s.team,
+          points: s.points,
+          goalDifference: s.goalDifference,
+        }))
+      ).filter(t => t.team)
+
+      if (teams.length < MIN_TEAMS_FOR_SIMULATION) {
+        console.error(`Tournament simulation requires at least ${MIN_TEAMS_FOR_SIMULATION} teams, found ${teams.length}. Please ensure tournament data is loaded.`)
+        setRunningSimulation(false)
+        return
+      }
+
+      // Monte Carlo simulation based on team strength (points + GD)
+      const teamResults: Record<string, { wins: number; finals: number; semis: number; quarters: number }> = {}
+      teams.forEach(t => {
+        teamResults[t.team] = { wins: 0, finals: 0, semis: 0, quarters: 0 }
+      })
+
+      // Run simulations
+      for (let sim = 0; sim < numSimulations; sim++) {
+        // Create tournament bracket simulation
+        // Weight teams by their points + goal difference using named constants
+        const weightedTeams = teams.map(t => ({
+          ...t,
+          strength: t.points + (t.goalDifference / GOAL_DIFF_NORMALIZATION) + Math.random() * RANDOM_VARIANCE,
+        })).sort((a, b) => b.strength - a.strength)
+
+        // Simulate knockout rounds
+        const quarterFinalists = weightedTeams.slice(0, 8)
+        quarterFinalists.forEach(t => teamResults[t.team].quarters++)
+
+        // Semi-finals (top 4 based on weighted random)
+        const semiFinalists = quarterFinalists
+          .map(t => ({ ...t, roundStrength: t.strength + Math.random() * ROUND_VARIANCE }))
+          .sort((a, b) => b.roundStrength - a.roundStrength)
+          .slice(0, 4)
+        semiFinalists.forEach(t => teamResults[t.team].semis++)
+
+        // Finals (top 2)
+        const finalists = semiFinalists
+          .map(t => ({ ...t, roundStrength: t.strength + Math.random() * ROUND_VARIANCE }))
+          .sort((a, b) => b.roundStrength - a.roundStrength)
+          .slice(0, 2)
+        finalists.forEach(t => teamResults[t.team].finals++)
+
+        // Winner - Use weighted probability based on team strength instead of coin flip
+        // Calculate probability based on relative strength of finalists
+        const totalStrength = finalists[0].roundStrength + finalists[1].roundStrength
+        const team1WinProb = finalists[0].roundStrength / totalStrength
+        const winner = Math.random() < team1WinProb ? finalists[0] : finalists[1]
+        if (winner) teamResults[winner.team].wins++
+      }
+
+      // Calculate probabilities
+      const teamProbabilities = Object.entries(teamResults)
+        .map(([team_name, results]) => ({
+          team_name,
+          current_points: teams.find(t => t.team === team_name)?.points || 0,
+          win_probability: results.wins / numSimulations,
+          final_probability: results.finals / numSimulations,
+          semi_final_probability: results.semis / numSimulations,
+          quarter_final_probability: results.quarters / numSimulations,
+        }))
+        .sort((a, b) => b.win_probability - a.win_probability)
+
+      const mostLikelyWinner = teamProbabilities[0]
+
+      setSimulationResults({
+        tournament_name: tournamentName,
+        n_simulations: numSimulations,
+        teams: teamProbabilities,
+        most_likely_winner: mostLikelyWinner?.team_name || 'Unknown',
+        winner_probability: mostLikelyWinner?.win_probability || 0,
+      })
+    } catch (error) {
+      console.error('Simulation error:', error)
+    } finally {
+      setRunningSimulation(false)
+    }
+  }
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
       try {
-        // Fetch standings (groups), matches, and news in parallel
-        const [standingsRes, matchesRes, newsRes] = await Promise.allSettled([
-          fetch(`/api/v1/leagues/${config.leagueId}/standings`),
-          fetch(`/api/v1/leagues/${config.leagueId}/matches`),
-          fetch(`/api/v1/leagues/${config.leagueId}/news`),
-        ])
-
         const newData: TournamentData = {
           groups: [],
           knockoutMatches: [],
@@ -131,109 +283,149 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
           news: [],
         }
 
-        // Process groups from standings
-        if (standingsRes.status === 'fulfilled' && standingsRes.value.ok) {
-          const standingsJson = await standingsRes.value.json()
-          const groups = standingsJson.groups || standingsJson.standings || []
-          
-          newData.groups = groups.map((g: any) => ({
-            name: g.group || g.name || 'Group',
-            standings: (g.standings || g.teams || []).map((t: any, idx: number) => ({
-              position: idx + 1,
-              team: t.team || t.name || 'Unknown',
-              teamId: t.team_id || t.id,
-              played: t.played || t.matches || 0,
-              won: t.won || t.wins || 0,
-              drawn: t.drawn || t.draws || 0,
-              lost: t.lost || t.losses || 0,
-              goalsFor: t.goals_for || t.goalsFor || 0,
-              goalsAgainst: t.goals_against || t.goalsAgainst || 0,
-              goalDifference: t.goal_difference || t.goalDifference || 0,
-              points: t.points || 0,
+        // Fetch from ESPN APIs for real tournament data
+        const espnLeagueId = config.espnId
+        
+        // Fetch standings (groups), matches, and news in parallel from ESPN
+        const espnResults = await Promise.allSettled([
+          fetch(`https://site.api.espn.com/apis/v2/sports/soccer/${espnLeagueId}/standings`),
+          fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnLeagueId}/scoreboard`),
+          fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnLeagueId}/news`),
+        ])
+
+        // Process standings/groups from ESPN
+        if (espnResults[0].status === 'fulfilled') {
+          const standingsRes = espnResults[0] as PromiseFulfilledResult<Response>
+          if (standingsRes.value.ok) {
+            const standingsData = await standingsRes.value.json()
+            const children = standingsData.children || []
+            
+            // Process groups
+            for (const child of children) {
+              const groupName = child.name || child.abbreviation || 'Group'
+              const entries = child.standings?.entries || []
+              
+              if (entries.length > 0) {
+                const groupTeams: GroupStanding[] = entries.map((entry: any, idx: number) => {
+                  const getStatVal = (name: string) => {
+                    const stat = entry.stats?.find((s: any) => s.name === name)
+                    return parseInt(stat?.value || '0', 10)
+                  }
+                  return {
+                    position: idx + 1,
+                    team: entry.team?.displayName || 'Unknown',
+                    teamId: entry.team?.id,
+                    played: getStatVal('gamesPlayed'),
+                    won: getStatVal('wins'),
+                    drawn: getStatVal('ties'),
+                    lost: getStatVal('losses'),
+                    goalsFor: getStatVal('pointsFor'),
+                    goalsAgainst: getStatVal('pointsAgainst'),
+                    goalDifference: getStatVal('pointDifferential'),
+                    points: getStatVal('points'),
+                  }
+                })
+                newData.groups.push({ name: groupName, standings: groupTeams })
+              }
+            }
+          }
+        }
+
+        // Process matches from ESPN
+        if (espnResults[1].status === 'fulfilled') {
+          const matchesRes = espnResults[1] as PromiseFulfilledResult<Response>
+          if (matchesRes.value.ok) {
+            const matchesData = await matchesRes.value.json()
+            const events = matchesData.events || []
+            const now = new Date()
+            
+            for (const event of events) {
+              const competition = event.competitions?.[0]
+              if (!competition) continue
+              
+              const homeTeam = competition.competitors?.find((c: any) => c.homeAway === 'home')
+              const awayTeam = competition.competitors?.find((c: any) => c.homeAway === 'away')
+              const matchDate = new Date(event.date)
+              const statusType = competition.status?.type?.name || ''
+              
+              const isFinished = statusType.includes('FINAL') || statusType.includes('FULL_TIME')
+              const isLive = statusType.includes('IN_PROGRESS') || statusType.includes('HALFTIME')
+              const roundName = event.competitions?.[0]?.type?.text || event.shortName || ''
+              const isKnockout = roundName.toLowerCase().includes('final') || 
+                                roundName.toLowerCase().includes('round of') ||
+                                roundName.toLowerCase().includes('knockout')
+              
+              const matchObj: Match = {
+                id: String(event.id),
+                homeTeam: homeTeam?.team?.displayName || 'Home',
+                awayTeam: awayTeam?.team?.displayName || 'Away',
+                homeScore: isFinished || isLive ? parseInt(homeTeam?.score || '0') : undefined,
+                awayScore: isFinished || isLive ? parseInt(awayTeam?.score || '0') : undefined,
+                date: matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                time: matchDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+                round: roundName,
+                venue: competition.venue?.fullName,
+                status: isFinished ? 'finished' : isLive ? 'live' : 'upcoming',
+              }
+              
+              if (isKnockout && isFinished) {
+                newData.knockoutMatches.push(matchObj)
+                // Also add to recent results so they show on overview
+                newData.recentResults.push(matchObj)
+              } else if (isFinished) {
+                newData.recentResults.push(matchObj)
+              } else {
+                newData.upcomingMatches.push(matchObj)
+              }
+            }
+            
+            // Build bracket rounds from knockout matches
+            const roundsMap: Record<string, BracketMatch[]> = {}
+            for (const match of newData.knockoutMatches) {
+              const round = match.round || 'Unknown'
+              if (!roundsMap[round]) {
+                roundsMap[round] = []
+              }
+              roundsMap[round].push({
+                id: match.id,
+                homeTeam: match.homeTeam,
+                awayTeam: match.awayTeam,
+                homeScore: match.homeScore,
+                awayScore: match.awayScore,
+                date: match.date,
+                time: match.time,
+                status: match.status as 'scheduled' | 'live' | 'finished',
+                round: round,
+                winner: match.homeScore !== undefined && match.awayScore !== undefined
+                  ? match.homeScore > match.awayScore ? 'home' 
+                  : match.awayScore > match.homeScore ? 'away' 
+                  : null
+                  : null,
+              })
+            }
+            
+            // Convert to bracket rounds array
+            const bracketData: BracketRound[] = Object.entries(roundsMap).map(([name, matches]) => ({
+              name,
+              matches,
             }))
-          }))
+            setBracketRounds(bracketData)
+          }
         }
 
-        // Process matches
-        if (matchesRes.status === 'fulfilled' && matchesRes.value.ok) {
-          const matchesJson = await matchesRes.value.json()
-          const allMatches = matchesJson.matches || []
-          const now = new Date()
-
-          for (const match of allMatches) {
-            const matchDate = new Date(match.utcTime || match.date || '')
-            const isPlayed = match.status === 'played' || match.status === 'finished'
-            const isKnockout = match.round?.toLowerCase().includes('final') || 
-                              match.round?.toLowerCase().includes('round of')
-
-            const matchObj: Match = {
-              id: String(match.id || ''),
-              homeTeam: match.home?.name || match.home_team || 'Home',
-              awayTeam: match.away?.name || match.away_team || 'Away',
-              homeScore: isPlayed ? (match.home?.score ?? match.home_goals) : undefined,
-              awayScore: isPlayed ? (match.away?.score ?? match.away_goals) : undefined,
-              date: matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-              time: matchDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-              round: match.round || match.stage,
-              venue: match.venue?.name,
-              status: isPlayed ? 'finished' : match.status === 'live' ? 'live' : 'upcoming',
-            }
-
-            if (isKnockout && isPlayed) {
-              newData.knockoutMatches.push(matchObj)
-            } else if (isPlayed) {
-              newData.recentResults.push(matchObj)
-            } else {
-              newData.upcomingMatches.push(matchObj)
-            }
+        // Process news from ESPN (tournament-specific)
+        if (espnResults[2].status === 'fulfilled') {
+          const newsRes = espnResults[2] as PromiseFulfilledResult<Response>
+          if (newsRes.value.ok) {
+            const newsData = await newsRes.value.json()
+            newData.news = (newsData.articles || []).slice(0, 8).map((n: any) => ({
+              headline: n.headline || '',
+              description: n.description || '',
+              link: n.links?.web?.href || '',
+              image: n.images?.[0]?.url || '',
+              published: n.published || '',
+            }))
           }
-
-          newData.recentResults = newData.recentResults.slice(0, 10)
-          newData.upcomingMatches = newData.upcomingMatches.slice(0, 10)
-          
-          // Build bracket rounds from knockout matches
-          const roundsMap: Record<string, BracketMatch[]> = {}
-          for (const match of newData.knockoutMatches) {
-            const round = match.round || 'Unknown'
-            if (!roundsMap[round]) {
-              roundsMap[round] = []
-            }
-            roundsMap[round].push({
-              id: match.id,
-              homeTeam: match.homeTeam,
-              awayTeam: match.awayTeam,
-              homeScore: match.homeScore,
-              awayScore: match.awayScore,
-              date: match.date,
-              time: match.time,
-              status: match.status as 'scheduled' | 'live' | 'finished',
-              round: round,
-              winner: match.homeScore !== undefined && match.awayScore !== undefined
-                ? match.homeScore > match.awayScore ? 'home' 
-                : match.awayScore > match.homeScore ? 'away' 
-                : null
-                : null,
-            })
-          }
-          
-          // Convert to bracket rounds array
-          const bracketData: BracketRound[] = Object.entries(roundsMap).map(([name, matches]) => ({
-            name,
-            matches,
-          }))
-          setBracketRounds(bracketData)
-        }
-
-        // Process news
-        if (newsRes.status === 'fulfilled' && newsRes.value.ok) {
-          const newsJson = await newsRes.value.json()
-          newData.news = (newsJson.news || []).slice(0, 8).map((n: any) => ({
-            headline: n.headline || n.title || '',
-            description: n.description || n.summary || '',
-            link: n.links?.web?.href || n.url || '',
-            image: n.images?.[0]?.url || '',
-            published: n.published || '',
-          }))
         }
 
         setData(newData)
@@ -245,7 +437,7 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
     }
 
     fetchData()
-  }, [config.leagueId])
+  }, [config.espnId])
   
   // Fetch simulation probabilities for the tournament
   useEffect(() => {
@@ -292,41 +484,94 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
               <th className="px-3 py-2 text-center">L</th>
               <th className="px-3 py-2 text-center">GD</th>
               <th className="px-3 py-2 text-center font-semibold">Pts</th>
+              <th className="px-3 py-2 text-center">Status</th>
             </tr>
           </thead>
           <tbody>
-            {group.standings.map((team) => (
-              <tr 
-                key={team.team}
-                className={`border-b hover:bg-[var(--muted-bg)] transition-colors ${
-                  team.position <= 2 ? 'bg-green-500/10' : team.position === 3 ? 'bg-orange-500/10' : ''
-                }`}
-                style={{ borderColor: 'var(--border-color)' }}
-              >
-                <td className="px-3 py-2 text-[var(--text-tertiary)]">{team.position}</td>
-                <td className="px-3 py-2 text-[var(--text-primary)] font-medium">
-                  {team.teamId ? (
-                    <Link href={`/teams/${team.teamId}`} className="hover:text-[var(--accent-primary)]">
-                      {team.team}
-                    </Link>
-                  ) : team.team}
-                </td>
-                <td className="px-3 py-2 text-center text-[var(--text-secondary)]">{team.played}</td>
-                <td className="px-3 py-2 text-center text-[var(--text-secondary)]">{team.won}</td>
-                <td className="px-3 py-2 text-center text-[var(--text-secondary)]">{team.drawn}</td>
-                <td className="px-3 py-2 text-center text-[var(--text-secondary)]">{team.lost}</td>
-                <td className="px-3 py-2 text-center text-[var(--text-secondary)]">
-                  {team.goalDifference > 0 ? '+' : ''}{team.goalDifference}
-                </td>
-                <td className="px-3 py-2 text-center font-semibold text-[var(--text-primary)]">{team.points}</td>
-              </tr>
-            ))}
+            {group.standings.map((team, teamIdx) => {
+              // Determine qualification status based on tournament type
+              // For UCL/UEL new league format (36 teams in single league):
+              // - Positions 1-8 = Direct to Round of 16
+              // - Positions 9-24 = R16 Playoff
+              // - Positions 25-36 = Eliminated
+              // Calculate overall position across all entries for the league table format
+              let overallPos = team.position
+              // If there are multiple groups, calculate overall position
+              if (data.groups.length > 1) {
+                const groupIdx = data.groups.findIndex(g => g.name === group.name)
+                const teamsPerGroup = group.standings.length
+                overallPos = groupIdx * teamsPerGroup + team.position
+              }
+              
+              let statusBadge = null
+              let bgClass = ''
+              
+              if (tournamentId === 'world_cup') {
+                // World Cup: Top 2 qualify, 3rd has possible qualification
+                if (team.position <= 2) {
+                  statusBadge = <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded whitespace-nowrap font-medium">Qualified</span>
+                  bgClass = 'bg-green-500/20 border-l-4 border-l-green-400'
+                } else if (team.position === 3) {
+                  statusBadge = <span className="text-xs bg-amber-600 text-white px-2 py-0.5 rounded whitespace-nowrap font-medium">Possible</span>
+                  bgClass = 'bg-amber-500/20 border-l-4 border-l-amber-400'
+                }
+              } else {
+                // Champions League / Europa League: New league format
+                // Top 8 overall = Direct R16, 9-24 = R16 Playoff, 25+ = Eliminated
+                if (overallPos <= 8) {
+                  statusBadge = <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded whitespace-nowrap font-medium">R16</span>
+                  bgClass = 'bg-green-500/20 border-l-4 border-l-green-400'
+                } else if (overallPos <= 24) {
+                  statusBadge = <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded whitespace-nowrap font-medium">R16 Playoff</span>
+                  bgClass = 'bg-blue-500/20 border-l-4 border-l-blue-400'
+                } else {
+                  statusBadge = <span className="text-xs bg-red-500/80 text-white px-2 py-0.5 rounded whitespace-nowrap font-medium">Eliminated</span>
+                  bgClass = 'bg-red-500/10 border-l-4 border-l-red-400'
+                }
+              }
+              
+              return (
+                <tr 
+                  key={team.team}
+                  className={`border-b hover:bg-[var(--muted-bg)] transition-colors ${bgClass}`}
+                  style={{ borderColor: 'var(--border-color)' }}
+                >
+                  <td className="px-3 py-2 text-[var(--text-tertiary)]">{team.position}</td>
+                  <td className="px-3 py-2 text-[var(--text-primary)] font-medium">
+                    {team.teamId ? (
+                      <Link href={`/teams/${team.teamId}`} className="hover:text-[var(--accent-primary)]">
+                        {team.team}
+                      </Link>
+                    ) : team.team}
+                  </td>
+                  <td className="px-3 py-2 text-center text-[var(--text-secondary)]">{team.played}</td>
+                  <td className="px-3 py-2 text-center text-[var(--text-secondary)]">{team.won}</td>
+                  <td className="px-3 py-2 text-center text-[var(--text-secondary)]">{team.drawn}</td>
+                  <td className="px-3 py-2 text-center text-[var(--text-secondary)]">{team.lost}</td>
+                  <td className="px-3 py-2 text-center text-[var(--text-secondary)]">
+                    {team.goalDifference > 0 ? '+' : ''}{team.goalDifference}
+                  </td>
+                  <td className="px-3 py-2 text-center font-semibold text-[var(--text-primary)]">{team.points}</td>
+                  <td className="px-3 py-2 text-center">{statusBadge}</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
-      <div className="px-4 py-2 text-xs text-[var(--text-tertiary)] border-t" style={{ borderColor: 'var(--border-color)' }}>
-        <span className="inline-block w-3 h-3 rounded-sm bg-green-500/30 mr-1"></span> Qualifies for knockout stage
-        <span className="inline-block w-3 h-3 rounded-sm bg-orange-500/30 mx-2"></span> Europa League
+      <div className="px-4 py-2 text-xs text-[var(--text-tertiary)] border-t flex flex-wrap gap-3" style={{ borderColor: 'var(--border-color)' }}>
+        {tournamentId === 'world_cup' ? (
+          <>
+            <span><span className="inline-block w-3 h-3 rounded-sm bg-green-400 mr-1"></span> Qualified for knockout</span>
+            <span><span className="inline-block w-3 h-3 rounded-sm bg-amber-400 mr-1"></span> Possible qualification</span>
+          </>
+        ) : (
+          <>
+            <span><span className="inline-block w-3 h-3 rounded-sm bg-green-400 mr-1"></span> Round of 16 (Top 8)</span>
+            <span><span className="inline-block w-3 h-3 rounded-sm bg-blue-400 mr-1"></span> R16 Playoff (9-24)</span>
+            <span><span className="inline-block w-3 h-3 rounded-sm bg-red-400 mr-1"></span> Eliminated (25+)</span>
+          </>
+        )}
       </div>
     </div>
   )
@@ -566,15 +811,81 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
       
       {/* Header */}
       <div className={`bg-gradient-to-r ${config.gradient} rounded-2xl p-8 mb-6`}>
-        <div className="flex items-center gap-4">
-          <span className="text-5xl">{config.emoji}</span>
-          <div>
-            <h1 className="text-3xl font-bold text-white">{tournamentName}</h1>
-            <p className="text-white/80">
-              {tournamentId === 'world_cup' ? 'International Tournament' : 'European Club Competition'}
-            </p>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-4">
+            {config.logo ? (
+              <img 
+                src={config.logo} 
+                alt={tournamentName}
+                className="w-16 h-16 object-contain bg-white rounded-xl p-1"
+              />
+            ) : (
+              <span className="text-5xl">{config.emoji}</span>
+            )}
+            <div>
+              <h1 className="text-3xl font-bold text-white">{tournamentName}</h1>
+              <p className="text-white/80">
+                {tournamentId === 'world_cup' ? 'International Tournament' : 'European Club Competition'} • {availableSeasons.find(s => s.value === selectedSeason)?.label || '2025-26'}
+              </p>
+            </div>
+          </div>
+          
+          {/* Season Selector & Simulation Button */}
+          <div className="flex items-center gap-3">
+            <select
+              value={selectedSeason}
+              onChange={(e) => setSelectedSeason(e.target.value)}
+              className="px-4 py-2 rounded-lg bg-white/20 text-white border border-white/30 backdrop-blur-sm cursor-pointer hover:bg-white/30 transition-colors"
+            >
+              {availableSeasons.map(season => (
+                <option key={season.value} value={season.value} className="text-gray-900">
+                  {season.label}
+                </option>
+              ))}
+            </select>
+            
+            <button
+              onClick={runTournamentSimulation}
+              disabled={runningSimulation || data.groups.length === 0}
+              className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-semibold transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              {runningSimulation ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Simulating...
+                </>
+              ) : (
+                <>
+                  🎲 Run Simulation
+                </>
+              )}
+            </button>
           </div>
         </div>
+        
+        {/* Simulation Results - Updated to show probability-based output */}
+        {simulationResults && (
+          <div className="mt-4 p-4 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <p className="text-amber-300 text-sm font-medium">🏆 Monte Carlo Simulation ({simulationResults.n_simulations.toLocaleString()} runs)</p>
+                <p className="text-white font-bold text-lg">{simulationResults.most_likely_winner} to win the tournament</p>
+                <p className="text-white/70 text-sm mt-1">
+                  Top contenders: {simulationResults.teams.slice(0, 3).map(t => `${t.team_name} (${(t.win_probability * 100).toFixed(1)}%)`).join(', ')}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-amber-400">
+                  {(simulationResults.winner_probability * 100).toFixed(1)}%
+                </p>
+                <p className="text-white/60 text-xs">win probability</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -622,32 +933,230 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
           {activeTab === 'Knockout' && renderKnockoutBracket()}
           
           {activeTab === 'Fixtures' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-[var(--card-bg)] rounded-xl border p-6" style={{ borderColor: 'var(--border-color)' }}>
-                <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Upcoming Fixtures</h2>
-                {data.upcomingMatches.length > 0 ? (
-                  <div className="space-y-3">
-                    {data.upcomingMatches.map(match => renderMatchCard(match))}
-                  </div>
-                ) : (
-                  <p className="text-[var(--text-tertiary)]">No upcoming fixtures</p>
-                )}
-              </div>
-              <div className="bg-[var(--card-bg)] rounded-xl border p-6" style={{ borderColor: 'var(--border-color)' }}>
-                <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Recent Results</h2>
-                {data.recentResults.length > 0 ? (
-                  <div className="space-y-3">
-                    {data.recentResults.map(match => renderMatchCard(match, true))}
-                  </div>
-                ) : (
-                  <p className="text-[var(--text-tertiary)]">No recent results</p>
-                )}
-              </div>
-            </div>
+            <MatchCalendar leagueId={config.espnId} leagueName={tournamentName} />
           )}
           
           {activeTab === 'Simulator' && (
-            <KnockoutSimulator tournament={config.knockoutType} />
+            <div className="space-y-6">
+              {/* Tournament Simulator - Same style as LeagueHomePage */}
+              <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-3xl border border-[var(--border-color)] p-6">
+                <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+                      <span>🎲</span>
+                      Tournament Simulation
+                    </h3>
+                    <p className="text-sm text-[var(--text-secondary)]">
+                      Monte Carlo simulation using team standings and knockout bracket predictions
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <select
+                      value={numSimulations}
+                      onChange={(e) => setNumSimulations(parseInt(e.target.value))}
+                      className="px-4 py-2 rounded-lg bg-[var(--background-secondary)] border border-[var(--border-color)] text-[var(--text-primary)]"
+                    >
+                      {SIMULATION_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={runTournamentSimulation}
+                      disabled={runningSimulation || data.groups.length === 0}
+                      className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r ${config.gradient} hover:opacity-90 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-300 shadow-lg flex items-center gap-2`}
+                    >
+                      {runningSimulation ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Simulating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🎲</span>
+                          <span>Run Simulation</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Teams available info */}
+                {data.groups.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-[var(--text-tertiary)]">Tournament data is loading...</p>
+                    <p className="text-sm text-[var(--text-tertiary)] mt-1">Simulation will be available once team data is loaded</p>
+                  </div>
+                )}
+
+                {data.groups.length > 0 && !simulationResults && (
+                  <div className="text-center py-8">
+                    <p className="text-[var(--text-secondary)]">Click "Run Simulation" to predict the tournament winner</p>
+                    <p className="text-sm text-[var(--text-tertiary)] mt-1">
+                      Based on {data.groups.flatMap(g => g.standings).length} teams from the group stage
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Simulation Results - Full probability table like LeagueHomePage */}
+              {simulationResults && (
+                <div className="space-y-6 animate-fade-in">
+                  {/* Summary Card */}
+                  <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-3xl border border-[var(--border-color)] overflow-hidden">
+                    <div className={`p-6 bg-gradient-to-r ${config.gradient}/20 border-b border-[var(--border-color)]`}>
+                      <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div>
+                          <h3 className="text-2xl font-bold text-[var(--text-primary)]">{simulationResults.tournament_name}</h3>
+                          <p className="text-[var(--text-secondary)]">
+                            {simulationResults.n_simulations.toLocaleString()} simulations completed
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-[var(--text-secondary)]">Most Likely Winner</p>
+                          <p className="text-xl font-bold text-amber-400">{simulationResults.most_likely_winner}</p>
+                          <p className="text-sm text-amber-400/80">{(simulationResults.winner_probability * 100).toFixed(1)}% probability</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Key Insights */}
+                    <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="p-4 rounded-xl bg-[var(--background-secondary)]">
+                        <p className="text-sm text-[var(--text-secondary)] mb-2">🏆 Title Contenders</p>
+                        <div className="space-y-1">
+                          {simulationResults.teams
+                            .filter(t => t.win_probability > 0.01)
+                            .slice(0, 4)
+                            .map((team) => (
+                              <div key={team.team_name} className="flex justify-between text-sm">
+                                <span className="text-[var(--text-primary)]">{team.team_name}</span>
+                                <span className="text-amber-400">{(team.win_probability * 100).toFixed(1)}%</span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-[var(--background-secondary)]">
+                        <p className="text-sm text-[var(--text-secondary)] mb-2">🥈 Finalists</p>
+                        <div className="space-y-1">
+                          {simulationResults.teams
+                            .sort((a, b) => b.final_probability - a.final_probability)
+                            .slice(0, 4)
+                            .map((team) => (
+                              <div key={team.team_name} className="flex justify-between text-sm">
+                                <span className="text-[var(--text-primary)]">{team.team_name}</span>
+                                <span className="text-blue-400">{(team.final_probability * 100).toFixed(0)}%</span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-[var(--background-secondary)]">
+                        <p className="text-sm text-[var(--text-secondary)] mb-2">🥉 Semi-Finalists</p>
+                        <div className="space-y-1">
+                          {simulationResults.teams
+                            .sort((a, b) => b.semi_final_probability - a.semi_final_probability)
+                            .slice(0, 4)
+                            .map((team) => (
+                              <div key={team.team_name} className="flex justify-between text-sm">
+                                <span className="text-[var(--text-primary)]">{team.team_name}</span>
+                                <span className="text-emerald-400">{(team.semi_final_probability * 100).toFixed(0)}%</span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Full Standings Table */}
+                  <div className="bg-[var(--card-bg)] backdrop-blur-xl rounded-3xl border border-[var(--border-color)] overflow-hidden">
+                    <div className="p-4 border-b border-[var(--border-color)] flex items-center justify-between">
+                      <h3 className="font-semibold text-[var(--text-primary)]">Team Probabilities</h3>
+                      <span className="text-sm text-[var(--text-secondary)]">
+                        📊 {simulationResults.teams.length} teams analyzed
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="text-xs text-[var(--text-tertiary)] border-b border-[var(--border-color)]">
+                            <th className="text-left py-3 px-4">Rank</th>
+                            <th className="text-left py-3 px-4">Team</th>
+                            <th className="text-center py-3 px-4">Current Pts</th>
+                            <th className="text-center py-3 px-4">Win %</th>
+                            <th className="text-center py-3 px-4">Final %</th>
+                            <th className="text-center py-3 px-4">Semi %</th>
+                            <th className="text-center py-3 px-4">Quarter %</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {simulationResults.teams.map((team, idx) => (
+                            <tr
+                              key={team.team_name}
+                              className={`border-b border-[var(--border-color)] hover:bg-[var(--background-secondary)] transition-colors ${
+                                idx < 1 ? 'border-l-2 border-l-amber-500' : 
+                                idx < 4 ? 'border-l-2 border-l-emerald-500' : ''
+                              }`}
+                            >
+                              <td className="py-3 px-4 text-[var(--text-secondary)]">{idx + 1}</td>
+                              <td className="py-3 px-4 text-[var(--text-primary)] font-medium">{team.team_name}</td>
+                              <td className="py-3 px-4 text-center text-[var(--text-secondary)]">{team.current_points}</td>
+                              <td className="py-3 px-4 text-center">
+                                {team.win_probability > 0.001 ? (
+                                  <span className="text-amber-400 font-semibold">{(team.win_probability * 100).toFixed(1)}%</span>
+                                ) : (
+                                  <span className="text-[var(--text-tertiary)]">-</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                {team.final_probability > 0.01 ? (
+                                  <span className="text-blue-400">{(team.final_probability * 100).toFixed(0)}%</span>
+                                ) : (
+                                  <span className="text-[var(--text-tertiary)]">-</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                {team.semi_final_probability > 0.01 ? (
+                                  <span className="text-emerald-400">{(team.semi_final_probability * 100).toFixed(0)}%</span>
+                                ) : (
+                                  <span className="text-[var(--text-tertiary)]">-</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                {team.quarter_final_probability > 0.01 ? (
+                                  <span className="text-purple-400">{(team.quarter_final_probability * 100).toFixed(0)}%</span>
+                                ) : (
+                                  <span className="text-[var(--text-tertiary)]">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Legend */}
+                    <div className="p-4 flex gap-6 text-xs text-[var(--text-tertiary)] border-t border-[var(--border-color)]">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-amber-500 rounded" />
+                        <span>Winner</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-emerald-500 rounded" />
+                        <span>Top Contenders</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Also show the advanced knockout simulator */}
+              <div className="border-t pt-6" style={{ borderColor: 'var(--border-color)' }}>
+                <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Advanced Knockout Simulator</h3>
+                <KnockoutSimulator tournament={config.knockoutType} />
+              </div>
+            </div>
           )}
           
           {activeTab === 'News' && (
@@ -661,14 +1170,16 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
                       href={item.link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block group bg-[var(--muted-bg)] rounded-xl overflow-hidden hover:shadow-lg transition-shadow"
+                      className="block group bg-[var(--muted-bg)] rounded-xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:border hover:border-[var(--accent-primary)]"
                     >
                       {item.image && (
-                        <img
-                          src={item.image}
-                          alt={item.headline}
-                          className="w-full h-40 object-cover"
-                        />
+                        <div className="overflow-hidden">
+                          <img
+                            src={item.image}
+                            alt={item.headline}
+                            className="w-full h-40 object-cover group-hover:scale-110 transition-transform duration-300"
+                          />
+                        </div>
                       )}
                       <div className="p-4">
                         <p className="font-medium text-[var(--text-primary)] group-hover:text-[var(--accent-primary)] line-clamp-2">
