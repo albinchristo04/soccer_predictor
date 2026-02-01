@@ -201,6 +201,7 @@ const MLS_CONFERENCES = {
     'Sporting Kansas City', 'Sporting KC', 'Kansas City',
     'FC Dallas', 'Dallas',
     'San Jose Earthquakes', 'San Jose',
+    'San Diego FC', 'San Diego', // 2025 expansion team
   ],
 }
 
@@ -862,6 +863,7 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
                               <th className="text-left py-3 px-3 font-medium">Team</th>
                               <th className="text-center py-3 px-2 font-medium">P</th>
                               <th className="text-center py-3 px-2 font-medium">Pts</th>
+                              <th className="text-center py-3 px-2 font-medium hidden sm:table-cell">Form</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -876,10 +878,30 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
                                   <td className="py-2.5 px-3 font-medium text-[var(--text-primary)]">{team.teamName}</td>
                                   <td className="py-2.5 px-2 text-center text-[var(--text-secondary)]">{team.played}</td>
                                   <td className="py-2.5 px-2 text-center font-bold text-[var(--text-primary)]">{team.points}</td>
+                                  <td className="py-2.5 px-2 text-center hidden sm:table-cell">
+                                    <div className="flex justify-center gap-0.5">
+                                      {team.form && team.form.length > 0 ? (
+                                        team.form.slice(-5).map((result, i) => (
+                                          <span
+                                            key={i}
+                                            className={`w-4 h-4 flex items-center justify-center text-[9px] font-bold rounded ${
+                                              result === 'W' ? 'bg-green-500 text-white' :
+                                              result === 'D' ? 'bg-gray-400 text-white' :
+                                              'bg-red-500 text-white'
+                                            }`}
+                                          >
+                                            {result}
+                                          </span>
+                                        ))
+                                      ) : (
+                                        <span className="text-[var(--text-tertiary)] text-xs">-</span>
+                                      )}
+                                    </div>
+                                  </td>
                                 </tr>
                               )
                             }) : (
-                              <tr><td colSpan={4} className="py-4 text-center text-[var(--text-tertiary)]">No teams found</td></tr>
+                              <tr><td colSpan={5} className="py-4 text-center text-[var(--text-tertiary)]">No teams found</td></tr>
                             )}
                           </tbody>
                         </table>
@@ -912,6 +934,7 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
                         <th className="text-center py-3 px-2 font-medium">L</th>
                         <th className="text-center py-3 px-2 font-medium">GD</th>
                         <th className="text-center py-3 px-4 font-medium">Pts</th>
+                        <th className="text-center py-3 px-2 font-medium hidden sm:table-cell">Form</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -938,6 +961,26 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
                               {team.goalDiff > 0 ? `+${team.goalDiff}` : team.goalDiff}
                             </td>
                             <td className="py-3 px-4 text-center font-bold text-[var(--text-primary)]">{team.points}</td>
+                            <td className="py-3 px-2 text-center hidden sm:table-cell">
+                              <div className="flex justify-center gap-0.5">
+                                {team.form && team.form.length > 0 ? (
+                                  team.form.slice(-5).map((result, i) => (
+                                    <span
+                                      key={i}
+                                      className={`w-5 h-5 flex items-center justify-center text-[10px] font-bold rounded ${
+                                        result === 'W' ? 'bg-green-500 text-white' :
+                                        result === 'D' ? 'bg-gray-400 text-white' :
+                                        'bg-red-500 text-white'
+                                      }`}
+                                    >
+                                      {result}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-[var(--text-tertiary)] text-xs">-</span>
+                                )}
+                              </div>
+                            </td>
                           </tr>
                         )
                       })}
