@@ -49,6 +49,15 @@ interface KnockoutBracketProps {
   onMatchClick?: (match: KnockoutMatch) => void
 }
 
+// SVG connector line position constants for bracket visualization
+const BRACKET_CONNECTOR = {
+  TOP_MATCH: '25%',    // Position of top match connector
+  CENTER: '50%',       // Center position for vertical line
+  BOTTOM_MATCH: '75%', // Position of bottom match connector
+  END: '100%',         // End position for horizontal lines
+  START: '0',          // Start position for horizontal lines
+}
+
 const TOURNAMENT_CONFIG = {
   champions_league: {
     name: 'UEFA Champions League',
@@ -397,13 +406,13 @@ export default function KnockoutBracket({
                             className="text-[var(--border-color)]"
                           >
                             {/* Horizontal line from top match */}
-                            <line x1="0" y1="25%" x2="50%" y2="25%" stroke="currentColor" strokeWidth="2" />
+                            <line x1={BRACKET_CONNECTOR.START} y1={BRACKET_CONNECTOR.TOP_MATCH} x2={BRACKET_CONNECTOR.CENTER} y2={BRACKET_CONNECTOR.TOP_MATCH} stroke="currentColor" strokeWidth="2" />
                             {/* Horizontal line from bottom match */}
-                            <line x1="0" y1="75%" x2="50%" y2="75%" stroke="currentColor" strokeWidth="2" />
+                            <line x1={BRACKET_CONNECTOR.START} y1={BRACKET_CONNECTOR.BOTTOM_MATCH} x2={BRACKET_CONNECTOR.CENTER} y2={BRACKET_CONNECTOR.BOTTOM_MATCH} stroke="currentColor" strokeWidth="2" />
                             {/* Vertical connector */}
-                            <line x1="50%" y1="25%" x2="50%" y2="75%" stroke="currentColor" strokeWidth="2" />
+                            <line x1={BRACKET_CONNECTOR.CENTER} y1={BRACKET_CONNECTOR.TOP_MATCH} x2={BRACKET_CONNECTOR.CENTER} y2={BRACKET_CONNECTOR.BOTTOM_MATCH} stroke="currentColor" strokeWidth="2" />
                             {/* Line to next round */}
-                            <line x1="50%" y1="50%" x2="100%" y2="50%" stroke="currentColor" strokeWidth="2" />
+                            <line x1={BRACKET_CONNECTOR.CENTER} y1={BRACKET_CONNECTOR.CENTER} x2={BRACKET_CONNECTOR.END} y2={BRACKET_CONNECTOR.CENTER} stroke="currentColor" strokeWidth="2" />
                           </svg>
                         </div>
                       ))}
