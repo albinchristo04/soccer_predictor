@@ -148,6 +148,9 @@ const LEAGUE_CONFIGS: Record<string, { color: string; gradient: string; flag: st
 // Simulation count options (like in Predict tab)
 const SIMULATION_OPTIONS = [1000, 5000, 10000, 25000, 50000]
 
+// Table column counts for colSpan calculations
+const MLS_CONFERENCE_TABLE_COLUMNS = 5  // #, Team, P, Pts, Form
+
 // League ID to numeric ID mapping (shared across component)
 const LEAGUE_NUMERIC_ID_MAP: Record<string, number> = {
   'eng.1': 47, 'premier_league': 47,
@@ -901,7 +904,7 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
                                 </tr>
                               )
                             }) : (
-                              <tr><td colSpan={5} className="py-4 text-center text-[var(--text-tertiary)]">No teams found</td></tr>
+                              <tr><td colSpan={MLS_CONFERENCE_TABLE_COLUMNS} className="py-4 text-center text-[var(--text-tertiary)]">No teams found</td></tr>
                             )}
                           </tbody>
                         </table>
