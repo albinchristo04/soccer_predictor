@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import MatchCalendar from '@/components/match/MatchCalendar'
+import { getESPNDateRange } from '@/lib/api'
 
 interface Standing {
   position: number
@@ -354,17 +355,12 @@ export default function LeagueHomePage({ leagueId, leagueName, country }: League
         // Also fetch from ESPN for real-time data including top scorers
         const espnLeagueId = getEspnLeagueId()
         
-        // Calculate date ranges for fetching matches
-        // Get today and next 14 days for upcoming fixtures
-        const today = new Date()
-        const futureDate = new Date()
-        futureDate.setDate(futureDate.getDate() + 14)
-        const todayStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
-        const futureDateStr = `${futureDate.getFullYear()}${String(futureDate.getMonth() + 1).padStart(2, '0')}${String(futureDate.getDate()).padStart(2, '0')}`
+        // Get date range for fetching matches (next 14 days)
+        const { dateRange } = getESPNDateRange(14)
 
         const espnResults = await Promise.allSettled([
           fetch(`https://site.api.espn.com/apis/v2/sports/soccer/${espnLeagueId}/standings`),
-          fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnLeagueId}/scoreboard?dates=${todayStr}-${futureDateStr}`),
+          fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnLeagueId}/scoreboard?dates=${dateRange}`),
           fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnLeagueId}/leaders`),
         ])
 

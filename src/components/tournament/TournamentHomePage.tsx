@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
 import { KnockoutSimulator, KnockoutBracket, type BracketRound, type KnockoutMatch as BracketMatch } from '@/components/knockout'
 import MatchCalendar from '@/components/match/MatchCalendar'
+import { getESPNDateRange } from '@/lib/api'
 
 interface TournamentHomePageProps {
   tournamentId: 'champions_league' | 'europa_league' | 'world_cup'
@@ -286,17 +287,13 @@ export default function TournamentHomePage({ tournamentId, tournamentName }: Tou
         // Fetch from ESPN APIs for real tournament data
         const espnLeagueId = config.espnId
         
-        // Calculate date ranges for fetching matches (next 14 days)
-        const today = new Date()
-        const futureDate = new Date()
-        futureDate.setDate(futureDate.getDate() + 14)
-        const todayStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
-        const futureDateStr = `${futureDate.getFullYear()}${String(futureDate.getMonth() + 1).padStart(2, '0')}${String(futureDate.getDate()).padStart(2, '0')}`
+        // Get date range for fetching matches (next 14 days)
+        const { dateRange } = getESPNDateRange(14)
         
         // Fetch standings (groups), matches, and news in parallel from ESPN
         const espnResults = await Promise.allSettled([
           fetch(`https://site.api.espn.com/apis/v2/sports/soccer/${espnLeagueId}/standings`),
-          fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnLeagueId}/scoreboard?dates=${todayStr}-${futureDateStr}`),
+          fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnLeagueId}/scoreboard?dates=${dateRange}`),
           fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnLeagueId}/news`),
         ])
 
