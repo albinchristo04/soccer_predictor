@@ -4,7 +4,6 @@ import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { PageLoader } from '@/components/PageLoader'
 import { ThemeProvider } from '@/providers/ThemeProvider'
-import { AuthProvider } from '@/contexts/AuthContext'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -28,14 +27,14 @@ export const metadata: Metadata = {
   themeColor: '#4F46E5',
 }
 
-// Script to prevent flash of wrong theme - default to dark like Fotmob
+// Script to prevent flash of wrong theme - default to light mode
 const themeScript = `
   (function() {
     const stored = localStorage.getItem('theme');
-    if (stored === 'light') {
-      document.documentElement.classList.remove('dark');
-    } else {
+    if (stored === 'dark') {
       document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
     }
   })();
 `;
@@ -52,18 +51,16 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-[var(--background)] text-[var(--text-primary)] font-sans antialiased">
         <ThemeProvider>
-          <AuthProvider>
-            <Suspense fallback={null}>
-              <PageLoader />
-            </Suspense>
-            <div className="flex flex-col min-h-screen">
-              <Navbar />
-              <main className="flex-grow">
-                {children}
-              </main>
-              <Footer />
-            </div>
-          </AuthProvider>
+          <Suspense fallback={null}>
+            <PageLoader />
+          </Suspense>
+          <div className="flex flex-col min-h-screen">
+            <Navbar />
+            <main className="flex-grow">
+              {children}
+            </main>
+            <Footer />
+          </div>
         </ThemeProvider>
       </body>
     </html>

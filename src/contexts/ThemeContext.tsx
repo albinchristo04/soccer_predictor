@@ -24,11 +24,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         setTheme(savedTheme)
         document.documentElement.classList.toggle('dark', savedTheme === 'dark')
       } else {
-        // Check system preference
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-        const initialTheme = prefersDark ? 'dark' : 'light'
-        setTheme(initialTheme)
-        document.documentElement.classList.toggle('dark', initialTheme === 'dark')
+        // Default to light theme instead of checking system preference
+        setTheme('light')
+        document.documentElement.classList.remove('dark')
       }
     }
   }, [])
