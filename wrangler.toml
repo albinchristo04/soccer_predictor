@@ -1,0 +1,14 @@
+name = "tarjeta-roja-soccer-predictor"
+main = ".output/server/index.mjs"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[build]
+command = "next build"
+
+[vars]
+NEXT_PUBLIC_API_URL = "https://tarjetarojaenvivo.live"
+NEXT_PUBLIC_BACKEND_URL = ""
+
+[triggers]
+crons = []
