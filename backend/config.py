@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     ELO_K_FACTOR: float = 32.0
     
     # CORS settings
-    CORS_ORIGINS: list = ["http://localhost:3000", "https://*.vercel.app"]
+    CORS_ORIGINS: list = ["http://localhost:3000", "https://*.vercel.app", "https://tarjetarojaenvivo.live"]
     
     class Config:
         env_file = ".env"

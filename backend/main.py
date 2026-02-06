@@ -15,6 +15,7 @@ Features:
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from datetime import datetime
@@ -82,6 +83,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "https://*.vercel.app",
+        "https://tarjetarojaenvivo.live",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -90,6 +92,14 @@ app.add_middleware(
 
 # Include API v1 router with enhanced endpoints
 app.include_router(v1_router)
+
+# Add middleware for Cross-Origin-Opener-Policy
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
+    response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
+    return response
 
 
 # ==================== ROOT ENDPOINTS ====================
