@@ -47,6 +47,6 @@ export default function TrackingPage() {
 }
 
 export const metadata = {
-  title: 'Prediction Tracking | Soccer Predictor',
+  title: 'Prediction Tracking | Tarjeta Roja En Vivo',
   description: 'Track prediction accuracy and model performance over time',
 }

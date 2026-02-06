@@ -1,6 +1,6 @@
 # 📚 Documentation
 
-This directory contains all project documentation for the Soccer Match Predictor application.
+This directory contains all project documentation for the Tarjeta Roja En Vivo application.
 
 ## 📖 Contents
 

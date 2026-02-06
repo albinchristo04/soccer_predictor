@@ -14,7 +14,7 @@ export const Footer = () => {
                 <span className="text-xl">⚽</span>
               </div>
               <span className="text-lg font-bold text-[var(--text-primary)]">
-                Soccer Predictor
+                Tarjeta Roja En Vivo
               </span>
             </div>
             <p className="text-sm text-[var(--text-secondary)]">

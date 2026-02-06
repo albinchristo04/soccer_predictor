@@ -1,4 +1,4 @@
-# Soccer Predictor - Build Completion Summary
+# Tarjeta Roja En Vivo - Build Completion Summary
 
 ## ✅ Completed Tasks
 
@@ -158,7 +158,7 @@ The app is now installable on Chrome and other browsers that support PWA:
 1. **Desktop Chrome:**
    - Visit the website
    - Look for the install icon in the address bar
-   - Click "Install Soccer Predictor"
+   - Click "Install Tarjeta Roja En Vivo"
    
 2. **Mobile Chrome:**
    - Visit the website

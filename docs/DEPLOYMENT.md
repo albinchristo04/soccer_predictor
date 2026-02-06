@@ -1,6 +1,6 @@
 # Vercel Deployment Guide
 
-This guide will help you deploy the Soccer Stats Predictor to Vercel for production hosting.
+This guide will help you deploy the Tarjeta Roja En Vivo to Vercel for production hosting.
 
 ## Prerequisites
 
@@ -164,7 +164,7 @@ df = pd.read_csv(blob.open('rb'))
 ## Custom Domain
 
 1. Go to Vercel Dashboard → Settings → Domains
-2. Add your custom domain (e.g., `soccerpredictor.com`)
+2. Add your custom domain (e.g., `tarjetarojaenvivo.live`)
 3. Follow DNS configuration instructions
 4. Update `NEXT_PUBLIC_BACKEND_URL` environment variable
 

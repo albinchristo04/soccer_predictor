@@ -44,7 +44,7 @@ export const Navbar = () => {
                 <span className="text-xl">⚽</span>
               </div>
               <span className="text-lg font-bold text-[var(--text-primary)] hidden sm:block">
-                Soccer Predictor
+                Tarjeta Roja En Vivo
               </span>
             </Link>
 

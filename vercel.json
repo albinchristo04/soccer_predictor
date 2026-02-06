@@ -5,7 +5,7 @@
   "framework": "nextjs",
   "build": {
     "env": {
-      "NEXT_PUBLIC_API_URL": "https://soccer-stats-predictor-sigma.vercel.app",
+      "NEXT_PUBLIC_API_URL": "https://tarjetarojaenvivo.live",
       "NEXT_PUBLIC_BACKEND_URL": ""
     }
   }
