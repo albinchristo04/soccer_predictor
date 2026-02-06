@@ -61,30 +61,13 @@ export const Footer = () => {
             </div>
           </div>
 
-          {/* Data Source */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wider">
-              Data Source
-            </h3>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Powered by{' '}
-              <a 
-                href="https://fbref.com/en/" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="text-[var(--accent-primary)] hover:underline font-medium"
-              >
-                FBRef
-              </a>
-            </p>
-          </div>
         </div>
 
         {/* Bottom Bar */}
         <div className="mt-8 pt-6 border-t border-[var(--border-color)]">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-xs text-[var(--text-tertiary)]">
-              &copy; {new Date().getFullYear()} Ron Oshri Altshuler. All Rights Reserved.
+              &copy; 2026 Tarjeta Roja Soccer Predictor. All Rights Reserved.
             </p>
             <p className="text-xs text-[var(--text-tertiary)] text-center">
               ⚠️ For educational and entertainment purposes only. Soccer outcomes are inherently unpredictable.
