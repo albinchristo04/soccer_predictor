@@ -1,4 +1,4 @@
-# ⚽ Tarjeta Roja En Vivo
+# ⚽ Tarjeta Roja Soccer Predictor
 
 A modern soccer match prediction and live scores application powered by FotMob and ESPN data. Features real-time match updates, AI-powered predictions, comprehensive league standings, user authentication, and league standings simulation.
 

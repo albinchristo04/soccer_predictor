@@ -1,8 +1,8 @@
-# Soccer Predictor v2.0 - FotMob-Level Architecture
+# Tarjeta Roja En Vivo - FotMob-Level Architecture
 
 ## Overview
 
-This document outlines the complete restructuring of the Soccer Predictor app to achieve FotMob-level functionality with enhanced ML predictions, real-time data, and professional UX.
+This document outlines the complete restructuring of the Tarjeta Roja En Vivo app to achieve FotMob-level functionality with enhanced ML predictions, real-time data, and professional UX.
 
 ## New Project Structure
 

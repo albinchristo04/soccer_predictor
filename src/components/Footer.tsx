@@ -14,7 +14,7 @@ export const Footer = () => {
                 <span className="text-xl">⚽</span>
               </div>
               <span className="text-lg font-bold text-[var(--text-primary)]">
-                Tarjeta Roja En Vivo
+                Tarjeta Roja Soccer Predictor
               </span>
             </div>
             <p className="text-sm text-[var(--text-secondary)]">
@@ -39,6 +39,24 @@ export const Footer = () => {
               </Link>
               <Link href="/about" className="text-sm text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors">
                 About
+              </Link>
+            </div>
+          </div>
+
+          {/* Legal */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wider">
+              Legal
+            </h3>
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              <Link href="/privacy-policy" className="text-sm text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors">
+                Privacy Policy
+              </Link>
+              <Link href="/terms-of-service" className="text-sm text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors">
+                Terms of Service
+              </Link>
+              <Link href="/contact" className="text-sm text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors">
+                Contact
               </Link>
             </div>
           </div>

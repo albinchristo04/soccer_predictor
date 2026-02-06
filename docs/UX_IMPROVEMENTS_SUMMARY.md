@@ -1,6 +1,6 @@
 # UX & Infrastructure Improvements Summary
 
-This document summarizes all the improvements made to enhance user experience, code quality, and deployment infrastructure for the Soccer Stats Predictor.
+This document summarizes all the improvements made to enhance user experience, code quality, and deployment infrastructure for the Tarjeta Roja En Vivo.
 
 ## 🎨 User Experience Improvements
 
@@ -239,7 +239,7 @@ pre-commit install
 **Recommended architecture:**
 
 ```
-AWS S3 Bucket (soccer-predictor-data)
+AWS S3 Bucket (tarjeta-roja-en-vivo-data)
 ├── models/               # Trained .pkl files
 ├── data/                 # Processed CSV files
 └── visualizations/       # PNG charts (public CDN)
@@ -282,7 +282,7 @@ GitHub Repo (<50MB)
 
 ```bash
 # Daily at 3 AM during season
-0 3 * * * cd ~/soccer_predictor && ./.venv/bin/python scripts/auto_update.py
+0 3 * * * cd ~/tarjeta-roja-en-vivo && ./.venv/bin/python scripts/auto_update.py
 ```
 
 **Files modified:**

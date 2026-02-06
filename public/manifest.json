@@ -1,6 +1,6 @@
 {
-  "name": "Tarjeta Roja En Vivo",
-  "short_name": "Tarjeta Roja En Vivo",
+  "name": "Tarjeta Roja Soccer Predictor",
+  "short_name": "Tarjeta Roja Soccer Predictor",
   "description": "AI-powered soccer match prediction and analysis with real-time data from ESPN and FotMob",
   "start_url": "/",
   "display": "standalone",

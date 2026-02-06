@@ -1,4 +1,4 @@
-# Soccer Predictor - Recent Updates Summary
+# Tarjeta Roja En Vivo - Recent Updates Summary
 
 ## Date: Current Session
 
@@ -17,7 +17,7 @@
 **Command to Run**:
 
 ```bash
-cd /home/roaltshu/code/soccer_predictor
+cd /home/roaltshu/code/tarjeta-roja-en-vivo
 ./scripts/retrain_all.sh
 ```
 
@@ -201,7 +201,7 @@ Once the training script completes:
 1. **Restart Backend**:
 
    ```bash
-   cd /home/roaltshu/code/soccer_predictor
+   cd /home/roaltshu/code/tarjeta-roja-en-vivo
    ./.venv/bin/uvicorn backend.main:app --reload --port 8000
    ```
 

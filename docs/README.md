@@ -1,6 +1,6 @@
 # 📚 Documentation
 
-This directory contains all project documentation for the Tarjeta Roja En Vivo application.
+This directory contains all project documentation for the Tarjeta Roja Soccer Predictor application.
 
 ## 📖 Contents
 

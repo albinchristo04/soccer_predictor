@@ -13,7 +13,7 @@ Your models were previously trained with scikit-learn 1.6.1, but your environmen
 ### 1. Navigate to Scripts Directory
 
 ```bash
-cd /home/roaltshu/code/soccer_predictor/scripts
+cd /home/roaltshu/code/tarjeta-roja-en-vivo/scripts
 ```
 
 ### 2. Run the Training Script
@@ -40,7 +40,7 @@ The script will:
 ### 5. Restart the Development Server
 
 ```bash
-cd /home/roaltshu/code/soccer_predictor
+cd /home/roaltshu/code/tarjeta-roja-en-vivo
 npm run dev
 ```
 
@@ -150,7 +150,7 @@ Make some predictions. You should see:
 Make sure you're using the virtual environment:
 
 ```bash
-cd /home/roaltshu/code/soccer_predictor
+cd /home/roaltshu/code/tarjeta-roja-en-vivo
 source .venv/bin/activate  # or .venv/Scripts/activate on Windows
 cd scripts
 python train_league_models.py
@@ -207,7 +207,7 @@ This guide assumes the following files have been updated:
 
 ## After Retraining
 
-Your soccer predictor will have:
+Your tarjeta roja en vivo will have:
 
 - ✅ No sklearn version warnings
 - ✅ Reduced draw prediction bias

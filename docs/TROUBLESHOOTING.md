@@ -1,4 +1,4 @@
-# To do list of improvements and new features for Soccer Predictor:
+# To do list of improvements and new features for Tarjeta Roja En Vivo:
 
 ## ✅ COMPLETED - Upcoming Matches Feature
 
@@ -111,7 +111,7 @@
 
 ```bash
 # Step 1: Navigate to scripts directory
-cd /home/roaltshu/code/soccer_predictor/scripts
+cd /home/roaltshu/code/tarjeta-roja-en-vivo/scripts
 
 # Step 2: Run training script
 python train_league_models.py

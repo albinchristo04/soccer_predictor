@@ -1,6 +1,6 @@
 # Auto-Update Scheduling Guide
 
-This guide explains how to set up automatic data updates for the Soccer Predictor to keep models fresh with new match data.
+This guide explains how to set up automatic data updates for the Tarjeta Roja En Vivo to keep models fresh with new match data.
 
 ## Overview
 
@@ -30,13 +30,13 @@ crontab -e
 
 ```cron
 # Run daily at 3 AM
-0 3 * * * cd /home/roaltshu/code/soccer_predictor && ./.venv/bin/python scripts/auto_update.py >> logs/cron.log 2>&1
+0 3 * * * cd /home/roaltshu/code/tarjeta-roja-en-vivo && ./.venv/bin/python scripts/auto_update.py >> logs/cron.log 2>&1
 
 # Run twice weekly (Tuesday & Saturday at 2 AM)
-0 2 * * 2,6 cd /home/roaltshu/code/soccer_predictor && ./.venv/bin/python scripts/auto_update.py >> logs/cron.log 2>&1
+0 2 * * 2,6 cd /home/roaltshu/code/tarjeta-roja-en-vivo && ./.venv/bin/python scripts/auto_update.py >> logs/cron.log 2>&1
 
 # Run weekly on Monday at 1 AM
-0 1 * * 1 cd /home/roaltshu/code/soccer_predictor && ./.venv/bin/python scripts/auto_update.py >> logs/cron.log 2>&1
+0 1 * * 1 cd /home/roaltshu/code/tarjeta-roja-en-vivo && ./.venv/bin/python scripts/auto_update.py >> logs/cron.log 2>&1
 ```
 
 3. **Verify cron is running:**
@@ -52,9 +52,9 @@ tail -f logs/cron.log  # Watch logs in real-time
 2. Create Basic Task
 3. **Trigger**: Daily/Weekly at preferred time
 4. **Action**: Start a program
-   - Program: `C:\path\to\soccer_predictor\.venv\Scripts\python.exe`
+   - Program: `C:\path\to\tarjeta-roja-en-vivo\.venv\Scripts\python.exe`
    - Arguments: `scripts\auto_update.py`
-   - Start in: `C:\path\to\soccer_predictor`
+   - Start in: `C:\path\to\tarjeta-roja-en-vivo`
 
 ### Option 3: GitHub Actions (Cloud-based)
 
@@ -97,7 +97,7 @@ jobs:
 
       - name: Upload models to S3 (if using cloud storage)
         run: |
-          aws s3 sync fbref_data s3://soccer-predictor-data/fbref_data \
+          aws s3 sync fbref_data s3://tarjeta-roja-en-vivo-data/fbref_data \
             --exclude "*.csv" --include "*/models/*"
 
       - name: Commit updated data
@@ -142,7 +142,7 @@ For serverless automatic updates:
 - **Time**: 3-4 AM local time (after matches complete)
 
 ```cron
-0 3 * * * cd ~/soccer_predictor && ./.venv/bin/python scripts/auto_update.py
+0 3 * * * cd ~/tarjeta-roja-en-vivo && ./.venv/bin/python scripts/auto_update.py
 ```
 
 ### Off-Season (Jun-Jul):
@@ -150,7 +150,7 @@ For serverless automatic updates:
 - **Weekly updates**: Less frequent, conserves resources
 
 ```cron
-0 2 * * 1 cd ~/soccer_predictor && ./.venv/bin/python scripts/auto_update.py
+0 2 * * 1 cd ~/tarjeta-roja-en-vivo && ./.venv/bin/python scripts/auto_update.py
 ```
 
 ## Configuration
@@ -168,7 +168,7 @@ LEAGUES_TO_UPDATE=all  # Or specific: premier_league,la_liga
 # Cloud storage (if using S3)
 AWS_ACCESS_KEY_ID=your_key
 AWS_SECRET_ACCESS_KEY=your_secret
-AWS_S3_BUCKET=soccer-predictor-data
+AWS_S3_BUCKET=tarjeta-roja-en-vivo-data
 
 # Notifications (optional)
 SLACK_WEBHOOK_URL=https://hooks.slack.com/...
@@ -256,7 +256,7 @@ def send_discord_notification(message: str):
 **Solution**: Redirect output to log file
 
 ```cron
-0 3 * * * cd ~/soccer_predictor && ./.venv/bin/python scripts/auto_update.py >> logs/cron.log 2>&1
+0 3 * * * cd ~/tarjeta-roja-en-vivo && ./.venv/bin/python scripts/auto_update.py >> logs/cron.log 2>&1
 ```
 
 ### Issue: "Module not found" in cron
@@ -264,7 +264,7 @@ def send_discord_notification(message: str):
 **Solution**: Use full path to Python and script
 
 ```cron
-0 3 * * * /home/user/soccer_predictor/.venv/bin/python /home/user/soccer_predictor/scripts/auto_update.py
+0 3 * * * /home/user/tarjeta-roja-en-vivo/.venv/bin/python /home/user/tarjeta-roja-en-vivo/scripts/auto_update.py
 ```
 
 ### Issue: Scraping gets blocked

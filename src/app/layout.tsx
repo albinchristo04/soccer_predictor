@@ -8,13 +8,13 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Tarjeta Roja En Vivo',
+  title: 'Tarjeta Roja Soccer Predictor',
   description: 'AI-powered soccer match prediction and analysis with real-time data from ESPN and FotMob',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Tarjeta Roja En Vivo',
+    title: 'Tarjeta Roja Soccer Predictor',
   },
   icons: {
     icon: '/soccer-ball.png',
